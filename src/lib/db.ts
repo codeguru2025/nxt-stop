@@ -11,7 +11,7 @@ function createPrismaClient() {
     connectionString: process.env.DATABASE_URL!,
     max: 10,
     idleTimeoutMillis: 20000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 30000,
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
   })
