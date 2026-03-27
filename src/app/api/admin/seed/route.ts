@@ -5,11 +5,15 @@ import crypto from 'crypto'
 import { generateQRDataURL } from '@/lib/qr'
 import { slugify } from '@/lib/utils'
 
-// POST /api/admin/seed — seeds demo data (dev only)
-export async function POST() {
-  if (process.env.NODE_ENV === 'production') {
-    return Response.json({ error: 'Not allowed in production' }, { status: 403 })
-  }
+// POST /api/admin/seed — seeds initial data
+// Requires ?secret=SEED_SECRET or header x-seed-secret matching the SEED_SECRET env var
+export async function POST(req: Request) {
+  const secret = process.env.SEED_SECRET
+  if (!secret) return Response.json({ error: 'SEED_SECRET env var not set' }, { status: 500 })
+
+  const url = new URL(req.url)
+  const provided = url.searchParams.get('secret') ?? req.headers.get('x-seed-secret')
+  if (provided !== secret) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
     const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@nxtstop.com'
