@@ -1,5 +1,11 @@
 import Link from 'next/link'
-import { Music, Radio, Globe, ExternalLink } from 'lucide-react'
+import { Facebook, Instagram, Youtube, Mail, Phone } from 'lucide-react'
+
+const SOCIALS = [
+  { icon: Facebook,  href: 'https://www.facebook.com/share/18TBJBkjzL/?mibextid=wwXIfr', label: 'Facebook' },
+  { icon: Instagram, href: 'https://www.instagram.com/nxtstop_zw?igsh=OWI5OHBoY3J2OTZt', label: 'Instagram' },
+  { icon: Youtube,   href: 'https://youtube.com/@nxtstopsessions?si=Aba1DlP7Fn551Fv5', label: 'YouTube' },
+]
 
 export default function Footer() {
   return (
@@ -17,17 +23,29 @@ export default function Footer() {
             <p className="text-gray-500 text-sm leading-relaxed max-w-xs">
               The premium event technology platform powering Zimbabwe's best nightlife experiences.
             </p>
-            <div className="flex gap-4 mt-6">
-              {[
-                { icon: Music, href: '#' },
-                { icon: Radio, href: '#' },
-                { icon: Globe, href: '#' },
-                { icon: ExternalLink, href: '#' },
-              ].map(({ icon: Icon, href }) => (
-                <a key={href} href={href} className="w-9 h-9 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-gray-500 hover:text-purple-400 hover:border-purple-500/30 transition-all">
+            <div className="flex gap-3 mt-6">
+              {SOCIALS.map(({ icon: Icon, href, label }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="w-9 h-9 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-gray-500 hover:text-purple-400 hover:border-purple-500/30 transition-all"
+                >
                   <Icon size={16} />
                 </a>
               ))}
+            </div>
+            <div className="flex flex-col gap-2 mt-5">
+              <a href="mailto:nxtstop25@gmail.com" className="flex items-center gap-2 text-gray-500 hover:text-purple-400 text-sm transition-colors">
+                <Mail size={14} />
+                nxtstop25@gmail.com
+              </a>
+              <a href="tel:+263773316635" className="flex items-center gap-2 text-gray-500 hover:text-purple-400 text-sm transition-colors">
+                <Phone size={14} />
+                +263 773 316 635
+              </a>
             </div>
           </div>
 
