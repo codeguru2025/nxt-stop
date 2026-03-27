@@ -74,38 +74,38 @@ export async function POST() {
       })
     }
 
-    // Event
-    const eventSlug = slugify('NXT STOP Harare Edition') + '-2025'
+    // Event — Dlala Thukzin @ ZITF Pavilion, Bulawayo
+    const eventSlug = 'nxt-stop-bulawayo-dlala-thukzin-2026'
     const event = await prisma.event.upsert({
       where: { slug: eventSlug },
       update: {},
       create: {
-        name: 'NXT STOP: Harare Edition',
+        name: 'NXT STOP: Dlala Thukzin Live',
         slug: eventSlug,
-        description: 'The biggest nightlife event in Harare. Premium sound, world-class DJs, and an unforgettable atmosphere.',
-        venue: 'Glamis Arena',
-        address: '7 Grimble Road, Harare',
-        date: new Date('2025-12-31T20:00:00'),
-        endDate: new Date('2026-01-01T06:00:00'),
+        description: 'NXT STOP brings the heat to Bulawayo. Dlala Thukzin takes the stage at the iconic ZITF Pavilion — one night, one vibe, zero compromises. MC Mzoe7 holds it down on the mic.',
+        venue: 'ZITF Pavilion',
+        address: 'Centenary Park, Bulawayo',
+        date: new Date('2026-08-29T20:00:00'),
+        endDate: new Date('2026-08-30T04:00:00'),
         status: 'published',
-        lineup: JSON.stringify(['DJ Nova', 'DJ Maphorisa', 'Cassper Nyovest', 'Winky D']),
-        hasVirtual: true,
-        virtualPrice: 5,
+        posterImage: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/DLALA%20THUKZIN.jpeg',
+        lineup: JSON.stringify(['Dlala Thukzin', 'Big Q', 'Corrason', 'Yugo']),
+        hasVirtual: false,
         platformFee: 0.10,
         ticketTypes: {
           create: [
-            { name: 'Early Bird', price: 10, capacity: 200, color: '#10B981' },
-            { name: 'General', price: 15, capacity: 1000, color: '#8B5CF6' },
-            { name: 'VIP', price: 30, capacity: 150, color: '#F59E0B' },
-            { name: 'VVIP Table', price: 100, capacity: 20, color: '#EF4444', description: 'Includes private table, bottle service, and dedicated waitstaff.' },
+            { name: 'Early Bird', price: 10, capacity: 300, color: '#10B981' },
+            { name: 'General', price: 15, capacity: 2000, color: '#8B5CF6' },
+            { name: 'VIP', price: 35, capacity: 200, color: '#F59E0B' },
+            { name: 'VVIP Table', price: 120, capacity: 30, color: '#EF4444', description: 'Private table, bottle service, and dedicated waitstaff.' },
           ],
         },
         products: {
           create: [
-            { name: 'Heineken', category: 'drink', price: 3, stock: 500, lowStockAt: 50 },
-            { name: 'Jack Daniel\'s Shot', category: 'drink', price: 5, stock: 200, lowStockAt: 20 },
-            { name: 'Water 500ml', category: 'drink', price: 1, stock: 300, lowStockAt: 30 },
-            { name: 'NXT STOP T-Shirt', category: 'merchandise', price: 15, stock: 100, lowStockAt: 10 },
+            { name: 'Lager', category: 'drink', price: 3, stock: 1000, lowStockAt: 100 },
+            { name: 'Spirits Shot', category: 'drink', price: 5, stock: 500, lowStockAt: 50 },
+            { name: 'Water 500ml', category: 'drink', price: 1, stock: 500, lowStockAt: 50 },
+            { name: 'NXT STOP T-Shirt', category: 'merchandise', price: 15, stock: 150, lowStockAt: 15 },
           ],
         },
       },

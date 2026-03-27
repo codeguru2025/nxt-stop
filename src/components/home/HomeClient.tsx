@@ -199,6 +199,89 @@ export default function HomeClient() {
         </div>
       </section>
 
+      {/* Next Event Spotlight */}
+      <section className="py-20 border-t border-[#1a1a1a] bg-gradient-to-b from-[#0a0a0a] to-[#0f0a1a]">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-1.5 mb-8">
+            <div className="w-2 h-2 rounded-full bg-green-400 pulse-glow" />
+            <span className="text-purple-300 text-sm font-medium">Next Event — 29 August 2026</span>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-10 items-center">
+            {/* Images */}
+            <div className="relative">
+              {/* Main artist */}
+              <div className="rounded-2xl overflow-hidden aspect-[3/4] max-w-sm">
+                <img
+                  src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/DLALA%20THUKZIN.jpeg"
+                  alt="Dlala Thukzin"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent rounded-2xl" />
+                <div className="absolute bottom-4 left-4">
+                  <p className="text-white/60 text-xs uppercase tracking-widest mb-1">Headline Act</p>
+                  <p className="text-white font-black text-2xl">Dlala Thukzin</p>
+                </div>
+              </div>
+              {/* MC badge */}
+              <div className="absolute -bottom-4 -right-4 lg:right-8 flex items-center gap-3 bg-[#1a1a1a] border border-purple-500/30 rounded-2xl p-3 shadow-xl">
+                <img
+                  src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Mzoe7.jpeg"
+                  alt="Mzoe7"
+                  className="w-14 h-14 rounded-xl object-cover"
+                />
+                <div>
+                  <p className="text-purple-400 text-xs font-medium uppercase tracking-wider">MC</p>
+                  <p className="text-white font-black text-lg leading-tight">Mzoe7</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Details */}
+            <div className="lg:pl-6 pt-8 lg:pt-0">
+              <h2 className="text-4xl sm:text-5xl font-black text-white leading-none mb-2">
+                NXT STOP
+              </h2>
+              <h3 className="text-2xl sm:text-3xl font-black gradient-text mb-6">
+                Dlala Thukzin Live
+              </h3>
+
+              <div className="space-y-3 mb-8">
+                {[
+                  { icon: '📍', label: 'Venue', value: 'ZITF Pavilion, Bulawayo' },
+                  { icon: '📅', label: 'Date', value: 'Friday, 29 August 2026' },
+                  { icon: '🕗', label: 'Doors', value: '8:00 PM — 4:00 AM' },
+                ].map(d => (
+                  <div key={d.label} className="flex items-center gap-3">
+                    <span className="text-xl">{d.icon}</span>
+                    <div>
+                      <span className="text-gray-500 text-xs uppercase tracking-wider">{d.label}</span>
+                      <p className="text-white font-semibold">{d.value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-8">
+                {['Dlala Thukzin', 'Big Q', 'Corrason', 'Yugo'].map(a => (
+                  <span key={a} className="bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm font-medium px-3 py-1 rounded-full">
+                    {a}
+                  </span>
+                ))}
+              </div>
+
+              <a
+                href="/events/nxt-stop-bulawayo-dlala-thukzin-2026"
+                className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl px-8 py-4 font-bold text-lg transition-all hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5"
+              >
+                Get Tickets
+                <ArrowRight size={20} />
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features */}
       <section className="py-20 border-t border-[#1a1a1a]">
         <div className="max-w-7xl mx-auto px-4">
