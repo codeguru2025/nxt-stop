@@ -109,9 +109,6 @@ export default function Footer() {
           <p className="text-gray-600 text-sm">
             © {new Date().getFullYear()} NXT STOP. All rights reserved.
           </p>
-          <p className="text-gray-700 text-xs">
-            Powered by the NXT STOP Event Engine
-          </p>
         </div>
       </div>
     </footer>

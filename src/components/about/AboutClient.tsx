@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 
 type Founder = {
   id: string; name: string; role?: string; bio?: string
@@ -35,7 +36,7 @@ export default function AboutClient() {
             <span className="gradient-text">Live The Culture</span>
           </h1>
           <p className="text-gray-400 text-lg leading-relaxed max-w-2xl mx-auto">
-            NXT STOP was built by event lovers, for event lovers. We combined deep knowledge of Zimbabwe's nightlife scene with world-class technology to create the platform this culture deserved.
+            NXT STOP was born out of a love for Zimbabwe's nightlife. We exist to bring the best artists, the best nights, and the best energy — and make sure you never miss a moment.
           </p>
         </div>
       </section>
@@ -50,16 +51,6 @@ export default function AboutClient() {
           <div className="grid sm:grid-cols-3 gap-8">
             {[
               {
-                name: 'Big Q',
-                role: 'Resident DJ',
-                image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q.jpeg',
-                gallery: [
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%203.jpeg',
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%206.jpeg',
-                ],
-              },
-              {
                 name: 'Corrason',
                 role: 'Resident DJ',
                 image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason.jpeg',
@@ -67,6 +58,16 @@ export default function AboutClient() {
                   'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%202.jpeg',
                   'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%203.jpeg',
                   'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%205.jpeg',
+                ],
+              },
+              {
+                name: 'Big Q',
+                role: 'Resident DJ',
+                image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q.jpeg',
+                gallery: [
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%203.jpeg',
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%206.jpeg',
                 ],
               },
               {
@@ -82,10 +83,12 @@ export default function AboutClient() {
             ].map(dj => (
               <div key={dj.name} className="group">
                 <div className="relative overflow-hidden rounded-2xl mb-4 aspect-[3/4]">
-                  <img
+                  <Image
                     src={dj.image}
                     alt={dj.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    sizes="(max-width: 640px) 100vw, 33vw"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                   <div className="absolute bottom-4 left-4">
@@ -95,8 +98,14 @@ export default function AboutClient() {
                 </div>
                 <div className="grid grid-cols-3 gap-1.5">
                   {dj.gallery.map((img, i) => (
-                    <div key={i} className="aspect-square rounded-lg overflow-hidden">
-                      <img src={img} alt={`${dj.name} ${i + 2}`} className="w-full h-full object-cover hover:scale-110 transition-transform duration-300" />
+                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
+                      <Image
+                        src={img}
+                        alt={`${dj.name} ${i + 2}`}
+                        fill
+                        className="object-cover hover:scale-110 transition-transform duration-300"
+                        sizes="(max-width: 640px) 33vw, 11vw"
+                      />
                     </div>
                   ))}
                 </div>
@@ -112,14 +121,16 @@ export default function AboutClient() {
           <div className="max-w-5xl mx-auto px-4">
             <div className="text-center mb-14">
               <h2 className="text-3xl font-black text-white mb-2">The Team</h2>
-              <p className="text-gray-500">The people building NXT STOP</p>
+              <p className="text-gray-500">The people behind NXT STOP</p>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {founders.map(f => (
                 <div key={f.id} className="card p-6 text-center hover:border-[#3a3a3a] hover:-translate-y-1 transition-all group">
                   <div className="mb-5">
                     {f.image ? (
-                      <img src={f.image} alt={f.name} className="w-24 h-24 rounded-2xl object-cover border-2 border-purple-500/20 mx-auto group-hover:border-purple-500/50 transition-all" />
+                      <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-purple-500/20 mx-auto group-hover:border-purple-500/50 transition-all">
+                        <Image src={f.image} alt={f.name} fill className="object-cover" sizes="96px" />
+                      </div>
                     ) : (
                       <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center mx-auto">
                         <span className="text-white font-black text-4xl">{f.name[0]}</span>
@@ -141,9 +152,9 @@ export default function AboutClient() {
         <div className="max-w-4xl mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { title: 'The Mission', desc: "To elevate Zimbabwe's event industry with technology that delivers security, scale, and premium experiences for every attendee." },
-              { title: 'The Vision', desc: 'To become the infrastructure layer for premium nightlife events across Southern Africa — starting in Harare, scaling everywhere.' },
-              { title: 'The Standard', desc: "Every feature built on this platform is held to one standard: would this feel world-class? If not, it doesn't ship." },
+              { title: 'The Mission', desc: "To bring Zimbabwe's best artists and crowds together — and make every night an experience worth remembering." },
+              { title: 'The Vision', desc: "From Harare to Bulawayo and beyond. NXT STOP is the home of premium nightlife in Southern Africa." },
+              { title: 'The Standard', desc: "Every event we host is held to one standard: does it hit? If not, it doesn't happen." },
             ].map(s => (
               <div key={s.title} className="stat-card">
                 <h3 className="font-bold text-white mb-2">{s.title}</h3>

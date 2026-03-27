@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Calendar, MapPin, Users, Zap, Shield, Star, ArrowRight, Play, Clock } from 'lucide-react'
+import Image from 'next/image'
+import { Calendar, MapPin, ArrowRight, Play } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 type Event = {
@@ -73,10 +74,12 @@ export default function HomeClient() {
       <section className="relative min-h-screen flex items-center overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
-          <img
+          <Image
             src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/BigQ%20on%20deck.jpeg"
             alt=""
-            className="w-full h-full object-cover object-center"
+            fill
+            priority
+            className="object-cover object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-purple-900/50" />
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px]" />
@@ -88,7 +91,7 @@ export default function HomeClient() {
             <div>
               <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-1.5 mb-6">
                 <div className="w-2 h-2 rounded-full bg-purple-400 pulse-glow" />
-                <span className="text-purple-300 text-sm font-medium">Zimbabwe's Premium Event Platform</span>
+                <span className="text-purple-300 text-sm font-medium">Harare · Bulawayo · Southern Africa</span>
               </div>
 
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black leading-none mb-6">
@@ -100,7 +103,7 @@ export default function HomeClient() {
               </h1>
 
               <p className="text-gray-400 text-lg leading-relaxed mb-8 max-w-md">
-                Secure tickets. Real-time entry. Exclusive rewards. Experience premium nightlife like never before.
+                Zimbabwe's hottest nights. The artists. The energy. The culture. This is where it happens.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3">
@@ -141,14 +144,21 @@ export default function HomeClient() {
             {featured && (
               <div className="relative">
                 <div className="relative bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border border-purple-500/20 overflow-hidden glow-purple">
-                  {/* Event image placeholder */}
-                  <div className="h-48 bg-gradient-to-br from-purple-900/50 to-pink-900/30 flex items-center justify-center">
+                  <div className="relative h-48 bg-gradient-to-br from-purple-900/50 to-pink-900/30">
                     {featured.posterImage ? (
-                      <img src={featured.posterImage} alt={featured.name} className="w-full h-full object-cover" />
+                      <Image
+                        src={featured.posterImage}
+                        alt={featured.name}
+                        fill
+                        priority
+                        className="object-cover"
+                      />
                     ) : (
-                      <div className="text-center">
-                        <div className="text-6xl mb-2">🎵</div>
-                        <div className="text-purple-400 font-semibold">NEXT EVENT</div>
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="text-6xl mb-2">🎵</div>
+                          <div className="text-purple-400 font-semibold">NEXT EVENT</div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -208,37 +218,44 @@ export default function HomeClient() {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-10 items-center">
-            {/* Images */}
+            {/* Artists */}
             <div className="relative">
-              {/* Main artist */}
-              <div className="rounded-2xl overflow-hidden aspect-[3/4] max-w-sm">
-                <img
-                  src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/DLALA%20THUKZIN.jpeg"
-                  alt="Dlala Thukzin"
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent rounded-2xl" />
-                <div className="absolute bottom-4 left-4">
-                  <p className="text-white/60 text-xs uppercase tracking-widest mb-1">Headline Act</p>
-                  <p className="text-white font-black text-2xl">Dlala Thukzin</p>
+              <div className="grid grid-cols-5 gap-3 items-end">
+                {/* Dlala Thukzin — headline */}
+                <div className="col-span-3 relative rounded-2xl overflow-hidden aspect-[3/4]">
+                  <Image
+                    src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/DLALA%20THUKZIN.jpeg"
+                    alt="Dlala Thukzin"
+                    fill
+                    priority
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                  <div className="absolute bottom-4 left-4">
+                    <p className="text-white/60 text-xs uppercase tracking-widest mb-1">Headline Act</p>
+                    <p className="text-white font-black text-xl leading-tight">Dlala Thukzin</p>
+                  </div>
                 </div>
-              </div>
-              {/* MC badge */}
-              <div className="absolute -bottom-4 -right-4 lg:right-8 flex items-center gap-3 bg-[#1a1a1a] border border-purple-500/30 rounded-2xl p-3 shadow-xl">
-                <img
-                  src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Mzoe7.jpeg"
-                  alt="Mzoe7"
-                  className="w-14 h-14 rounded-xl object-cover"
-                />
-                <div>
-                  <p className="text-purple-400 text-xs font-medium uppercase tracking-wider">MC</p>
-                  <p className="text-white font-black text-lg leading-tight">Mzoe7</p>
+                {/* Mzoe7 — MC */}
+                <div className="col-span-2 relative rounded-2xl overflow-hidden aspect-[3/4]">
+                  <Image
+                    src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Mzoe7.jpeg"
+                    alt="Mzoe7"
+                    fill
+                    priority
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                  <div className="absolute bottom-4 left-3">
+                    <p className="text-purple-400 text-xs font-medium uppercase tracking-wider mb-1">MC</p>
+                    <p className="text-white font-black text-lg leading-tight">Mzoe7</p>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Details */}
-            <div className="lg:pl-6 pt-8 lg:pt-0">
+            <div className="lg:pl-6 pt-4 lg:pt-0">
               <h2 className="text-4xl sm:text-5xl font-black text-white leading-none mb-2">
                 NXT STOP
               </h2>
@@ -263,7 +280,7 @@ export default function HomeClient() {
               </div>
 
               <div className="flex flex-wrap gap-2 mb-8">
-                {['Dlala Thukzin', 'Big Q', 'Corrason', 'Yugo'].map(a => (
+                {['Corrason', 'Dlala Thukzin', 'Big Q', 'Yugo'].map(a => (
                   <span key={a} className="bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm font-medium px-3 py-1 rounded-full">
                     {a}
                   </span>
@@ -278,75 +295,6 @@ export default function HomeClient() {
                 <ArrowRight size={20} />
               </a>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="py-20 border-t border-[#1a1a1a]">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl font-black text-white mb-3">
-              A Platform Built Different
-            </h2>
-            <p className="text-gray-500 max-w-lg mx-auto">
-              From secure ticketing to real-time event ops — everything you need, nothing you don't.
-            </p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              {
-                icon: Shield,
-                color: 'text-purple-400',
-                bg: 'bg-purple-500/10',
-                title: 'Anti-Fraud Tickets',
-                desc: 'Every ticket gets a unique QR code. One scan, one entry. No duplicates. No fakes.',
-              },
-              {
-                icon: Zap,
-                color: 'text-yellow-400',
-                bg: 'bg-yellow-500/10',
-                title: 'Instant Gate Scan',
-                desc: 'Scan results in milliseconds. Real-time validation with full audit trail.',
-              },
-              {
-                icon: Star,
-                color: 'text-green-400',
-                bg: 'bg-green-500/10',
-                title: 'Referral Rewards',
-                desc: 'Share your link, earn points. Redeem for drinks, upgrades, and free entry.',
-              },
-              {
-                icon: Users,
-                color: 'text-pink-400',
-                bg: 'bg-pink-500/10',
-                title: 'Partner Network',
-                desc: 'DJs, influencers, and pharmacies sell your tickets and earn commissions automatically.',
-              },
-              {
-                icon: Clock,
-                color: 'text-blue-400',
-                bg: 'bg-blue-500/10',
-                title: 'Virtual Attendance',
-                desc: "Can't make it? Stream the event live with paid virtual access.",
-              },
-              {
-                icon: Calendar,
-                color: 'text-orange-400',
-                bg: 'bg-orange-500/10',
-                title: 'Live Event Store',
-                desc: 'Drinks, merch, and products sold in real-time with live stock tracking.',
-              },
-            ].map(f => (
-              <div key={f.title} className="stat-card hover:border-[#3a3a3a] transition-colors group">
-                <div className={`w-10 h-10 rounded-xl ${f.bg} flex items-center justify-center mb-4`}>
-                  <f.icon size={20} className={f.color} />
-                </div>
-                <h3 className="font-bold text-white mb-2">{f.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -401,24 +349,29 @@ export default function HomeClient() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {[
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%202.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%203.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%202.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%203.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%202.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%206.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%203.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%205.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%207.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%205.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%204.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%208.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/BigQ%20on%20deck.jpeg',
             ].map((url, i) => (
-              <div key={i} className={`overflow-hidden rounded-xl bg-[#1a1a1a] ${i === 0 || i === 7 ? 'col-span-2 row-span-2' : ''}`}>
-                <img
+              <div
+                key={i}
+                className={`relative overflow-hidden rounded-xl bg-[#1a1a1a] aspect-square ${i === 0 || i === 7 ? 'col-span-2 row-span-2' : ''}`}
+              >
+                <Image
                   src={url}
                   alt={`NXT STOP ${i + 1}`}
-                  className="w-full h-full object-cover aspect-square hover:scale-105 transition-transform duration-500"
+                  fill
+                  className="object-cover hover:scale-105 transition-transform duration-500"
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 />
               </div>
             ))}
@@ -437,10 +390,10 @@ export default function HomeClient() {
             <div className="relative">
               <div className="text-5xl mb-4">💸</div>
               <h2 className="text-3xl font-black text-white mb-4">
-                Turn Your Network Into <span className="gradient-text">Rewards</span>
+                Bring the Crew, Get <span className="gradient-text">Rewarded</span>
               </h2>
               <p className="text-gray-400 max-w-lg mx-auto mb-8">
-                Share your unique referral link. Every ticket your friends buy earns you points — redeemable for drinks, upgrades, and free entry.
+                Share your link with friends. When they come through, you earn — drinks, upgrades, free entry. It's that simple.
               </p>
               <Link
                 href="/register"
@@ -466,7 +419,13 @@ function EventCard({ event }: { event: Event }) {
       {/* Image */}
       <div className="relative h-48 bg-gradient-to-br from-[#1a1a2e] to-[#16213e] overflow-hidden">
         {event.posterImage ? (
-          <img src={event.posterImage} alt={event.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <Image
+            src={event.posterImage}
+            alt={event.name}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <div className="text-5xl">🎵</div>

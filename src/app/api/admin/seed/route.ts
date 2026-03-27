@@ -12,15 +12,20 @@ export async function POST() {
   }
 
   try {
-    const hash = await bcrypt.hash('admin123', 12)
+    const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@nxtstop.com'
+    const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin123'
+    const gateEmail = process.env.GATE_EMAIL ?? 'gate@nxtstop.com'
+    const gatePassword = process.env.GATE_PASSWORD ?? 'gate123'
+
+    const hash = await bcrypt.hash(adminPassword, 12)
 
     // Admin user
     const admin = await prisma.user.upsert({
-      where: { email: 'admin@nxtstop.com' },
+      where: { email: adminEmail },
       update: {},
       create: {
         name: 'NXT STOP Admin',
-        email: 'admin@nxtstop.com',
+        email: adminEmail,
         passwordHash: hash,
         role: 'admin',
       },
@@ -28,12 +33,12 @@ export async function POST() {
 
     // Gate staff
     await prisma.user.upsert({
-      where: { email: 'gate@nxtstop.com' },
+      where: { email: gateEmail },
       update: {},
       create: {
         name: 'Gate Staff',
-        email: 'gate@nxtstop.com',
-        passwordHash: await bcrypt.hash('gate123', 12),
+        email: gateEmail,
+        passwordHash: await bcrypt.hash(gatePassword, 12),
         role: 'gate_staff',
       },
     })
@@ -139,8 +144,8 @@ export async function POST() {
     return ok({
       message: 'Seed complete',
       credentials: {
-        admin: { email: 'admin@nxtstop.com', password: 'admin123' },
-        gate: { email: 'gate@nxtstop.com', password: 'gate123' },
+        admin: { email: adminEmail, password: adminPassword },
+        gate: { email: gateEmail, password: gatePassword },
         partner: { email: 'dj.fire@nxtstop.com', password: 'dj123' },
       },
     })
