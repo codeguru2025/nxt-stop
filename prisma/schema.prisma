@@ -1,0 +1,346 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── USERS ───────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  phone         String?
+  name          String
+  passwordHash  String
+  role          String   @default("customer") // customer | partner | gate_staff | admin
+  avatar        String?
+  referralCode  String   @unique @default(cuid())
+  points        Int      @default(0)
+  totalEarned   Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tickets           Ticket[]
+  orders            Order[]
+  referralsMade     Referral[]   @relation("ReferralSource")
+  referralsReceived Referral[]   @relation("ReferralTarget")
+  partnerProfile    Partner?
+  socialPosts       SocialPost[]
+  redemptions       Redemption[]
+  sessions          Session[]
+  scanLogs          ScanLog[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── FOUNDERS ────────────────────────────────────────────────────────────────
+
+model Founder {
+  id        String   @id @default(cuid())
+  name      String
+  role      String?
+  bio       String?
+  image     String?
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── EVENTS ──────────────────────────────────────────────────────────────────
+
+model Event {
+  id               String    @id @default(cuid())
+  name             String
+  slug             String    @unique
+  description      String?
+  venue            String
+  address          String?
+  date             DateTime
+  endDate          DateTime?
+  status           String    @default("draft") // draft | published | live | ended | cancelled
+  posterImage      String?
+  bannerImage      String?
+  videoUrl         String?
+  lineup           String?
+  hasVirtual       Boolean   @default(false)
+  virtualPrice     Float     @default(0)
+  virtualStreamUrl String?
+  virtualActive    Boolean   @default(false)
+  platformFee      Float     @default(0.10)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  ticketTypes TicketType[]
+  tickets     Ticket[]
+  partners    EventPartner[]
+  products    Product[]
+  socialPosts SocialPost[]
+  scanLogs    ScanLog[]
+  media       EventMedia[]
+}
+
+model EventMedia {
+  id        String   @id @default(cuid())
+  eventId   String
+  type      String   // image | video
+  url       String
+  caption   String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+// ─── TICKET TYPES ────────────────────────────────────────────────────────────
+
+model TicketType {
+  id          String   @id @default(cuid())
+  eventId     String
+  name        String
+  description String?
+  price       Float
+  capacity    Int
+  sold        Int      @default(0)
+  active      Boolean  @default(true)
+  color       String   @default("#8B5CF6")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tickets Ticket[]
+}
+
+// ─── TICKETS ─────────────────────────────────────────────────────────────────
+
+model Ticket {
+  id           String    @id @default(cuid())
+  ticketNumber String    @unique
+  qrCode       String    @unique
+  userId       String
+  eventId      String
+  ticketTypeId String
+  orderId      String
+  status       String    @default("valid") // valid | used | cancelled | refunded
+  usedAt       DateTime?
+  partnerId    String?
+  referralCode String?
+  createdAt    DateTime  @default(now())
+
+  user       User       @relation(fields: [userId], references: [id])
+  event      Event      @relation(fields: [eventId], references: [id])
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id])
+  order      Order      @relation(fields: [orderId], references: [id])
+  partner    Partner?   @relation(fields: [partnerId], references: [id])
+  scanLogs   ScanLog[]
+}
+
+model ScanLog {
+  id        String   @id @default(cuid())
+  ticketId  String
+  eventId   String
+  scannedBy String?
+  result    String   // valid | already_used | invalid
+  deviceId  String?
+  createdAt DateTime @default(now())
+
+  ticket  Ticket @relation(fields: [ticketId], references: [id])
+  event   Event  @relation(fields: [eventId], references: [id])
+  scanner User?  @relation(fields: [scannedBy], references: [id])
+}
+
+// ─── ORDERS & PAYMENTS ───────────────────────────────────────────────────────
+
+model Order {
+  id            String    @id @default(cuid())
+  orderNumber   String    @unique
+  userId        String
+  subtotal      Float
+  platformFees  Float     @default(0)
+  total         Float
+  status        String    @default("pending") // pending | paid | failed | refunded
+  paymentMethod String?
+  paymentRef    String?
+  paidAt        DateTime?
+  partnerId     String?
+  referralCode  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user    User        @relation(fields: [userId], references: [id])
+  tickets Ticket[]
+  items   OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String?
+  name      String
+  price     Float
+  quantity  Int     @default(1)
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+}
+
+// ─── PARTNERS & AFFILIATES ───────────────────────────────────────────────────
+
+model Partner {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  type           String   // dj | influencer | pharmacy | promoter | venue | other
+  businessName   String?
+  referralCode   String   @unique
+  qrCode         String?
+  commissionRate Float    @default(10)
+  totalSales     Int      @default(0)
+  totalEarned    Float    @default(0)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user        User           @relation(fields: [userId], references: [id])
+  eventLinks  EventPartner[]
+  tickets     Ticket[]
+  referrals   Referral[]
+  commissions Commission[]
+}
+
+model EventPartner {
+  id               String   @id @default(cuid())
+  eventId          String
+  partnerId        String
+  customCommission Float?
+  ticketsAllocated Int?
+  ticketsSold      Int      @default(0)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  partner Partner @relation(fields: [partnerId], references: [id])
+
+  @@unique([eventId, partnerId])
+}
+
+model Commission {
+  id        String    @id @default(cuid())
+  partnerId String
+  orderId   String?
+  amount    Float
+  status    String    @default("pending") // pending | paid | cancelled
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  partner Partner @relation(fields: [partnerId], references: [id])
+}
+
+// ─── REFERRALS ───────────────────────────────────────────────────────────────
+
+model Referral {
+  id            String   @id @default(cuid())
+  sourceUserId  String
+  targetUserId  String
+  partnerId     String?
+  orderId       String?
+  pointsAwarded Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  source  User     @relation("ReferralSource", fields: [sourceUserId], references: [id])
+  target  User     @relation("ReferralTarget", fields: [targetUserId], references: [id])
+  partner Partner? @relation(fields: [partnerId], references: [id])
+}
+
+// ─── REWARDS ─────────────────────────────────────────────────────────────────
+
+model Reward {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  type        String   // free_drink | discounted_ticket | free_entry | bring_friend | vip_upgrade | merchandise
+  pointsCost  Int
+  stock       Int?
+  active      Boolean  @default(true)
+  image       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  redemptions Redemption[]
+}
+
+model Redemption {
+  id        String   @id @default(cuid())
+  userId    String
+  rewardId  String
+  points    Int
+  status    String   @default("pending") // pending | approved | used | rejected
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  reward Reward @relation(fields: [rewardId], references: [id])
+}
+
+model PointsConfig {
+  id              String   @id @default(cuid())
+  pointsPerSale   Int      @default(10)
+  bonusMultiplier Float    @default(1.0)
+  active          Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── PRODUCTS / STORE ────────────────────────────────────────────────────────
+
+model Product {
+  id          String   @id @default(cuid())
+  eventId     String
+  name        String
+  description String?
+  price       Float
+  stock       Int
+  sold        Int      @default(0)
+  category    String   @default("drink") // drink | food | merchandise | other
+  image       String?
+  active      Boolean  @default(true)
+  lowStockAt  Int      @default(10)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+}
+
+// ─── SOCIAL FEED ─────────────────────────────────────────────────────────────
+
+model SocialPost {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  type      String   // photo | video
+  url       String
+  caption   String?
+  status    String   @default("pending") // pending | approved | rejected
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+}
+
+// ─── SETTINGS ────────────────────────────────────────────────────────────────
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
