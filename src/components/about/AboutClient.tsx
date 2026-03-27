@@ -40,60 +40,101 @@ export default function AboutClient() {
         </div>
       </section>
 
-      {/* Founders */}
+      {/* Featured DJs */}
       <section className="py-16 border-t border-[#1a1a1a]">
         <div className="max-w-5xl mx-auto px-4">
           <div className="text-center mb-14">
-            <h2 className="text-3xl font-black text-white mb-2">The Founders</h2>
-            <p className="text-gray-500">The minds who built NXT STOP from the ground up</p>
+            <h2 className="text-3xl font-black text-white mb-2">The DJs</h2>
+            <p className="text-gray-500">The talent behind the NXT STOP sound</p>
           </div>
-
-          {loading ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(2)].map((_, i) => (
-                <div key={i} className="card p-6">
-                  <div className="skeleton w-24 h-24 rounded-2xl mx-auto mb-4" />
-                  <div className="skeleton h-5 rounded mb-2 w-2/3 mx-auto" />
-                  <div className="skeleton h-4 rounded w-1/2 mx-auto" />
+          <div className="grid sm:grid-cols-3 gap-8">
+            {[
+              {
+                name: 'Big Q',
+                role: 'Resident DJ',
+                image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q.jpeg',
+                gallery: [
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%203.jpeg',
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%206.jpeg',
+                ],
+              },
+              {
+                name: 'Corrason',
+                role: 'Resident DJ',
+                image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason.jpeg',
+                gallery: [
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%202.jpeg',
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%203.jpeg',
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%205.jpeg',
+                ],
+              },
+              {
+                name: 'Yugo',
+                role: 'Resident DJ',
+                image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo.jpeg',
+                gallery: [
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%202.jpeg',
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%204.jpeg',
+                ],
+              },
+            ].map(dj => (
+              <div key={dj.name} className="group">
+                <div className="relative overflow-hidden rounded-2xl mb-4 aspect-[3/4]">
+                  <img
+                    src={dj.image}
+                    alt={dj.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                  <div className="absolute bottom-4 left-4">
+                    <h3 className="text-2xl font-black text-white">{dj.name}</h3>
+                    <p className="text-purple-400 text-sm font-medium">{dj.role}</p>
+                  </div>
                 </div>
-              ))}
+                <div className="grid grid-cols-3 gap-1.5">
+                  {dj.gallery.map((img, i) => (
+                    <div key={i} className="aspect-square rounded-lg overflow-hidden">
+                      <img src={img} alt={`${dj.name} ${i + 2}`} className="w-full h-full object-cover hover:scale-110 transition-transform duration-300" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Founders — managed via admin */}
+      {founders.length > 0 && (
+        <section className="py-16 border-t border-[#1a1a1a]">
+          <div className="max-w-5xl mx-auto px-4">
+            <div className="text-center mb-14">
+              <h2 className="text-3xl font-black text-white mb-2">The Team</h2>
+              <p className="text-gray-500">The people building NXT STOP</p>
             </div>
-          ) : founders.length === 0 ? (
-            <div className="text-center py-10">
-              <p className="text-gray-600">Founder profiles coming soon.</p>
-            </div>
-          ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {founders.map(f => (
                 <div key={f.id} className="card p-6 text-center hover:border-[#3a3a3a] hover:-translate-y-1 transition-all group">
-                  {/* Photo */}
                   <div className="mb-5">
                     {f.image ? (
-                      <img
-                        src={f.image}
-                        alt={f.name}
-                        className="w-24 h-24 rounded-2xl object-cover border-2 border-purple-500/20 mx-auto group-hover:border-purple-500/50 transition-all"
-                      />
+                      <img src={f.image} alt={f.name} className="w-24 h-24 rounded-2xl object-cover border-2 border-purple-500/20 mx-auto group-hover:border-purple-500/50 transition-all" />
                     ) : (
                       <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center mx-auto">
                         <span className="text-white font-black text-4xl">{f.name[0]}</span>
                       </div>
                     )}
                   </div>
-
                   <h3 className="text-xl font-black text-white mb-1">{f.name}</h3>
-                  {f.role && (
-                    <p className="text-purple-400 text-sm font-medium mb-3">{f.role}</p>
-                  )}
-                  {f.bio && (
-                    <p className="text-gray-500 text-sm leading-relaxed">{f.bio}</p>
-                  )}
+                  {f.role && <p className="text-purple-400 text-sm font-medium mb-3">{f.role}</p>}
+                  {f.bio && <p className="text-gray-500 text-sm leading-relaxed">{f.bio}</p>}
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       {/* Mission */}
       <section className="py-16 border-t border-[#1a1a1a]">

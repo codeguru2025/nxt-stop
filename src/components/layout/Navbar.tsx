@@ -50,12 +50,11 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center">
-              <span className="text-white font-black text-sm">N</span>
-            </div>
-            <span className="font-black text-xl tracking-tight text-white">
-              NXT <span className="text-purple-500">STOP</span>
-            </span>
+            <img
+              src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo.jpeg"
+              alt="NXT STOP"
+              className="h-9 w-auto object-contain"
+            />
           </Link>
 
           {/* Desktop nav */}

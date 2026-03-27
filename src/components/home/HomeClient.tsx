@@ -73,14 +73,14 @@ export default function HomeClient() {
       <section className="relative min-h-screen flex items-center overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-black to-pink-900/20" />
+          <img
+            src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/BigQ%20on%20deck.jpeg"
+            alt=""
+            className="w-full h-full object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-purple-900/50" />
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px]" />
           <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[120px]" />
-          {/* Grid pattern */}
-          <div className="absolute inset-0 opacity-5" style={{
-            backgroundImage: 'linear-gradient(rgba(139,92,246,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.5) 1px, transparent 1px)',
-            backgroundSize: '60px 60px'
-          }} />
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 pt-24 pb-16 w-full">
@@ -306,6 +306,40 @@ export default function HomeClient() {
               ))}
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Gallery */}
+      <section className="py-20 border-t border-[#1a1a1a]">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl font-black text-white">The Vibe</h2>
+            <p className="text-gray-500 mt-1">NXT STOP in action</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {[
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%203.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%202.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%202.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%206.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%203.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%207.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%205.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%204.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%208.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/BigQ%20on%20deck.jpeg',
+            ].map((url, i) => (
+              <div key={i} className={`overflow-hidden rounded-xl bg-[#1a1a1a] ${i === 0 || i === 7 ? 'col-span-2 row-span-2' : ''}`}>
+                <img
+                  src={url}
+                  alt={`NXT STOP ${i + 1}`}
+                  className="w-full h-full object-cover aspect-square hover:scale-105 transition-transform duration-500"
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
