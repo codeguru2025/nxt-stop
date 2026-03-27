@@ -5,6 +5,11 @@ import crypto from 'crypto'
 import { generateQRDataURL } from '@/lib/qr'
 import { slugify } from '@/lib/utils'
 
+// GET /api/admin/seed?secret=... — same as POST, allows browser URL access
+export async function GET(req: Request) {
+  return POST(req)
+}
+
 // POST /api/admin/seed — seeds initial data
 // Requires ?secret=SEED_SECRET or header x-seed-secret matching the SEED_SECRET env var
 export async function POST(req: Request) {
