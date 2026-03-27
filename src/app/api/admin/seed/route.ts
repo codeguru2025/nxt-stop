@@ -158,7 +158,7 @@ export async function POST(req: Request) {
         partner: { email: 'dj.fire@nxtstop.com', password: 'dj123' },
       },
     })
-  } catch (e) {
-    return serverError(e)
+  } catch (e: any) {
+    return Response.json({ success: false, error: e?.message ?? String(e), stack: e?.stack }, { status: 500 })
   }
 }
