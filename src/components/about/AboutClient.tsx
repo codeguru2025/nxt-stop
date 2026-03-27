@@ -115,6 +115,51 @@ export default function AboutClient() {
         </div>
       </section>
 
+      {/* The Crew */}
+      <section className="py-16 border-t border-[#1a1a1a]">
+        <div className="max-w-5xl mx-auto px-4">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-black text-white mb-2">The Crew</h2>
+            <p className="text-gray-500">The people who keep everything running</p>
+          </div>
+          <div className="flex justify-center">
+            <div className="group max-w-xs w-full">
+              <div className="relative overflow-hidden rounded-2xl mb-4 aspect-[3/4]">
+                <Image
+                  src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Handy.jpeg"
+                  alt="Handy"
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  sizes="(max-width: 640px) 100vw, 320px"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                <div className="absolute bottom-4 left-4">
+                  <h3 className="text-2xl font-black text-white">Handy</h3>
+                  <p className="text-purple-400 text-sm font-medium">Organiser / Promoter</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Handy%202.jpeg',
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Handy%203.jpeg',
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Handy%204.jpeg',
+                ].map((img, i) => (
+                  <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
+                    <Image
+                      src={img}
+                      alt={`Handy ${i + 2}`}
+                      fill
+                      className="object-cover hover:scale-110 transition-transform duration-300"
+                      sizes="(max-width: 640px) 33vw, 107px"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Founders — managed via admin */}
       {founders.length > 0 && (
         <section className="py-16 border-t border-[#1a1a1a]">
