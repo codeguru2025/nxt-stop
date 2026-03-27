@@ -14,6 +14,7 @@ function createPrismaClient() {
     connectionTimeoutMillis: 30000,
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
+    ssl: { rejectUnauthorized: false },
   })
   const adapter = new PrismaPg(pool)
   return new PrismaClient({ adapter } as any)
