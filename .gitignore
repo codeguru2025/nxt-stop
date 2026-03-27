@@ -44,6 +44,9 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# Compiled custom server
+server.js
+
 # SQLite dev databases
 *.db
 *.db-journal
