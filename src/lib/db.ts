@@ -4,27 +4,47 @@ import { PrismaPg } from '@prisma/adapter-pg'
 
 declare global {
   var __prisma: PrismaClient | undefined
+  var __pgPool: Pool | undefined
 }
 
 function createPrismaClient() {
+  // Strip sslmode from the connection string — we configure SSL explicitly
+  // on the Pool. pg-connection-string treats sslmode=require as verify-full
+  // which logs a noisy warning and may cause cert-validation failures.
+  const url = new URL(process.env.DATABASE_URL!)
+  url.searchParams.delete('sslmode')
+  url.searchParams.delete('sslaccept')
+
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL!,
-    max: 10,
-    idleTimeoutMillis: 20000,
-    connectionTimeoutMillis: 30000,
+    connectionString: url.toString(),
+    // Keep the pool small — DigitalOcean managed PG has a limited connection
+    // budget (typ. 25 for basic plans). With keepAlive + idle timeout the
+    // pool will hold onto connections efficiently.
+    max: 5,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
     ssl: { rejectUnauthorized: false },
   })
+
+  // Prevent unhandled 'error' events from crashing the process.
+  // Broken-idle connections are removed automatically by the pool.
+  pool.on('error', (err) => {
+    console.error('[pg pool] Idle client error:', err.message)
+  })
+
+  global.__pgPool = pool
+
   const adapter = new PrismaPg(pool)
   return new PrismaClient({ adapter } as any)
 }
 
+// Singleton: cache the client on `globalThis` so it survives module
+// re-evaluations in BOTH development (HMR) and production (edge cases
+// where bundlers re-run the module init).
 const prisma = global.__prisma ?? createPrismaClient()
-
-if (process.env.NODE_ENV !== 'production') {
-  global.__prisma = prisma
-}
+global.__prisma = prisma
 
 export { prisma }
 export default prisma
