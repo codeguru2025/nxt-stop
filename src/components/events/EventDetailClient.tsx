@@ -18,7 +18,7 @@ type Event = {
   venue: string; address?: string; date: string; endDate?: string
   posterImage?: string; bannerImage?: string; videoUrl?: string
   lineup?: string; hasVirtual: boolean; virtualPrice: number
-  status: string; ticketTypes: TicketType[]
+  platformFee: number; status: string; ticketTypes: TicketType[]
   media: { id: string; type: string; url: string; caption?: string }[]
   _count: { tickets: number; socialPosts: number }
 }
@@ -77,7 +77,7 @@ export default function EventDetailClient() {
   const selectedTicket = event?.ticketTypes.find(t => t.id === selectedType)
   const available = selectedTicket ? selectedTicket.capacity - selectedTicket.sold : 0
   const subtotal = selectedTicket ? selectedTicket.price * quantity : 0
-  const fees = quantity * (event?.ticketTypes[0] ? 0.10 : 0)
+  const fees = quantity * (event?.platformFee ?? 0.10)
   const total = subtotal + fees
 
   const isMobile = PAYMENT_METHODS.find(m => m.id === paymentMethod)?.mobile ?? false

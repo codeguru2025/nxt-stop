@@ -22,20 +22,24 @@ app.prepare().then(() => {
   })
 
   // Redis adapter for multi-instance pub/sub
-  const redisUrl = process.env.REDIS_URL!
-  const tlsOpts = redisUrl.startsWith('rediss://') ? { tls: {} } : {}
-  const pubClient = new Redis(redisUrl, tlsOpts)
-  const subClient = pubClient.duplicate()
+  const redisUrl = process.env.REDIS_URL
+  if (redisUrl) {
+    const tlsOpts = redisUrl.startsWith('rediss://') ? { tls: {} } : {}
+    const pubClient = new Redis(redisUrl, tlsOpts)
+    const subClient = pubClient.duplicate()
 
-  Promise.all([
-    new Promise<void>((res) => pubClient.once('ready', res)),
-    new Promise<void>((res) => subClient.once('ready', res)),
-  ]).then(() => {
-    io.adapter(createAdapter(pubClient, subClient))
-    console.log('[socket.io] Redis adapter connected')
-  }).catch((err) => {
-    console.error('[socket.io] Redis adapter failed:', err.message)
-  })
+    Promise.all([
+      new Promise<void>((res) => pubClient.once('ready', res)),
+      new Promise<void>((res) => subClient.once('ready', res)),
+    ]).then(() => {
+      io.adapter(createAdapter(pubClient, subClient))
+      console.log('[socket.io] Redis adapter connected')
+    }).catch((err) => {
+      console.error('[socket.io] Redis adapter failed:', err.message)
+    })
+  } else {
+    console.warn('[socket.io] REDIS_URL not set — running without Redis adapter (single-instance only)')
+  }
 
   // Gate room: gate staff join event-specific rooms to receive live scan events
   io.on('connection', (socket) => {

@@ -49,10 +49,7 @@ export async function GET() {
         },
       }),
       prisma.product.findMany({
-        where: {
-          active: true,
-          stock: { lte: prisma.product.fields.lowStockAt as any },
-        },
+        where: { active: true },
       }).catch(() => []),
       prisma.ticket.count({ where: { event: { hasVirtual: true } } }),
     ])
@@ -65,7 +62,7 @@ export async function GET() {
     const eventStats = await prisma.event.findMany({
       where: { status: { in: ['published', 'live', 'ended'] } },
       include: {
-        _count: { select: { tickets: true, scanLogs: { where: { result: 'valid' } } } },
+        _count: { select: { tickets: true, scanLogs: true } },
         ticketTypes: true,
       },
     })

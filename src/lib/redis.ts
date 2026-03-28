@@ -20,7 +20,7 @@ function createRedisClient() {
 
 // Singleton — shared across hot-reloads in dev
 const redis = global.__redis ?? createRedisClient()
-if (process.env.NODE_ENV !== 'production') global.__redis = redis
+global.__redis = redis
 
 export { redis }
 export default redis

@@ -1,5 +1,5 @@
 import { prisma } from './db'
-import { generateTicketNumber, generateQRDataURL } from './qr'
+import { generateTicketNumber } from './qr'
 import crypto from 'crypto'
 
 /**

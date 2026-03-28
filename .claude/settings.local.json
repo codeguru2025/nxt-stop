@@ -12,7 +12,19 @@
       "WebFetch(domain:developers.paynow.co.zw)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:www.npmjs.com)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(node:*)",
+      "Bash(npx tsc:*)",
+      "Bash(grep -v \"^$\\\\|warning\\\\|LF will\")",
+      "Bash(npx prisma:*)",
+      "Bash(curl -s -X POST http://localhost:3000/api/admin/seed)",
+      "WebFetch(domain:nxt-stop.lon1.cdn.digitaloceanspaces.com)",
+      "WebFetch(domain:nxt-stop-gzp5t.ondigitalocean.app)",
+      "Bash(curl:*)",
+      "Bash(grep -r 'Connection terminated' src --include=*.ts -l)",
+      "Bash(grep -r \"use\\\\b\\\\|extends\\\\b\" node_modules/@prisma/adapter-pg/dist/*.d.ts)",
+      "Bash(grep -n \"$use\\\\b\" node_modules/@prisma/client/runtime/client.d.ts)",
+      "Bash(grep -n \"^\\\\s*$use\\\\b\\\\|use\\\\?\\\\\\(middleware\\\\|Middleware\\\\\\)\" node_modules/@prisma/client/runtime/client.d.ts)"
     ]
   }
 }
