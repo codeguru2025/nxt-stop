@@ -11,12 +11,19 @@ function createPrismaClient() {
   // Strip sslmode from the connection string — we configure SSL explicitly
   // on the Pool. pg-connection-string treats sslmode=require as verify-full
   // which logs a noisy warning and may cause cert-validation failures.
-  const url = new URL(process.env.DATABASE_URL!)
-  url.searchParams.delete('sslmode')
-  url.searchParams.delete('sslaccept')
+  // Guard against DATABASE_URL being absent at build time.
+  let connectionString = process.env.DATABASE_URL!
+  try {
+    const url = new URL(connectionString)
+    url.searchParams.delete('sslmode')
+    url.searchParams.delete('sslaccept')
+    connectionString = url.toString()
+  } catch {
+    // DATABASE_URL not set or invalid (e.g. during next build) — use as-is
+  }
 
   const pool = new Pool({
-    connectionString: url.toString(),
+    connectionString,
     // Keep the pool small — DigitalOcean managed PG has a limited connection
     // budget (typ. 25 for basic plans). With keepAlive + idle timeout the
     // pool will hold onto connections efficiently.
