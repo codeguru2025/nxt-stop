@@ -1,12 +1,12 @@
 import { cookies } from 'next/headers'
 import { SignJWT, jwtVerify } from 'jose'
 import { prisma } from './db'
-import type { User } from '@/generated/prisma/client'
+import { env } from './env'
+
+const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET)
 
 function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET
-  if (!secret) throw new Error('JWT_SECRET environment variable is not set')
-  return new TextEncoder().encode(secret)
+  return JWT_SECRET
 }
 
 export type SessionUser = {

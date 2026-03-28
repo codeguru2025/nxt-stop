@@ -2,9 +2,14 @@ import { prisma } from '@/lib/db'
 import { requireAuth, signToken } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { generateOrderNumber } from '@/lib/qr'
+import { checkOrderLimit } from '@/lib/rateLimit'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { z } from 'zod'
+
+function getIp(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
+}
 
 const CreateOrderSchema = z.object({
   eventId:      z.string().min(1),
@@ -20,6 +25,11 @@ const CreateOrderSchema = z.object({
 export async function POST(req: Request) {
   try {
     const session = await requireAuth().catch(() => null)
+
+    // Rate limit: keyed by session userId for logged-in users, by IP for guests
+    const rlKey = session ? `user:${session.id}` : `ip:${getIp(req)}`
+    const { limited } = await checkOrderLimit(rlKey)
+    if (limited) return error('Too many orders — please wait before trying again', 429)
 
     const body = await req.json()
     const parsed = CreateOrderSchema.safeParse(body)

@@ -17,8 +17,14 @@ export async function POST(req: Request) {
   if (!secret) return Response.json({ error: 'SEED_SECRET env var not set' }, { status: 500 })
 
   const url = new URL(req.url)
-  const provided = url.searchParams.get('secret') ?? req.headers.get('x-seed-secret')
-  if (provided !== secret) return Response.json({ error: 'Forbidden' }, { status: 403 })
+  const provided = url.searchParams.get('secret') ?? req.headers.get('x-seed-secret') ?? ''
+  // Timing-safe comparison to prevent secret prefix leakage via timing attacks
+  const secretBuf   = Buffer.from(secret.padEnd(64))
+  const providedBuf = Buffer.from(provided.padEnd(64))
+  const match = secretBuf.length === providedBuf.length &&
+    crypto.timingSafeEqual(secretBuf, providedBuf) &&
+    provided === secret
+  if (!match) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
     const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@nxtstop.com'

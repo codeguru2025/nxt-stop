@@ -10,9 +10,9 @@ function create(): PrismaClient {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
-    max: 5,
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 30_000,
+    max: 15,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
     keepAlive: true,
     keepAliveInitialDelayMillis: 30_000,
   })

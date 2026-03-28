@@ -22,7 +22,11 @@ export async function GET(req: Request) {
       },
     })
 
-    return ok(events)
+    const res = ok(events)
+    // Cache public event list for 60s at the CDN/browser level.
+    // Admin status changes will be visible within a minute.
+    res.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120')
+    return res
   } catch (e) {
     return serverError(e)
   }

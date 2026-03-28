@@ -1,4 +1,4 @@
-import { RateLimiterRedis } from 'rate-limiter-flexible'
+import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible'
 import { redis } from './redis'
 
 // Hard timeout — if Redis is hung, bail after this many ms
@@ -14,6 +14,7 @@ function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 // Lazily create limiters only when Redis is available
 let authLimiter: RateLimiterRedis | null = null
 let scanLimiter: RateLimiterRedis | null = null
+let orderLimiter: RateLimiterRedis | RateLimiterMemory | null = null
 
 function getAuthLimiter(): RateLimiterRedis | null {
   if (!redis) return null
@@ -71,6 +72,31 @@ export async function checkScanLimit(ip: string): Promise<{ limited: boolean }> 
     (async () => {
       try {
         await limiter.consume(ip)
+        return { limited: false }
+      } catch (e: any) {
+        if (isRateLimited(e)) return { limited: true }
+        return { limited: false }
+      }
+    })(),
+    { limited: false }
+  )
+}
+
+function getOrderLimiter(): RateLimiterRedis | RateLimiterMemory {
+  if (!orderLimiter) {
+    const opts = { keyPrefix: 'rl:order', points: 10, duration: 3600 } // 10 orders/hour per key
+    orderLimiter = redis
+      ? new RateLimiterRedis({ storeClient: redis, ...opts })
+      : new RateLimiterMemory(opts)
+  }
+  return orderLimiter
+}
+
+export async function checkOrderLimit(key: string): Promise<{ limited: boolean }> {
+  return withTimeout(
+    (async () => {
+      try {
+        await getOrderLimiter().consume(key)
         return { limited: false }
       } catch (e: any) {
         if (isRateLimited(e)) return { limited: true }

@@ -31,7 +31,9 @@
       "Bash(grep -r RouteContext src/ --include=*.ts -l)",
       "Bash(grep -r RouteContext src/types/ --include=*.ts)",
       "Bash(find src:*)",
-      "Bash(cat .next/types/app/api/admin/events/[id]/route.ts)"
+      "Bash(cat .next/types/app/api/admin/events/[id]/route.ts)",
+      "Bash(grep -v \":0$\")",
+      "Bash(grep -l route.ts C:UsersausizCascadeProjectsnxt-stop/src/app/api/**/*.ts)"
     ]
   }
 }

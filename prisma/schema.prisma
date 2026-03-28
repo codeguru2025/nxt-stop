@@ -42,6 +42,8 @@ model Session {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // ─── FOUNDERS ────────────────────────────────────────────────────────────────
@@ -91,6 +93,8 @@ model Event {
   socialPosts SocialPost[]
   scanLogs    ScanLog[]
   media       EventMedia[]
+
+  @@index([status, date])
 }
 
 model EventMedia {
@@ -104,6 +108,8 @@ model EventMedia {
   createdAt  DateTime @default(now())
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
 }
 
 model GalleryPhoto {
@@ -133,6 +139,8 @@ model TicketType {
   event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   tickets    Ticket[]
   orderItems OrderItem[]
+
+  @@index([eventId])
 }
 
 // ─── TICKETS ─────────────────────────────────────────────────────────────────
@@ -157,6 +165,10 @@ model Ticket {
   order      Order      @relation(fields: [orderId], references: [id])
   partner    Partner?   @relation(fields: [partnerId], references: [id])
   scanLogs   ScanLog[]
+
+  @@index([userId])
+  @@index([eventId, status])
+  @@index([orderId])
 }
 
 model ScanLog {
@@ -171,6 +183,9 @@ model ScanLog {
   ticket  Ticket @relation(fields: [ticketId], references: [id])
   event   Event  @relation(fields: [eventId], references: [id])
   scanner User?  @relation(fields: [scannedBy], references: [id])
+
+  @@index([ticketId])
+  @@index([eventId, createdAt])
 }
 
 // ─── ORDERS & PAYMENTS ───────────────────────────────────────────────────────
@@ -198,6 +213,9 @@ model Order {
   user    User        @relation(fields: [userId], references: [id])
   tickets Ticket[]
   items   OrderItem[]
+
+  @@index([userId, status])
+  @@index([status, createdAt])
 }
 
 model OrderItem {
@@ -212,6 +230,9 @@ model OrderItem {
   order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product    Product?    @relation(fields: [productId], references: [id])
   ticketType TicketType? @relation(fields: [ticketTypeId], references: [id])
+
+  @@index([orderId])
+  @@index([ticketTypeId])
 }
 
 // ─── PARTNERS & AFFILIATES ───────────────────────────────────────────────────
@@ -263,6 +284,8 @@ model Commission {
   createdAt DateTime  @default(now())
 
   partner Partner @relation(fields: [partnerId], references: [id])
+
+  @@index([partnerId])
 }
 
 // ─── REFERRALS ───────────────────────────────────────────────────────────────
@@ -279,6 +302,9 @@ model Referral {
   source  User     @relation("ReferralSource", fields: [sourceUserId], references: [id])
   target  User     @relation("ReferralTarget", fields: [targetUserId], references: [id])
   partner Partner? @relation(fields: [partnerId], references: [id])
+
+  @@index([sourceUserId])
+  @@index([targetUserId])
 }
 
 // ─── REWARDS ─────────────────────────────────────────────────────────────────
@@ -308,6 +334,9 @@ model Redemption {
 
   user   User   @relation(fields: [userId], references: [id])
   reward Reward @relation(fields: [rewardId], references: [id])
+
+  @@index([userId])
+  @@index([rewardId])
 }
 
 model PointsConfig {
@@ -337,6 +366,8 @@ model Product {
 
   event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]
+
+  @@index([eventId])
 }
 
 // ─── SOCIAL FEED ─────────────────────────────────────────────────────────────
@@ -354,6 +385,9 @@ model SocialPost {
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id])
+
+  @@index([eventId])
+  @@index([userId])
 }
 
 // ─── SETTINGS ────────────────────────────────────────────────────────────────

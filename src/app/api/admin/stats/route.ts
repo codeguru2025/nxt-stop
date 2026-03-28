@@ -54,9 +54,8 @@ export async function GET() {
       prisma.ticket.count({ where: { event: { hasVirtual: true } } }),
     ])
 
-    // Low stock alerts (manual approach)
-    const products = await prisma.product.findMany({ where: { active: true } })
-    const lowStock = products.filter(p => p.stock <= p.lowStockAt)
+    // Low stock alerts — reuse the result already fetched above (stockAlerts)
+    const lowStock = (stockAlerts as any[]).filter((p: any) => p.stock <= p.lowStockAt)
 
     // Tickets sold per event
     const eventStats = await prisma.event.findMany({
