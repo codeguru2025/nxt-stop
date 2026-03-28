@@ -1,4 +1,4 @@
-import { Pool } from 'pg'
+import { Pool, PoolClient } from 'pg'
 import { PrismaClient } from '@/generated/prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 
@@ -24,22 +24,38 @@ function createPrismaClient() {
 
   const pool = new Pool({
     connectionString,
-    // Keep the pool small — DigitalOcean managed PG has a limited connection
-    // budget (typ. 25 for basic plans). With keepAlive + idle timeout the
-    // pool will hold onto connections efficiently.
     max: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-    keepAlive: true,
-    keepAliveInitialDelayMillis: 10000,
+    // Close connections after 10s idle — shorter than DO's load balancer
+    // TCP idle timeout (~60-120s), so we never hand Prisma a stale connection.
+    idleTimeoutMillis: 10_000,
+    // Allow 30s to establish a new connection (cold-start / high load headroom).
+    connectionTimeoutMillis: 30_000,
+    // No TCP keepalive — idleTimeoutMillis handles recycling instead.
+    keepAlive: false,
     ssl: { rejectUnauthorized: false },
   })
 
-  // Prevent unhandled 'error' events from crashing the process.
-  // Broken-idle connections are removed automatically by the pool.
   pool.on('error', (err) => {
     console.error('[pg pool] Idle client error:', err.message)
   })
+
+  // Validate connections before handing them to Prisma.
+  // If a connection was killed server-side while idle, the lightweight
+  // SELECT 1 will throw immediately so the pool destroys it and creates
+  // a fresh one — preventing "Connection terminated unexpectedly" from
+  // surfacing as a Prisma query error.
+  const originalConnect = pool.connect.bind(pool)
+  ;(pool as any).connect = async (): Promise<PoolClient> => {
+    const client = await originalConnect()
+    try {
+      await client.query('SELECT 1')
+      return client
+    } catch {
+      client.release(true) // destroy this dead connection
+      // One retry — the pool will open a fresh TCP connection.
+      return originalConnect()
+    }
+  }
 
   global.__pgPool = pool
 
@@ -48,8 +64,7 @@ function createPrismaClient() {
 }
 
 // Singleton: cache the client on `globalThis` so it survives module
-// re-evaluations in BOTH development (HMR) and production (edge cases
-// where bundlers re-run the module init).
+// re-evaluations in BOTH development (HMR) and production.
 const prisma = global.__prisma ?? createPrismaClient()
 global.__prisma = prisma
 
