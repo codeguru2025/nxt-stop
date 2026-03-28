@@ -91,7 +91,7 @@ export default function HomeClient() {
             <div>
               <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-1.5 mb-6">
                 <div className="w-2 h-2 rounded-full bg-purple-400 pulse-glow" />
-                <span className="text-purple-300 text-sm font-medium">Harare · Bulawayo · Southern Africa</span>
+                <span className="text-purple-300 text-sm font-medium">Plumtree · Bulawayo · Harare · Johannesburg</span>
               </div>
 
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black leading-none mb-6">
@@ -267,7 +267,7 @@ export default function HomeClient() {
                 {[
                   { icon: '📍', label: 'Venue', value: 'ZITF Pavilion, Bulawayo' },
                   { icon: '📅', label: 'Date', value: 'Friday, 29 August 2026' },
-                  { icon: '🕗', label: 'Doors', value: '8:00 PM — 4:00 AM' },
+                  { icon: '🕗', label: 'Doors', value: '12:00 PM — 10:00 PM' },
                 ].map(d => (
                   <div key={d.label} className="flex items-center gap-3">
                     <span className="text-xl">{d.icon}</span>

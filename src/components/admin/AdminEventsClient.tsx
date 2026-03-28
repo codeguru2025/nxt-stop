@@ -80,6 +80,32 @@ export default function AdminEventsClient() {
     load()
   }
 
+  const startEdit = async (id: string) => {
+    const res = await fetch(`/api/admin/events/${id}`).then(r => r.json())
+    if (!res.success) return
+    const ev = res.data
+    // Format datetime-local value (strip seconds+timezone)
+    const toLocal = (iso: string | null) => iso ? iso.slice(0, 16) : ''
+    setForm({
+      name: ev.name ?? '',
+      venue: ev.venue ?? '',
+      address: ev.address ?? '',
+      date: toLocal(ev.date),
+      endDate: toLocal(ev.endDate),
+      description: ev.description ?? '',
+      posterImage: ev.posterImage ?? '',
+      bannerImage: ev.bannerImage ?? '',
+      hasVirtual: ev.hasVirtual ?? false,
+      virtualPrice: ev.virtualPrice ?? 5,
+      status: ev.status ?? 'draft',
+      lat: ev.lat != null ? String(ev.lat) : '',
+      lng: ev.lng != null ? String(ev.lng) : '',
+      ticketTypes: ev.ticketTypes ?? [],
+    })
+    setEditing(id)
+    setShowForm(true)
+  }
+
   const deleteEvent = async (id: string) => {
     if (!confirm('Delete this event? This cannot be undone.')) return
     await fetch(`/api/admin/events/${id}`, { method: 'DELETE' })
@@ -248,7 +274,7 @@ export default function AdminEventsClient() {
                     <option value="live">Live</option>
                     <option value="ended">Ended</option>
                   </select>
-                  <button onClick={() => { setEditing(ev.id); setShowForm(true) }} className="text-gray-500 hover:text-blue-400 transition-colors">
+                  <button onClick={() => startEdit(ev.id)} className="text-gray-500 hover:text-blue-400 transition-colors">
                     <Edit size={14} />
                   </button>
                   <button onClick={() => deleteEvent(ev.id)} className="text-gray-500 hover:text-red-400 transition-colors">
