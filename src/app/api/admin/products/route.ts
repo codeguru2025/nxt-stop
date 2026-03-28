@@ -8,14 +8,16 @@ export async function GET(req: Request) {
     if (!session) return forbidden()
 
     const url = new URL(req.url)
-    const eventId = url.searchParams.get('eventId')
+    const eventId  = url.searchParams.get('eventId')
+    const category = url.searchParams.get('category')
 
     const products = await prisma.product.findMany({
-      where: eventId ? { eventId } : undefined,
-      orderBy: { sold: 'desc' },
-      include: {
-        event: { select: { name: true } },
+      where: {
+        ...(eventId  ? { eventId }  : {}),
+        ...(category ? { category } : {}),
       },
+      orderBy: { sold: 'desc' },
+      include: { event: { select: { name: true } } },
     })
 
     return ok(products)
@@ -29,7 +31,10 @@ export async function POST(req: Request) {
     const session = await requireAdmin().catch(() => null)
     if (!session) return forbidden()
 
-    const { eventId, name, description, price, stock, category, image, lowStockAt } = await req.json()
+    const {
+      eventId, name, description, price, stock, category,
+      image, lowStockAt, merchType, size, color,
+    } = await req.json()
 
     if (!eventId || !name || price === undefined || stock === undefined) {
       return error('eventId, name, price, and stock are required')
@@ -38,9 +43,12 @@ export async function POST(req: Request) {
     const product = await prisma.product.create({
       data: {
         eventId, name, description, price, stock,
-        category: category ?? 'drink',
+        category:  category  ?? 'drink',
         image,
         lowStockAt: lowStockAt ?? 10,
+        merchType:  merchType  ?? null,
+        size:       size       ?? null,
+        color:      color      ?? null,
       },
     })
 

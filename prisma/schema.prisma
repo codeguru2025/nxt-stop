@@ -358,6 +358,9 @@ model Product {
   stock       Int
   sold        Int      @default(0)
   category    String   @default("drink") // drink | food | merchandise | other
+  merchType   String?  // tshirt | hoodie | cap | wineglass | tote | vinyl | other
+  size        String?  // S | M | L | XL | XXL | One Size | etc
+  color       String?
   image       String?
   active      Boolean  @default(true)
   lowStockAt  Int      @default(10)
@@ -368,6 +371,7 @@ model Product {
   orderItems OrderItem[]
 
   @@index([eventId])
+  @@index([category])
 }
 
 // ─── SOCIAL FEED ─────────────────────────────────────────────────────────────
