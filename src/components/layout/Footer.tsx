@@ -99,13 +99,16 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold text-white mb-4 text-sm uppercase tracking-wider">Company</h4>
             <ul className="space-y-2">
-              {['About', 'Contact', 'Terms', 'Privacy'].map(l => (
-                <li key={l}>
-                  <Link href={`/${l.toLowerCase()}`} className="text-gray-500 hover:text-white text-sm transition-colors">
-                    {l}
-                  </Link>
-                </li>
-              ))}
+              <li>
+                <Link href="/about" className="text-gray-500 hover:text-white text-sm transition-colors">
+                  About
+                </Link>
+              </li>
+              <li>
+                <a href="mailto:nxtstop25@gmail.com" className="text-gray-500 hover:text-white text-sm transition-colors">
+                  Contact
+                </a>
+              </li>
             </ul>
           </div>
         </div>
