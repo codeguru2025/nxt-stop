@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from 'pg'
+import { Pool } from 'pg'
 import { PrismaClient } from '@/generated/prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 
@@ -8,49 +8,32 @@ declare global {
 }
 
 function createPrismaClient() {
-  // Strip sslmode from the connection string — we configure SSL explicitly
-  // on the Pool. pg-connection-string treats sslmode=require as verify-full
-  // which logs a noisy warning. Guard against DATABASE_URL being absent at
-  // build time (next build runs without runtime env vars).
-  let connectionString = process.env.DATABASE_URL!
+  // Parse DATABASE_URL so we can set SSL explicitly on the Pool config.
+  // pg-connection-string maps sslmode=require → verify-full, which rejects
+  // DO's self-signed cert. Stripping it lets our ssl option below take over.
+  // The try/catch handles the build phase where DATABASE_URL is not set.
+  let connectionString = process.env.DATABASE_URL ?? ''
   try {
     const url = new URL(connectionString)
     url.searchParams.delete('sslmode')
     url.searchParams.delete('sslaccept')
     connectionString = url.toString()
   } catch {
-    // DATABASE_URL not set or invalid at build time — use as-is
+    // no-op during next build
   }
 
   const pool = new Pool({
     connectionString,
-    max: 5,
-    // Close idle connections after 10s — well within DO VPC's TCP idle timeout,
-    // ensuring the pool never hands Prisma a stale connection.
-    idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 30_000,
-    keepAlive: false,
-    ssl: { rejectUnauthorized: false },
+    max: 3,
+    idleTimeoutMillis: 10_000,        // recycle before DO's LB idle timeout
+    connectionTimeoutMillis: 30_000,  // allow 30 s to establish a connection
+    ssl: { rejectUnauthorized: false }, // accept DO's self-signed cert
   })
 
   pool.on('error', (err) => {
-    console.error('[pg pool] Idle client error:', err.message)
+    // prevents unhandled-rejection crashes when the server drops an idle client
+    console.error('[pg pool] client error:', err.message)
   })
-
-  // Validate connections on checkout. If a connection was killed server-side
-  // while idle, SELECT 1 detects it immediately so the pool destroys and
-  // replaces it — preventing "Connection terminated unexpectedly" errors.
-  const originalConnect = pool.connect.bind(pool)
-  ;(pool as any).connect = async (): Promise<PoolClient> => {
-    const client = await originalConnect()
-    try {
-      await client.query('SELECT 1')
-      return client
-    } catch {
-      client.release(true) // destroy the dead connection
-      return originalConnect() // one retry with a fresh connection
-    }
-  }
 
   global.__pgPool = pool
 
@@ -58,7 +41,7 @@ function createPrismaClient() {
   return new PrismaClient({ adapter } as any)
 }
 
-// Singleton: one PrismaClient/Pool per process in both dev (HMR) and production.
+// One PrismaClient per process — survives HMR in dev and module re-evals in prod
 const prisma = global.__prisma ?? createPrismaClient()
 global.__prisma = prisma
 
