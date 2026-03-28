@@ -11,13 +11,19 @@ function createRedisClient(): Redis | null {
     return null
   }
   const client = new Redis(url, {
-    // Reconnect with exponential backoff up to 30s
-    retryStrategy: (times) => Math.min(times * 200, 30_000),
-    maxRetriesPerRequest: 3,
+    connectTimeout: 5_000, // Give up connecting after 5s
+    maxRetriesPerRequest: 1, // Fail fast on individual commands
+    retryStrategy: (times) => {
+      if (times > 5) return null // Stop retrying after 5 attempts
+      return Math.min(times * 200, 5_000)
+    },
     enableReadyCheck: true,
+    lazyConnect: true, // Don't block module load
     tls: url.startsWith('rediss://') ? {} : undefined,
   })
   client.on('error', (err) => console.error('[redis]', err.message))
+  // Attempt connection but don't block
+  client.connect().catch(() => {})
   return client
 }
 
