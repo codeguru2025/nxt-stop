@@ -1,6 +1,16 @@
 import { RateLimiterRedis } from 'rate-limiter-flexible'
 import { redis } from './redis'
 
+// Hard timeout — if Redis is hung, bail after this many ms
+const TIMEOUT_MS = 3_000
+
+function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), TIMEOUT_MS)),
+  ])
+}
+
 // Lazily create limiters only when Redis is available
 let authLimiter: RateLimiterRedis | null = null
 let scanLimiter: RateLimiterRedis | null = null
@@ -40,26 +50,35 @@ function isRateLimited(e: any): boolean {
 export async function checkAuthLimit(ip: string): Promise<{ limited: boolean; retryAfter?: number }> {
   const limiter = getAuthLimiter()
   if (!limiter) return { limited: false }
-  try {
-    await limiter.consume(ip)
-    return { limited: false }
-  } catch (e: any) {
-    if (isRateLimited(e)) return { limited: true, retryAfter: Math.ceil(e.msBeforeNextReset / 1000) }
-    // Redis unavailable — fail open so auth still works
-    return { limited: false }
-  }
+  return withTimeout(
+    (async () => {
+      try {
+        await limiter.consume(ip)
+        return { limited: false }
+      } catch (e: any) {
+        if (isRateLimited(e)) return { limited: true, retryAfter: Math.ceil(e.msBeforeNextReset / 1000) }
+        return { limited: false }
+      }
+    })(),
+    { limited: false } // Timeout fallback: fail open
+  )
 }
 
 export async function checkScanLimit(ip: string): Promise<{ limited: boolean }> {
   const limiter = getScanLimiter()
   if (!limiter) return { limited: false }
-  try {
-    await limiter.consume(ip)
-    return { limited: false }
-  } catch (e: any) {
-    if (isRateLimited(e)) return { limited: true }
-    return { limited: false }
-  }
+  return withTimeout(
+    (async () => {
+      try {
+        await limiter.consume(ip)
+        return { limited: false }
+      } catch (e: any) {
+        if (isRateLimited(e)) return { limited: true }
+        return { limited: false }
+      }
+    })(),
+    { limited: false }
+  )
 }
 
 /**
@@ -68,13 +87,17 @@ export async function checkScanLimit(ip: string): Promise<{ limited: boolean }> 
  */
 export async function acquireScanLock(qrCode: string): Promise<boolean> {
   if (!redis) return true // No Redis — allow scan
-  try {
-    const key = `lock:scan:${qrCode}`
-    const result = await redis.set(key, '1', 'EX', 5, 'NX')
-    return result === 'OK'
-  } catch {
-    // Redis unavailable — allow scan rather than block entry
-    return true
-  }
+  return withTimeout(
+    (async () => {
+      try {
+        const key = `lock:scan:${qrCode}`
+        const result = await redis.set(key, '1', 'EX', 5, 'NX')
+        return result === 'OK'
+      } catch {
+        return true
+      }
+    })(),
+    true // Timeout fallback: allow scan
+  )
 }
 
