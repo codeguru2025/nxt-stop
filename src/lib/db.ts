@@ -8,10 +8,10 @@ declare global {
 }
 
 function createPrismaClient() {
-  // Parse DATABASE_URL so we can set SSL explicitly on the Pool config.
-  // pg-connection-string maps sslmode=require → verify-full, which rejects
-  // DO's self-signed cert. Stripping it lets our ssl option below take over.
-  // The try/catch handles the build phase where DATABASE_URL is not set.
+  // Strip sslmode so pg-connection-string doesn't map it to verify-full,
+  // which rejects DO's self-signed cert. We set ssl explicitly below.
+  // The try/catch is a no-op guard for the build phase where DATABASE_URL
+  // is absent and new URL() would throw.
   let connectionString = process.env.DATABASE_URL ?? ''
   try {
     const url = new URL(connectionString)
@@ -25,15 +25,38 @@ function createPrismaClient() {
   const pool = new Pool({
     connectionString,
     max: 3,
-    idleTimeoutMillis: 10_000,        // recycle before DO's LB idle timeout
-    connectionTimeoutMillis: 30_000,  // allow 30 s to establish a connection
+    idleTimeoutMillis: 10_000,        // close idle connections after 10 s
+    connectionTimeoutMillis: 30_000,  // allow 30 s to acquire a connection
+    // TCP keepalive: send probes every 30 s so DO's VPC network / NAT
+    // (which drops idle TCP after ~120 s) never sees the connection as idle.
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 30_000,
     ssl: { rejectUnauthorized: false }, // accept DO's self-signed cert
   })
 
   pool.on('error', (err) => {
-    // prevents unhandled-rejection crashes when the server drops an idle client
-    console.error('[pg pool] client error:', err.message)
+    console.error('[pg pool] idle client error:', err.message)
   })
+
+  // Patch pool.query() with retry logic for transient "Connection terminated"
+  // errors. PrismaPg calls pool.query() for every non-transactional operation,
+  // so this single patch covers the entire read/write path.
+  const originalQuery = pool.query.bind(pool)
+  ;(pool as any).query = async function (...args: Parameters<typeof pool.query>) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await (originalQuery as any)(...args)
+      } catch (err: any) {
+        const isConnErr =
+          attempt < 2 &&
+          typeof err?.message === 'string' &&
+          err.message.includes('Connection terminated')
+        if (!isConnErr) throw err
+        console.warn(`[pg pool] retrying after connection drop (attempt ${attempt + 1})`)
+        await new Promise((r) => setTimeout(r, 150 * (attempt + 1)))
+      }
+    }
+  }
 
   global.__pgPool = pool
 
@@ -41,7 +64,8 @@ function createPrismaClient() {
   return new PrismaClient({ adapter } as any)
 }
 
-// One PrismaClient per process — survives HMR in dev and module re-evals in prod
+// One PrismaClient + Pool per process — survives HMR in dev and module
+// re-evaluations in prod.
 const prisma = global.__prisma ?? createPrismaClient()
 global.__prisma = prisma
 
