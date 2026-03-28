@@ -26,14 +26,22 @@ export async function GET(req: Request) {
       return unauthorized()
     }
 
+    // Webhook may have already fulfilled the order — return immediately
     if (order.status === 'paid') return ok({ status: 'paid' })
-    if (!order.paymentRef) return error('No poll URL on record — initiate payment first')
+    if (order.status === 'failed') return ok({ status: 'failed', message: 'Payment was declined or cancelled' })
 
-    const paid = await pollPaynowTransaction(order.paymentRef)
+    if (!order.paymentRef) return ok({ status: 'pending' })
 
-    if (paid) {
+    const txStatus = await pollPaynowTransaction(order.paymentRef)
+
+    if (txStatus === 'paid') {
       await fulfillOrder(orderId, order.paymentMethod ?? 'paynow', order.paymentRef)
       return ok({ status: 'paid' })
+    }
+
+    if (txStatus === 'failed' || txStatus === 'cancelled') {
+      await prisma.order.update({ where: { id: orderId }, data: { status: 'failed' } })
+      return ok({ status: 'failed', message: 'Payment was declined or cancelled. Please try again.' })
     }
 
     return ok({ status: 'pending' })

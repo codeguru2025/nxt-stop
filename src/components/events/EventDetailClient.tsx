@@ -44,6 +44,7 @@ type Stage =
   | { name: 'innbucks_pending'; code: string; orderId: string; guestToken?: string }
   | { name: 'redirect'; redirectUrl: string; orderId: string; guestToken?: string }
   | { name: 'paid'; guestToken?: string }
+  | { name: 'payment_failed'; message: string; guestToken?: string }
   | { name: 'error'; message: string }
 
 export default function EventDetailClient() {
@@ -67,7 +68,9 @@ export default function EventDetailClient() {
   const [recipientName, setRecipientName]   = useState('')
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollCountRef = useRef(0)
   const ref = searchParams.get('ref') ?? ''
+  const POLL_TIMEOUT = 72 // 72 × 5s = 6 minutes
 
   useEffect(() => {
     Promise.all([
@@ -92,19 +95,43 @@ export default function EventDetailClient() {
   const isMobile = PAYMENT_METHODS.find(m => m.id === paymentMethod)?.mobile ?? false
 
   function startPolling(orderId: string, guestToken?: string) {
+    pollCountRef.current = 0
     pollRef.current = setInterval(async () => {
-      const qs = guestToken ? `&guestToken=${guestToken}` : ''
-      const res = await fetch(`/api/paynow/poll?orderId=${orderId}${qs}`).then(r => r.json())
-      if (res.success && res.data.status === 'paid') {
+      pollCountRef.current += 1
+
+      // Timeout after ~6 minutes — stop polling, show fallback
+      if (pollCountRef.current > POLL_TIMEOUT) {
         clearInterval(pollRef.current!)
-        setStage({ name: 'paid', guestToken })
-        setTimeout(() => {
-          if (guestToken) {
-            router.push(`/dashboard/tickets?guestToken=${guestToken}`)
-          } else {
-            router.push('/dashboard/tickets')
-          }
-        }, 3000)
+        setStage({
+          name: 'payment_failed',
+          message: 'Payment timed out. If you approved the payment, check your tickets — it may still process.',
+          guestToken,
+        })
+        return
+      }
+
+      try {
+        const qs = guestToken ? `&guestToken=${guestToken}` : ''
+        const res = await fetch(`/api/paynow/poll?orderId=${orderId}${qs}`).then(r => r.json())
+        if (!res.success) return // network hiccup — keep polling
+
+        const { status, message } = res.data
+
+        if (status === 'paid') {
+          clearInterval(pollRef.current!)
+          setStage({ name: 'paid', guestToken })
+          setTimeout(() => {
+            router.push(guestToken ? `/dashboard/tickets?guestToken=${guestToken}` : '/dashboard/tickets')
+          }, 2000)
+          return
+        }
+
+        if (status === 'failed' || status === 'cancelled') {
+          clearInterval(pollRef.current!)
+          setStage({ name: 'payment_failed', message: message ?? 'Payment was declined or cancelled.', guestToken })
+        }
+      } catch {
+        // network error — keep polling silently
       }
     }, 5000)
   }
@@ -327,11 +354,13 @@ export default function EventDetailClient() {
           <div className="lg:col-span-1">
             <div className="sticky top-24">
               {stage.name === 'paid' ? (
-                <PaidCard />
+                <PaidCard guestToken={stage.guestToken} />
+              ) : stage.name === 'payment_failed' ? (
+                <PaymentFailedCard message={stage.message} guestToken={stage.guestToken} onRetry={() => setStage({ name: 'idle' })} />
               ) : stage.name === 'mobile_pending' ? (
-                <MobilePendingCard instructions={stage.instructions} method={paymentMethod} phone={phone} />
+                <MobilePendingCard instructions={stage.instructions} method={paymentMethod} phone={phone} orderId={stage.orderId} guestToken={stage.guestToken} />
               ) : stage.name === 'innbucks_pending' ? (
-                <InnbucksCard code={stage.code} />
+                <InnbucksCard code={stage.code} orderId={stage.orderId} guestToken={stage.guestToken} />
               ) : (
                 <div className="card p-6">
                   <h3 className="text-xl font-bold text-white mb-5">Get Your Tickets</h3>
@@ -542,37 +571,65 @@ export default function EventDetailClient() {
   )
 }
 
-function PaidCard() {
+function PaidCard({ guestToken }: { guestToken?: string }) {
+  const ticketsUrl = guestToken ? `/dashboard/tickets?guestToken=${guestToken}` : '/dashboard/tickets'
   return (
     <div className="card p-6 text-center border-green-500/30 bg-green-500/5">
       <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
         <Check size={32} className="text-green-400" />
       </div>
-      <h3 className="text-xl font-bold text-white mb-2">Tickets Purchased!</h3>
-      <p className="text-gray-400 text-sm">Redirecting to your tickets...</p>
+      <h3 className="text-xl font-bold text-white mb-2">Payment Confirmed!</h3>
+      <p className="text-gray-400 text-sm mb-4">Your ticket has been generated.</p>
+      <a href={ticketsUrl} className="btn-primary inline-flex items-center gap-2 text-sm">
+        <Ticket size={15} /> View My Tickets
+      </a>
     </div>
   )
 }
 
-function MobilePendingCard({ instructions, method, phone }: { instructions: string; method: string; phone: string }) {
+function PaymentFailedCard({ message, guestToken, onRetry }: { message: string; guestToken?: string; onRetry: () => void }) {
+  const ticketsUrl = guestToken ? `/dashboard/tickets?guestToken=${guestToken}` : '/dashboard/tickets'
+  return (
+    <div className="card p-6 text-center border-red-500/30 bg-red-500/5">
+      <AlertCircle size={32} className="text-red-400 mx-auto mb-3" />
+      <h3 className="text-lg font-bold text-white mb-2">Payment Issue</h3>
+      <p className="text-gray-400 text-sm leading-relaxed mb-4">{message}</p>
+      <div className="flex flex-col gap-2">
+        <button onClick={onRetry} className="btn-primary text-sm">Try Again</button>
+        <a href={ticketsUrl} className="text-xs text-gray-500 hover:text-purple-400 transition-colors py-2">
+          Already paid? Check my tickets →
+        </a>
+      </div>
+    </div>
+  )
+}
+
+function MobilePendingCard({ instructions, method, phone, orderId, guestToken }: {
+  instructions: string; method: string; phone: string; orderId: string; guestToken?: string
+}) {
   const methodName = PAYMENT_METHODS.find(m => m.id === method)?.label ?? method
+  const ticketsUrl = guestToken ? `/dashboard/tickets?guestToken=${guestToken}` : '/dashboard/tickets'
   return (
     <div className="card p-6 text-center border-yellow-500/30 bg-yellow-500/5">
       <Loader2 size={32} className="animate-spin text-yellow-400 mx-auto mb-4" />
       <h3 className="text-lg font-bold text-white mb-2">Check Your Phone</h3>
       <p className="text-gray-400 text-sm leading-relaxed mb-3">{instructions}</p>
-      <div className="bg-[#111] rounded-xl p-3 text-sm">
+      <div className="bg-[#111] rounded-xl p-3 text-sm mb-4">
         <p className="text-gray-500 text-xs mb-0.5">{methodName} push sent to</p>
         <p className="text-white font-bold">{phone}</p>
-        <p className="text-gray-600 text-xs mt-2">Enter your PIN to approve → ticket generates instantly</p>
+        <p className="text-gray-600 text-xs mt-2">Enter your PIN → ticket generates instantly</p>
       </div>
-      <p className="text-gray-600 text-xs mt-4">This page updates automatically when payment is confirmed.</p>
+      <p className="text-gray-600 text-xs mb-3">This page updates automatically when confirmed.</p>
+      <a href={ticketsUrl} className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+        Already approved? Check my tickets →
+      </a>
     </div>
   )
 }
 
-function InnbucksCard({ code }: { code: string }) {
+function InnbucksCard({ code, orderId, guestToken }: { code: string; orderId: string; guestToken?: string }) {
   const deepLink = `schinn.wbpycode://innbucks.co.zw?pymInnCode=${code}`
+  const ticketsUrl = guestToken ? `/dashboard/tickets?guestToken=${guestToken}` : '/dashboard/tickets'
   return (
     <div className="card p-6 text-center border-blue-500/30 bg-blue-500/5">
       <div className="text-4xl mb-3">🔵</div>
@@ -584,7 +641,10 @@ function InnbucksCard({ code }: { code: string }) {
       <a href={deepLink} className="inline-flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors mb-3">
         <ExternalLink size={14} /> Open InnBucks App
       </a>
-      <p className="text-gray-600 text-xs">Enter the code in your InnBucks app. This page updates automatically.</p>
+      <p className="text-gray-600 text-xs mb-3">This page updates automatically.</p>
+      <a href={ticketsUrl} className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+        Already paid? Check my tickets →
+      </a>
     </div>
   )
 }

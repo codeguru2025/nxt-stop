@@ -59,12 +59,18 @@ export async function initiatePaynowPayment(opts: {
   }
 }
 
+export type PollStatus = 'paid' | 'failed' | 'cancelled' | 'pending'
+
 /**
  * Poll Paynow for the current status of a transaction.
- * Returns true if the transaction is confirmed paid.
+ * Returns a full status so callers can detect failure, not just success.
  */
-export async function pollPaynowTransaction(pollUrl: string): Promise<boolean> {
+export async function pollPaynowTransaction(pollUrl: string): Promise<PollStatus> {
   const client = createClient()
-  const status = await client.pollTransaction(pollUrl)
-  return status.paid()
+  const res = await client.pollTransaction(pollUrl)
+  if (res.paid()) return 'paid'
+  const s: string = (res.status ?? '').toLowerCase()
+  if (['failed', 'voided', 'error', 'disputed', 'cancelled'].includes(s)) return 'failed'
+  if (s === 'cancelled') return 'cancelled'
+  return 'pending'
 }
