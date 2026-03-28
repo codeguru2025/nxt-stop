@@ -1,0 +1,59 @@
+# DigitalOcean App Platform Spec
+# Docs: https://docs.digitalocean.com/products/app-platform/reference/app-spec/
+#
+# SETUP CHECKLIST:
+# 1. Create managed PostgreSQL database "nxt-stop" in LON1
+# 2. Create managed Valkey database "nxt-stopcaching" in LON1
+# 3. Create a Space "nxt-stop" in LON1 with CDN enabled
+# 4. Add this app's component as a trusted source on BOTH databases (Network Access tab)
+# 5. Set all environment variables in the App Platform dashboard
+# 6. After first deploy: run `npx prisma db push` using DIRECT_URL (non-pooled connection)
+
+name: nxt-stop
+region: lon
+
+services:
+  - name: nxt-stop
+    github:
+      repo: codeguru2025/nxt-stop
+      branch: master
+      deploy_on_push: true
+
+    # Build
+    build_command: npm ci && npm run build
+    run_command: npm start
+    environment_slug: node-js
+
+    # Resources
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-1gb
+
+    # Health check
+    http_port: 3000
+    health_check:
+      http_path: /api/health
+
+    # Routes
+    routes:
+      - path: /
+
+    # Environment variables
+    # Set these in the App Platform dashboard, NOT here (secrets should not be in YAML)
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+
+# Databases (reference only — create these manually via DO dashboard first)
+# databases:
+#   - name: nxt-stop
+#     engine: PG
+#     version: "18"
+#     size: db-s-1vcpu-1gb
+#     num_nodes: 1
+#   - name: nxt-stopcaching
+#     engine: VALKEY
+#     version: "8"
+#     size: db-s-1vcpu-1gb
+#     num_nodes: 1

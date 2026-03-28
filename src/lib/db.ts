@@ -25,37 +25,21 @@ function createPrismaClient() {
   const pool = new Pool({
     connectionString,
     max: 5,
-    // Close connections after 10s idle — shorter than DO's load balancer
+    // Close connections after 30s idle — shorter than DO's load balancer
     // TCP idle timeout (~60-120s), so we never hand Prisma a stale connection.
-    idleTimeoutMillis: 10_000,
-    // Allow 30s to establish a new connection (cold-start / high load headroom).
-    connectionTimeoutMillis: 30_000,
-    // No TCP keepalive — idleTimeoutMillis handles recycling instead.
-    keepAlive: false,
+    idleTimeoutMillis: 30_000,
+    // Allow 10s to establish a new connection.
+    connectionTimeoutMillis: 10_000,
+    // TCP keepalive is CRITICAL for DigitalOcean managed databases.
+    // Without it, the load balancer silently drops idle connections and
+    // the pool hands dead sockets to Prisma → "Connection terminated".
+    keepAlive: true,
     ssl: { rejectUnauthorized: false },
   })
 
   pool.on('error', (err) => {
     console.error('[pg pool] Idle client error:', err.message)
   })
-
-  // Validate connections before handing them to Prisma.
-  // If a connection was killed server-side while idle, the lightweight
-  // SELECT 1 will throw immediately so the pool destroys it and creates
-  // a fresh one — preventing "Connection terminated unexpectedly" from
-  // surfacing as a Prisma query error.
-  const originalConnect = pool.connect.bind(pool)
-  ;(pool as any).connect = async (): Promise<PoolClient> => {
-    const client = await originalConnect()
-    try {
-      await client.query('SELECT 1')
-      return client
-    } catch {
-      client.release(true) // destroy this dead connection
-      // One retry — the pool will open a fresh TCP connection.
-      return originalConnect()
-    }
-  }
 
   global.__pgPool = pool
 
