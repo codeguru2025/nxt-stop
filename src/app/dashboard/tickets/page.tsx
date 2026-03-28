@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Navbar from '@/components/layout/Navbar'
 import TicketsClient from '@/components/dashboard/TicketsClient'
 
@@ -8,7 +9,9 @@ export default function TicketsPage() {
     <>
       <Navbar />
       <main className="flex-1 pt-20 min-h-screen">
-        <TicketsClient />
+        <Suspense>
+          <TicketsClient />
+        </Suspense>
       </main>
     </>
   )

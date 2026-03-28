@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import EventDetailClient from '@/components/events/EventDetailClient'
@@ -7,7 +8,9 @@ export default function EventDetailPage() {
     <>
       <Navbar />
       <main className="flex-1 pt-16">
-        <EventDetailClient />
+        <Suspense>
+          <EventDetailClient />
+        </Suspense>
       </main>
       <Footer />
     </>
