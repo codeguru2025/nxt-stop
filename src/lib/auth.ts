@@ -3,9 +3,11 @@ import { SignJWT, jwtVerify } from 'jose'
 import { prisma } from './db'
 import type { User } from '@/generated/prisma/client'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? 'nxt-stop-secret'
-)
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET
+  if (!secret) throw new Error('JWT_SECRET environment variable is not set')
+  return new TextEncoder().encode(secret)
+}
 
 export type SessionUser = {
   id: string
@@ -20,12 +22,12 @@ export async function signToken(payload: SessionUser): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime('7d')
     .setIssuedAt()
-    .sign(JWT_SECRET)
+    .sign(getJwtSecret())
 }
 
 export async function verifyToken(token: string): Promise<SessionUser | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
+    const { payload } = await jwtVerify(token, getJwtSecret())
     return payload as unknown as SessionUser
   } catch {
     return null
@@ -50,6 +52,11 @@ export async function requireAuth(): Promise<SessionUser> {
 export async function requireAdmin(): Promise<SessionUser> {
   const session = await requireAuth()
   if (session.role !== 'admin') {
+    throw new Error('Forbidden')
+  }
+  // Re-verify role from DB to prevent JWT role escalation attacks
+  const user = await prisma.user.findUnique({ where: { id: session.id }, select: { role: true } })
+  if (!user || user.role !== 'admin') {
     throw new Error('Forbidden')
   }
   return session

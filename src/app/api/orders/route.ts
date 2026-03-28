@@ -4,19 +4,29 @@ import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { generateOrderNumber } from '@/lib/qr'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import { z } from 'zod'
+
+const CreateOrderSchema = z.object({
+  eventId:      z.string().min(1),
+  ticketTypeId: z.string().min(1),
+  quantity:     z.number().int().min(1).max(20).default(1),
+  referralCode: z.string().optional(),
+  partnerId:    z.string().optional(),
+  guestEmail:   z.string().email().optional(),
+  guestName:    z.string().min(1).max(100).optional(),
+  recipientName: z.string().max(100).optional(),
+})
 
 export async function POST(req: Request) {
   try {
     const session = await requireAuth().catch(() => null)
 
-    const {
-      eventId, ticketTypeId, quantity = 1, referralCode, partnerId,
-      guestEmail, guestName, recipientName,
-    } = await req.json()
-
-    if (!eventId || !ticketTypeId) {
-      return error('eventId and ticketTypeId are required')
+    const body = await req.json()
+    const parsed = CreateOrderSchema.safeParse(body)
+    if (!parsed.success) {
+      return error(parsed.error.issues.map(i => i.message).join('; '))
     }
+    const { eventId, ticketTypeId, quantity, referralCode, partnerId, guestEmail, guestName, recipientName } = parsed.data
 
     // Resolve user — either from session or guest checkout
     let userId: string
@@ -29,23 +39,22 @@ export async function POST(req: Request) {
       if (!guestEmail) return error('Email is required to purchase tickets')
       if (!guestName)  return error('Name is required to purchase tickets')
 
-      // Find or create the guest user
-      let guestUser = await prisma.user.findUnique({ where: { email: guestEmail } })
-      if (!guestUser) {
-        const fakeHash = await bcrypt.hash(crypto.randomUUID(), 6)
-        guestUser = await prisma.user.create({
-          data: {
-            email: guestEmail,
-            name: guestName,
-            passwordHash: fakeHash,
-            role: 'customer',
-          },
-        })
-      }
+      // Upsert to prevent TOCTOU race between two concurrent guest checkouts with same email
+      const fakeHash = await bcrypt.hash(crypto.randomUUID(), 6)
+      const guestUser = await prisma.user.upsert({
+        where:  { email: guestEmail },
+        update: {},
+        create: {
+          email: guestEmail,
+          name: guestName,
+          passwordHash: fakeHash,
+          role: 'customer',
+        },
+      })
+
       userId = guestUser.id
       guestToken = crypto.randomUUID()
 
-      // Auto-sign a session so client can be logged in after payment
       autoSessionToken = await signToken({
         id: guestUser.id,
         email: guestUser.email,
@@ -55,60 +64,67 @@ export async function POST(req: Request) {
       })
     }
 
-    const ticketType = await prisma.ticketType.findFirst({
-      where: { id: ticketTypeId, eventId, active: true },
-      include: { event: true },
-    })
+    // Capacity check + order creation inside a transaction to prevent overselling
+    const result = await prisma.$transaction(async (tx) => {
+      const ticketType = await tx.ticketType.findFirst({
+        where: { id: ticketTypeId, eventId, active: true },
+        include: { event: true },
+      })
 
-    if (!ticketType) return error('Ticket type not found')
-    if (ticketType.sold + quantity > ticketType.capacity) {
-      return error('Not enough tickets available')
-    }
+      if (!ticketType) throw Object.assign(new Error('Ticket type not found'), { status: 404 })
+      if (!ticketType.active) throw Object.assign(new Error('Ticket type is no longer available'), { status: 409 })
+      if (ticketType.sold + quantity > ticketType.capacity) {
+        throw Object.assign(new Error('Not enough tickets available'), { status: 409 })
+      }
 
-    const platformFee = ticketType.event.platformFee * quantity
-    const subtotal = ticketType.price * quantity
-    const total = subtotal + platformFee
+      const platformFee = ticketType.event.platformFee * quantity
+      const subtotal = ticketType.price * quantity
+      const total = subtotal + platformFee
 
-    let resolvedPartnerId = partnerId
-    if (!resolvedPartnerId && referralCode) {
-      const partner = await prisma.partner.findUnique({ where: { referralCode } })
-      resolvedPartnerId = partner?.id
-    }
+      let resolvedPartnerId = partnerId
+      if (!resolvedPartnerId && referralCode) {
+        const partner = await tx.partner.findUnique({ where: { referralCode } })
+        resolvedPartnerId = partner?.id
+      }
 
-    const order = await prisma.order.create({
-      data: {
-        orderNumber: generateOrderNumber(),
-        userId,
-        subtotal,
-        platformFees: platformFee,
-        total,
-        status: 'pending',
-        partnerId: resolvedPartnerId ?? null,
-        referralCode: referralCode ?? null,
-        guestToken: guestToken ?? null,
-        guestEmail: guestEmail ?? null,
-        guestName: guestName ?? null,
-        recipientName: recipientName ?? null,
-        items: {
-          create: {
-            name: `${ticketType.name} - ${ticketType.event.name}`,
-            price: ticketType.price,
-            quantity,
-            ticketTypeId,
+      const order = await tx.order.create({
+        data: {
+          orderNumber: generateOrderNumber(),
+          userId,
+          subtotal,
+          platformFees: platformFee,
+          total,
+          status: 'pending',
+          partnerId: resolvedPartnerId ?? null,
+          referralCode: referralCode ?? null,
+          guestToken: guestToken ?? null,
+          guestEmail: guestEmail ?? null,
+          guestName: guestName ?? null,
+          recipientName: recipientName ?? null,
+          items: {
+            create: {
+              name: `${ticketType.name} - ${ticketType.event.name}`,
+              price: ticketType.price,
+              quantity,
+              ticketTypeId,
+            },
           },
         },
-      },
-      include: { items: true },
+        include: { items: true },
+      })
+
+      return { order, ticketType, event: ticketType.event }
     })
 
     return ok({
-      order,
-      ticketType,
-      event: ticketType.event,
+      order: result.order,
+      ticketType: result.ticketType,
+      event: result.event,
       guestToken: guestToken ?? null,
       autoSessionToken: autoSessionToken ?? null,
     }, 201)
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.status === 404 || e?.status === 409) return error(e.message, e.status)
     return serverError(e)
   }
 }

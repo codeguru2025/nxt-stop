@@ -2,21 +2,26 @@ import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { initiatePaynowPayment, type PaynowMethod } from '@/lib/paynow'
+import { z } from 'zod'
 
 const MERCHANT_EMAIL = process.env.PAYNOW_EMAIL ?? 'gustozw@gmail.com'
+
+const InitiateSchema = z.object({
+  orderId:    z.string().min(1),
+  method:     z.enum(['ecocash', 'onemoney', 'innbucks', 'omari', 'vmc', 'standard']),
+  phone:      z.string().max(20).optional(),
+  guestToken: z.string().uuid().optional(),
+})
 
 export async function POST(req: Request) {
   try {
     const session = await requireAuth().catch(() => null)
 
-    const { orderId, method, phone, guestToken } = await req.json() as {
-      orderId: string
-      method: PaynowMethod
-      phone?: string
-      guestToken?: string
-    }
+    const body = await req.json()
+    const parsed = InitiateSchema.safeParse(body)
+    if (!parsed.success) return error(parsed.error.issues.map(i => i.message).join('; '))
 
-    if (!orderId || !method) return error('orderId and method are required')
+    const { orderId, method, phone, guestToken } = parsed.data
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
