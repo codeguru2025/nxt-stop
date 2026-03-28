@@ -26,7 +26,12 @@
       "Bash(grep -n \"$use\\\\b\" node_modules/@prisma/client/runtime/client.d.ts)",
       "Bash(grep -n \"^\\\\s*$use\\\\b\\\\|use\\\\?\\\\\\(middleware\\\\|Middleware\\\\\\)\" node_modules/@prisma/client/runtime/client.d.ts)",
       "Bash(grep -rn $use src/generated/prisma/)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(grep -r RouteContext node_modules/next/dist/ --include=*.d.ts -l)",
+      "Bash(grep -r RouteContext src/ --include=*.ts -l)",
+      "Bash(grep -r RouteContext src/types/ --include=*.ts)",
+      "Bash(find src:*)",
+      "Bash(cat .next/types/app/api/admin/events/[id]/route.ts)"
     ]
   }
 }

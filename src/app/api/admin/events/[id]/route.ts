@@ -74,6 +74,23 @@ export async function PATCH(
       },
     })
 
+    // Update ticket type prices/capacity if provided
+    if (body.ticketTypes?.length) {
+      for (const tt of body.ticketTypes) {
+        if (!tt.id) continue
+        await prisma.ticketType.update({
+          where: { id: tt.id },
+          data: {
+            ...(tt.name !== undefined && { name: tt.name }),
+            ...(tt.price !== undefined && { price: parseFloat(String(tt.price)) }),
+            ...(tt.capacity !== undefined && { capacity: parseInt(String(tt.capacity)) }),
+            ...(tt.color !== undefined && { color: tt.color }),
+            ...(tt.description !== undefined && { description: tt.description }),
+          },
+        })
+      }
+    }
+
     return ok(event)
   } catch (e) {
     return serverError(e)

@@ -5,7 +5,8 @@ import dynamic from 'next/dynamic'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import {
   Calendar, MapPin, Clock, Users, Ticket, Share2,
-  Check, AlertCircle, Loader2, Music, Video, Star, Phone, ExternalLink
+  Check, AlertCircle, Loader2, Music, Video, Star, Phone, ExternalLink,
+  ChevronDown, ChevronUp, User
 } from 'lucide-react'
 import { formatDate, formatCurrency, buildReferralUrl } from '@/lib/utils'
 
@@ -28,21 +29,21 @@ type Event = {
 }
 
 const PAYMENT_METHODS = [
-  { id: 'ecocash',  label: 'EcoCash',   icon: '📱', mobile: true },
-  { id: 'onemoney', label: 'OneMoney',  icon: '💰', mobile: true },
-  { id: 'innbucks', label: 'InnBucks',  icon: '🔵', mobile: true },
-  { id: 'omari',    label: "O'mari",    icon: '🏦', mobile: true },
-  { id: 'standard', label: 'Card / Bank', icon: '💳', mobile: false },
+  { id: 'ecocash',  label: 'EcoCash',     icon: '📱', mobile: true,  desc: 'USSD push to your phone' },
+  { id: 'onemoney', label: 'OneMoney',    icon: '💰', mobile: true,  desc: 'NetOne mobile money' },
+  { id: 'innbucks', label: 'InnBucks',    icon: '🔵', mobile: true,  desc: 'Auth code in app' },
+  { id: 'omari',    label: "O'mari",      icon: '🏦', mobile: true,  desc: 'Steward Bank wallet' },
+  { id: 'standard', label: 'Card / Bank', icon: '💳', mobile: false, desc: 'Visa, Mastercard, ZimSwitch' },
 ]
 
 type Stage =
   | { name: 'idle' }
-  | { name: 'phone' }
+  | { name: 'checkout' }
   | { name: 'processing' }
-  | { name: 'mobile_pending'; instructions: string; orderId: string }
-  | { name: 'innbucks_pending'; code: string; orderId: string }
-  | { name: 'redirect'; redirectUrl: string; orderId: string }
-  | { name: 'paid' }
+  | { name: 'mobile_pending'; instructions: string; orderId: string; guestToken?: string }
+  | { name: 'innbucks_pending'; code: string; orderId: string; guestToken?: string }
+  | { name: 'redirect'; redirectUrl: string; orderId: string; guestToken?: string }
+  | { name: 'paid'; guestToken?: string }
   | { name: 'error'; message: string }
 
 export default function EventDetailClient() {
@@ -58,8 +59,14 @@ export default function EventDetailClient() {
   const [phone, setPhone] = useState('')
   const [stage, setStage] = useState<Stage>({ name: 'idle' })
   const [user, setUser] = useState<any>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Guest / "for someone else" fields
+  const [guestName, setGuestName]           = useState('')
+  const [guestEmail, setGuestEmail]         = useState('')
+  const [forSomeoneElse, setForSomeoneElse] = useState(false)
+  const [recipientName, setRecipientName]   = useState('')
+
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const ref = searchParams.get('ref') ?? ''
 
   useEffect(() => {
@@ -75,7 +82,6 @@ export default function EventDetailClient() {
     }).finally(() => setLoading(false))
   }, [slug])
 
-  // Clean up polling on unmount
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
   const selectedTicket = event?.ticketTypes.find(t => t.id === selectedType)
@@ -83,41 +89,63 @@ export default function EventDetailClient() {
   const subtotal = selectedTicket ? selectedTicket.price * quantity : 0
   const fees = quantity * (event?.platformFee ?? 0.10)
   const total = subtotal + fees
-
   const isMobile = PAYMENT_METHODS.find(m => m.id === paymentMethod)?.mobile ?? false
 
-  function startPolling(orderId: string) {
+  function startPolling(orderId: string, guestToken?: string) {
     pollRef.current = setInterval(async () => {
-      const res = await fetch(`/api/paynow/poll?orderId=${orderId}`).then(r => r.json())
+      const qs = guestToken ? `&guestToken=${guestToken}` : ''
+      const res = await fetch(`/api/paynow/poll?orderId=${orderId}${qs}`).then(r => r.json())
       if (res.success && res.data.status === 'paid') {
         clearInterval(pollRef.current!)
-        setStage({ name: 'paid' })
-        setTimeout(() => router.push('/dashboard/tickets'), 3000)
+        setStage({ name: 'paid', guestToken })
+        setTimeout(() => {
+          if (guestToken) {
+            router.push(`/dashboard/tickets?guestToken=${guestToken}`)
+          } else {
+            router.push('/dashboard/tickets')
+          }
+        }, 3000)
       }
     }, 5000)
   }
 
   const handleBuy = async () => {
-    if (!user) { router.push(`/login?redirect=/events/${slug}`); return }
     if (!selectedType) return
 
-    if (isMobile && stage.name === 'idle') {
-      setStage({ name: 'phone' })
+    // Show checkout form if not yet shown
+    if (stage.name === 'idle') {
+      setStage({ name: 'checkout' })
       return
     }
 
+    // Validate guest fields if not logged in
+    if (!user) {
+      if (!guestEmail.trim()) return
+      if (!guestName.trim()) return
+    }
+
+    // Validate phone for mobile methods
+    if (isMobile && !phone.trim()) return
+
     setStage({ name: 'processing' })
 
-    // 1. Create pending order
+    // 1. Create order
+    const orderBody: any = {
+      eventId: event!.id,
+      ticketTypeId: selectedType,
+      quantity,
+      referralCode: ref || undefined,
+      recipientName: forSomeoneElse && recipientName ? recipientName : undefined,
+    }
+    if (!user) {
+      orderBody.guestEmail = guestEmail
+      orderBody.guestName = guestName
+    }
+
     const orderRes = await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        eventId: event!.id,
-        ticketTypeId: selectedType,
-        quantity,
-        referralCode: ref || undefined,
-      }),
+      body: JSON.stringify(orderBody),
     }).then(r => r.json())
 
     if (!orderRes.success) {
@@ -126,12 +154,18 @@ export default function EventDetailClient() {
     }
 
     const orderId = orderRes.data.order.id
+    const guestToken = orderRes.data.guestToken ?? undefined
 
-    // 2. Initiate Paynow payment
+    // 2. Initiate payment
     const payRes = await fetch('/api/paynow/initiate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId, method: paymentMethod, phone: isMobile ? phone : undefined }),
+      body: JSON.stringify({
+        orderId,
+        method: paymentMethod,
+        phone: isMobile ? phone : undefined,
+        guestToken,
+      }),
     }).then(r => r.json())
 
     if (!payRes.success) {
@@ -142,21 +176,20 @@ export default function EventDetailClient() {
     const result = payRes.data
 
     if (result.type === 'redirect') {
-      setStage({ name: 'redirect', redirectUrl: result.redirectUrl, orderId })
-      startPolling(orderId)
+      setStage({ name: 'redirect', redirectUrl: result.redirectUrl, orderId, guestToken })
+      startPolling(orderId, guestToken)
       window.location.href = result.redirectUrl
       return
     }
 
     if (result.type === 'innbucks') {
-      setStage({ name: 'innbucks_pending', code: result.innbucksCode, orderId })
-      startPolling(orderId)
+      setStage({ name: 'innbucks_pending', code: result.innbucksCode, orderId, guestToken })
+      startPolling(orderId, guestToken)
       return
     }
 
-    // mobile
-    setStage({ name: 'mobile_pending', instructions: result.instructions, orderId })
-    startPolling(orderId)
+    setStage({ name: 'mobile_pending', instructions: result.instructions, orderId, guestToken })
+    startPolling(orderId, guestToken)
   }
 
   const lineup: string[] = event?.lineup ? JSON.parse(event.lineup) : []
@@ -169,12 +202,11 @@ export default function EventDetailClient() {
 
   if (!event) return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="text-5xl mb-4">😢</div>
-        <p className="text-gray-400">Event not found.</p>
-      </div>
+      <div className="text-center"><div className="text-5xl mb-4">😢</div><p className="text-gray-400">Event not found.</p></div>
     </div>
   )
+
+  const isCheckoutVisible = stage.name === 'checkout' || stage.name === 'processing' || stage.name === 'error'
 
   return (
     <div>
@@ -209,7 +241,7 @@ export default function EventDetailClient() {
               </div>
               <div className="flex items-center gap-2 text-gray-400">
                 <Clock size={16} className="text-purple-400" />
-                <span>{formatDate(event.date, 'h:mm a')} {event.endDate ? `– ${formatDate(event.endDate, 'h:mm a')}` : ''}</span>
+                <span>{formatDate(event.date, 'h:mm a')}{event.endDate ? ` – ${formatDate(event.endDate, 'h:mm a')}` : ''}</span>
               </div>
               <div className="flex items-center gap-2 text-gray-400">
                 <MapPin size={16} className="text-purple-400" />
@@ -239,8 +271,7 @@ export default function EventDetailClient() {
             {lineup.length > 0 && (
               <div className="mb-8">
                 <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <Music size={20} className="text-purple-400" />
-                  Lineup
+                  <Music size={20} className="text-purple-400" />Lineup
                 </h2>
                 <div className="flex flex-wrap gap-2">
                   {lineup.map((artist: string) => (
@@ -285,8 +316,7 @@ export default function EventDetailClient() {
             {event.lat && event.lng && (
               <div className="mb-8">
                 <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <MapPin size={20} className="text-purple-400" />
-                  Venue Location
+                  <MapPin size={20} className="text-purple-400" />Venue Location
                 </h2>
                 <VenueMap lat={event.lat} lng={event.lng} venueName={event.venue} address={event.address} />
               </div>
@@ -299,25 +329,23 @@ export default function EventDetailClient() {
               {stage.name === 'paid' ? (
                 <PaidCard />
               ) : stage.name === 'mobile_pending' ? (
-                <MobilePendingCard instructions={stage.instructions} />
+                <MobilePendingCard instructions={stage.instructions} method={paymentMethod} phone={phone} />
               ) : stage.name === 'innbucks_pending' ? (
                 <InnbucksCard code={stage.code} />
-              ) : stage.name === 'error' ? (
-                <div className="card p-6">
-                  <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4 text-sm text-red-400">
-                    <AlertCircle size={14} />
-                    {stage.message}
-                  </div>
-                  <button
-                    onClick={() => setStage({ name: 'idle' })}
-                    className="w-full btn-primary"
-                  >
-                    Try Again
-                  </button>
-                </div>
               ) : (
                 <div className="card p-6">
                   <h3 className="text-xl font-bold text-white mb-5">Get Your Tickets</h3>
+
+                  {/* Error */}
+                  {stage.name === 'error' && (
+                    <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-xl p-3 mb-4 text-sm text-red-400">
+                      <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                      <div>
+                        {stage.message}
+                        <button onClick={() => setStage({ name: 'checkout' })} className="block text-xs text-red-300 mt-1 underline">Try again</button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Ticket type selection */}
                   <div className="space-y-2 mb-5">
@@ -330,11 +358,9 @@ export default function EventDetailClient() {
                           onClick={() => avail > 0 && setSelectedType(t.id)}
                           disabled={avail <= 0}
                           className={`w-full rounded-xl p-3.5 text-left transition-all border ${
-                            isSelected
-                              ? 'border-purple-500 bg-purple-500/10'
-                              : avail <= 0
-                              ? 'border-[#2a2a2a] opacity-40 cursor-not-allowed'
-                              : 'border-[#2a2a2a] hover:border-[#3a3a3a]'
+                            isSelected ? 'border-purple-500 bg-purple-500/10' :
+                            avail <= 0  ? 'border-[#2a2a2a] opacity-40 cursor-not-allowed' :
+                            'border-[#2a2a2a] hover:border-[#3a3a3a]'
                           }`}
                         >
                           <div className="flex items-center justify-between">
@@ -344,9 +370,7 @@ export default function EventDetailClient() {
                             </div>
                             <span className="font-black text-white">{formatCurrency(t.price)}</span>
                           </div>
-                          {t.description && (
-                            <p className="text-xs text-gray-500 mt-1 ml-4">{t.description}</p>
-                          )}
+                          {t.description && <p className="text-xs text-gray-500 mt-1 ml-4">{t.description}</p>}
                           <div className="flex items-center justify-between mt-1.5 ml-4">
                             <span className="text-xs text-gray-600">{avail} remaining</span>
                             {avail <= 20 && avail > 0 && <span className="text-xs text-orange-400 font-medium">Almost sold out!</span>}
@@ -361,56 +385,11 @@ export default function EventDetailClient() {
                   <div className="mb-5">
                     <label>Quantity</label>
                     <div className="flex items-center gap-3 mt-1">
-                      <button
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="w-10 h-10 rounded-lg bg-[#2a2a2a] flex items-center justify-center text-white hover:bg-[#3a3a3a] transition-colors font-bold"
-                      >−</button>
+                      <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-10 h-10 rounded-lg bg-[#2a2a2a] flex items-center justify-center text-white hover:bg-[#3a3a3a] transition-colors font-bold">−</button>
                       <span className="text-xl font-bold text-white w-8 text-center">{quantity}</span>
-                      <button
-                        onClick={() => setQuantity(Math.min(10, available, quantity + 1))}
-                        disabled={quantity >= Math.min(10, available)}
-                        className="w-10 h-10 rounded-lg bg-[#2a2a2a] flex items-center justify-center text-white hover:bg-[#3a3a3a] transition-colors font-bold disabled:opacity-40"
-                      >+</button>
+                      <button onClick={() => setQuantity(Math.min(10, available, quantity + 1))} disabled={quantity >= Math.min(10, available)} className="w-10 h-10 rounded-lg bg-[#2a2a2a] flex items-center justify-center text-white hover:bg-[#3a3a3a] transition-colors font-bold disabled:opacity-40">+</button>
                     </div>
                   </div>
-
-                  {/* Payment method */}
-                  <div className="mb-5">
-                    <label>Payment Method</label>
-                    <div className="grid grid-cols-3 gap-2 mt-1">
-                      {PAYMENT_METHODS.map(pm => (
-                        <button
-                          key={pm.id}
-                          onClick={() => { setPaymentMethod(pm.id); setStage({ name: 'idle' }); setPhone('') }}
-                          className={`rounded-lg p-2 text-center text-xs font-medium border transition-all ${
-                            paymentMethod === pm.id
-                              ? 'border-purple-500 bg-purple-500/10 text-purple-300'
-                              : 'border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]'
-                          }`}
-                        >
-                          <div className="text-lg mb-0.5">{pm.icon}</div>
-                          {pm.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Phone input — shown when mobile method + phone stage */}
-                  {stage.name === 'phone' && isMobile && (
-                    <div className="mb-5">
-                      <label>Mobile Number</label>
-                      <div className="relative mt-1">
-                        <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                        <input
-                          type="tel"
-                          placeholder="07X XXX XXXX"
-                          value={phone}
-                          onChange={e => setPhone(e.target.value)}
-                          className="pl-9"
-                        />
-                      </div>
-                    </div>
-                  )}
 
                   {/* Price summary */}
                   {selectedTicket && (
@@ -430,21 +409,123 @@ export default function EventDetailClient() {
                     </div>
                   )}
 
-                  <button
-                    onClick={handleBuy}
-                    disabled={stage.name === 'processing' || !selectedType || available <= 0 || (stage.name === 'phone' && !phone)}
-                    className="w-full btn-primary flex items-center justify-center gap-2 text-base"
-                  >
-                    {stage.name === 'processing' ? (
-                      <><Loader2 size={18} className="animate-spin" /> Processing...</>
-                    ) : stage.name === 'phone' ? (
-                      <><Phone size={18} /> Confirm &amp; Pay</>
-                    ) : user ? (
-                      <><Ticket size={18} /> Buy {quantity} Ticket{quantity > 1 ? 's' : ''}</>
-                    ) : (
-                      'Sign In to Buy'
-                    )}
-                  </button>
+                  {/* Checkout form — shown when user clicks Buy */}
+                  {isCheckoutVisible && (
+                    <div className="space-y-4 mb-5 border-t border-[#2a2a2a] pt-4">
+
+                      {/* Payment method */}
+                      <div>
+                        <label className="text-sm font-medium text-gray-300 mb-2 block">Pay with</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {PAYMENT_METHODS.map(pm => (
+                            <button
+                              key={pm.id}
+                              onClick={() => { setPaymentMethod(pm.id); setPhone('') }}
+                              className={`rounded-lg p-2 text-center text-xs font-medium border transition-all ${
+                                paymentMethod === pm.id
+                                  ? 'border-purple-500 bg-purple-500/10 text-purple-300'
+                                  : 'border-[#2a2a2a] text-gray-400 hover:border-[#3a3a3a]'
+                              }`}
+                            >
+                              <div className="text-lg mb-0.5">{pm.icon}</div>
+                              {pm.label}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1.5">{PAYMENT_METHODS.find(m => m.id === paymentMethod)?.desc}</p>
+                      </div>
+
+                      {/* Mobile phone number */}
+                      {isMobile && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-300 mb-1 block">Mobile Number</label>
+                          <div className="relative">
+                            <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                            <input
+                              type="tel"
+                              placeholder="07X XXX XXXX"
+                              value={phone}
+                              onChange={e => setPhone(e.target.value)}
+                              className="pl-9 w-full"
+                              autoFocus
+                            />
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1">You'll get a push notification to approve payment</p>
+                        </div>
+                      )}
+
+                      {/* Guest fields (not logged in) */}
+                      {!user && (
+                        <div className="space-y-3 bg-[#111] rounded-xl p-4 border border-[#2a2a2a]">
+                          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Your Details</p>
+                          <input
+                            type="text"
+                            placeholder="Full name *"
+                            value={guestName}
+                            onChange={e => setGuestName(e.target.value)}
+                            className="w-full"
+                          />
+                          <input
+                            type="email"
+                            placeholder="Email address *"
+                            value={guestEmail}
+                            onChange={e => setGuestEmail(e.target.value)}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-gray-600">We'll send your ticket here. <a href="/register" className="text-purple-400 hover:text-purple-300">Create an account</a> to manage tickets easier.</p>
+                        </div>
+                      )}
+
+                      {/* Buying for someone else */}
+                      <button
+                        onClick={() => setForSomeoneElse(!forSomeoneElse)}
+                        className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                      >
+                        <User size={12} />
+                        Buying for someone else?
+                        {forSomeoneElse ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
+                      {forSomeoneElse && (
+                        <input
+                          type="text"
+                          placeholder="Recipient's name (shown on ticket)"
+                          value={recipientName}
+                          onChange={e => setRecipientName(e.target.value)}
+                          className="w-full"
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* CTA */}
+                  {stage.name === 'idle' ? (
+                    <button
+                      onClick={handleBuy}
+                      disabled={!selectedType || available <= 0}
+                      className="w-full btn-primary flex items-center justify-center gap-2 text-base"
+                    >
+                      <Ticket size={18} />
+                      {user ? `Buy ${quantity} Ticket${quantity > 1 ? 's' : ''}` : 'Get Tickets'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleBuy}
+                      disabled={
+                        stage.name === 'processing' ||
+                        !selectedType ||
+                        available <= 0 ||
+                        (isMobile && !phone.trim()) ||
+                        (!user && (!guestEmail.trim() || !guestName.trim()))
+                      }
+                      className="w-full btn-primary flex items-center justify-center gap-2 text-base"
+                    >
+                      {stage.name === 'processing' ? (
+                        <><Loader2 size={18} className="animate-spin" /> Processing...</>
+                      ) : (
+                        <><Phone size={18} /> Confirm &amp; Pay {formatCurrency(total)}</>
+                      )}
+                    </button>
+                  )}
 
                   {ref && (
                     <p className="text-xs text-gray-600 mt-3 text-center">
@@ -473,13 +554,19 @@ function PaidCard() {
   )
 }
 
-function MobilePendingCard({ instructions }: { instructions: string }) {
+function MobilePendingCard({ instructions, method, phone }: { instructions: string; method: string; phone: string }) {
+  const methodName = PAYMENT_METHODS.find(m => m.id === method)?.label ?? method
   return (
     <div className="card p-6 text-center border-yellow-500/30 bg-yellow-500/5">
       <Loader2 size={32} className="animate-spin text-yellow-400 mx-auto mb-4" />
       <h3 className="text-lg font-bold text-white mb-2">Check Your Phone</h3>
-      <p className="text-gray-400 text-sm leading-relaxed">{instructions}</p>
-      <p className="text-gray-600 text-xs mt-4">This page will update automatically when payment is confirmed.</p>
+      <p className="text-gray-400 text-sm leading-relaxed mb-3">{instructions}</p>
+      <div className="bg-[#111] rounded-xl p-3 text-sm">
+        <p className="text-gray-500 text-xs mb-0.5">{methodName} push sent to</p>
+        <p className="text-white font-bold">{phone}</p>
+        <p className="text-gray-600 text-xs mt-2">Enter your PIN to approve → ticket generates instantly</p>
+      </div>
+      <p className="text-gray-600 text-xs mt-4">This page updates automatically when payment is confirmed.</p>
     </div>
   )
 }
@@ -497,7 +584,7 @@ function InnbucksCard({ code }: { code: string }) {
       <a href={deepLink} className="inline-flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors mb-3">
         <ExternalLink size={14} /> Open InnBucks App
       </a>
-      <p className="text-gray-600 text-xs">Enter the code in your InnBucks app to complete payment. This page updates automatically.</p>
+      <p className="text-gray-600 text-xs">Enter the code in your InnBucks app. This page updates automatically.</p>
     </div>
   )
 }

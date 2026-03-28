@@ -130,8 +130,9 @@ model TicketType {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  tickets Ticket[]
+  event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tickets    Ticket[]
+  orderItems OrderItem[]
 }
 
 // ─── TICKETS ─────────────────────────────────────────────────────────────────
@@ -187,6 +188,10 @@ model Order {
   paidAt        DateTime?
   partnerId     String?
   referralCode  String?
+  guestToken    String?   @unique
+  guestEmail    String?
+  guestName     String?
+  recipientName String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -196,15 +201,17 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  productId String?
-  name      String
-  price     Float
-  quantity  Int     @default(1)
+  id           String  @id @default(cuid())
+  orderId      String
+  productId    String?
+  ticketTypeId String?
+  name         String
+  price        Float
+  quantity     Int     @default(1)
 
-  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product? @relation(fields: [productId], references: [id])
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product?    @relation(fields: [productId], references: [id])
+  ticketType TicketType? @relation(fields: [ticketTypeId], references: [id])
 }
 
 // ─── PARTNERS & AFFILIATES ───────────────────────────────────────────────────

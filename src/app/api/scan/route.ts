@@ -39,9 +39,10 @@ export async function POST(req: Request) {
     const ticket = await prisma.ticket.findUnique({
       where: { qrCode },
       include: {
-        event: { select: { id: true, name: true, date: true } },
-        ticketType: { select: { name: true } },
+        event: { select: { id: true, name: true, date: true, venue: true, posterImage: true } },
+        ticketType: { select: { name: true, color: true, price: true } },
         user: { select: { name: true, email: true } },
+        order: { select: { recipientName: true, guestName: true } },
       },
     })
 
@@ -61,15 +62,19 @@ export async function POST(req: Request) {
 
     if (ticket.status === 'used') {
       await logScan(ticket.id, ticket.eventId, session.id, 'already_used', deviceId)
+      const usedHolder = (ticket.order as any)?.recipientName || (ticket.order as any)?.guestName || ticket.user.name
       const payload = {
         result: 'already_used',
         message: 'Ticket has already been used',
         usedAt: ticket.usedAt,
         ticket: {
           number: ticket.ticketNumber,
-          holder: ticket.user.name,
+          holder: usedHolder,
           type: ticket.ticketType.name,
+          color: (ticket.ticketType as any).color,
+          price: (ticket.ticketType as any).price,
           event: ticket.event.name,
+          venue: (ticket.event as any).venue,
         },
       }
       emitScanEvent(ticket.eventId, payload)
@@ -90,15 +95,21 @@ export async function POST(req: Request) {
 
     await logScan(ticket.id, ticket.eventId, session.id, 'valid', deviceId)
 
+    const holderName = (ticket.order as any)?.recipientName || (ticket.order as any)?.guestName || ticket.user.name
     const payload = {
       result: 'valid',
       message: 'Entry granted',
       ticket: {
         number: ticket.ticketNumber,
-        holder: ticket.user.name,
+        holder: holderName,
         email: ticket.user.email,
         type: ticket.ticketType.name,
+        color: (ticket.ticketType as any).color,
+        price: (ticket.ticketType as any).price,
         event: ticket.event.name,
+        venue: (ticket.event as any).venue,
+        date: (ticket.event as any).date,
+        posterImage: (ticket.event as any).posterImage,
       },
     }
     emitScanEvent(ticket.eventId, payload)

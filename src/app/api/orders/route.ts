@@ -1,17 +1,58 @@
 import { prisma } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, signToken } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { generateOrderNumber } from '@/lib/qr'
+import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 
 export async function POST(req: Request) {
   try {
     const session = await requireAuth().catch(() => null)
-    if (!session) return unauthorized()
 
-    const { eventId, ticketTypeId, quantity = 1, referralCode, partnerId } = await req.json()
+    const {
+      eventId, ticketTypeId, quantity = 1, referralCode, partnerId,
+      guestEmail, guestName, recipientName,
+    } = await req.json()
 
     if (!eventId || !ticketTypeId) {
       return error('eventId and ticketTypeId are required')
+    }
+
+    // Resolve user — either from session or guest checkout
+    let userId: string
+    let guestToken: string | undefined
+    let autoSessionToken: string | undefined
+
+    if (session) {
+      userId = session.id
+    } else {
+      if (!guestEmail) return error('Email is required to purchase tickets')
+      if (!guestName)  return error('Name is required to purchase tickets')
+
+      // Find or create the guest user
+      let guestUser = await prisma.user.findUnique({ where: { email: guestEmail } })
+      if (!guestUser) {
+        const fakeHash = await bcrypt.hash(crypto.randomUUID(), 6)
+        guestUser = await prisma.user.create({
+          data: {
+            email: guestEmail,
+            name: guestName,
+            passwordHash: fakeHash,
+            role: 'customer',
+          },
+        })
+      }
+      userId = guestUser.id
+      guestToken = crypto.randomUUID()
+
+      // Auto-sign a session so client can be logged in after payment
+      autoSessionToken = await signToken({
+        id: guestUser.id,
+        email: guestUser.email,
+        name: guestUser.name,
+        role: guestUser.role,
+        referralCode: guestUser.referralCode,
+      })
     }
 
     const ticketType = await prisma.ticketType.findFirst({
@@ -34,29 +75,39 @@ export async function POST(req: Request) {
       resolvedPartnerId = partner?.id
     }
 
-    // Create a pending order — no tickets yet, fulfilled after payment confirmation
     const order = await prisma.order.create({
       data: {
         orderNumber: generateOrderNumber(),
-        userId: session.id,
+        userId,
         subtotal,
         platformFees: platformFee,
         total,
         status: 'pending',
         partnerId: resolvedPartnerId ?? null,
         referralCode: referralCode ?? null,
+        guestToken: guestToken ?? null,
+        guestEmail: guestEmail ?? null,
+        guestName: guestName ?? null,
+        recipientName: recipientName ?? null,
         items: {
           create: {
             name: `${ticketType.name} - ${ticketType.event.name}`,
             price: ticketType.price,
             quantity,
+            ticketTypeId,
           },
         },
       },
       include: { items: true },
     })
 
-    return ok({ order, ticketType, event: ticketType.event }, 201)
+    return ok({
+      order,
+      ticketType,
+      event: ticketType.event,
+      guestToken: guestToken ?? null,
+      autoSessionToken: autoSessionToken ?? null,
+    }, 201)
   } catch (e) {
     return serverError(e)
   }
