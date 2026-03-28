@@ -79,12 +79,17 @@ export default function Footer() {
 
           {/* Links */}
           <div>
-            <h4 className="font-semibold text-white mb-4 text-sm uppercase tracking-wider">Platform</h4>
+          <h4 className="font-semibold text-white mb-4 text-sm uppercase tracking-wider">Platform</h4>
             <ul className="space-y-2">
-              {['Events', 'Tickets', 'Partners', 'Virtual Events', 'Rewards'].map(l => (
-                <li key={l}>
-                  <Link href={`/${l.toLowerCase().replace(' ', '-')}`} className="text-gray-500 hover:text-white text-sm transition-colors">
-                    {l}
+              {[
+                { label: 'Events', href: '/events' },
+                { label: 'Tickets', href: '/dashboard/tickets' },
+                { label: 'Rewards', href: '/dashboard/rewards' },
+                { label: 'About', href: '/about' },
+              ].map(l => (
+                <li key={l.label}>
+                  <Link href={l.href} className="text-gray-500 hover:text-white text-sm transition-colors">
+                    {l.label}
                   </Link>
                 </li>
               ))}

@@ -1,22 +1,36 @@
 import { RateLimiterRedis } from 'rate-limiter-flexible'
 import { redis } from './redis'
 
-// Auth endpoints: 10 attempts per 15 minutes per IP
-const authLimiter = new RateLimiterRedis({
-  storeClient: redis,
-  keyPrefix: 'rl:auth',
-  points: 10,
-  duration: 900,
-  blockDuration: 900,
-})
+// Lazily create limiters only when Redis is available
+let authLimiter: RateLimiterRedis | null = null
+let scanLimiter: RateLimiterRedis | null = null
 
-// Scan endpoint: 120 scans per minute per IP (2/sec — fast gate throughput)
-const scanLimiter = new RateLimiterRedis({
-  storeClient: redis,
-  keyPrefix: 'rl:scan',
-  points: 120,
-  duration: 60,
-})
+function getAuthLimiter(): RateLimiterRedis | null {
+  if (!redis) return null
+  if (!authLimiter) {
+    authLimiter = new RateLimiterRedis({
+      storeClient: redis,
+      keyPrefix: 'rl:auth',
+      points: 10,
+      duration: 900,
+      blockDuration: 900,
+    })
+  }
+  return authLimiter
+}
+
+function getScanLimiter(): RateLimiterRedis | null {
+  if (!redis) return null
+  if (!scanLimiter) {
+    scanLimiter = new RateLimiterRedis({
+      storeClient: redis,
+      keyPrefix: 'rl:scan',
+      points: 120,
+      duration: 60,
+    })
+  }
+  return scanLimiter
+}
 
 // RateLimiterResolution objects have msBeforeNextReset; plain Errors mean Redis is down
 function isRateLimited(e: any): boolean {
@@ -24,8 +38,10 @@ function isRateLimited(e: any): boolean {
 }
 
 export async function checkAuthLimit(ip: string): Promise<{ limited: boolean; retryAfter?: number }> {
+  const limiter = getAuthLimiter()
+  if (!limiter) return { limited: false }
   try {
-    await authLimiter.consume(ip)
+    await limiter.consume(ip)
     return { limited: false }
   } catch (e: any) {
     if (isRateLimited(e)) return { limited: true, retryAfter: Math.ceil(e.msBeforeNextReset / 1000) }
@@ -35,8 +51,10 @@ export async function checkAuthLimit(ip: string): Promise<{ limited: boolean; re
 }
 
 export async function checkScanLimit(ip: string): Promise<{ limited: boolean }> {
+  const limiter = getScanLimiter()
+  if (!limiter) return { limited: false }
   try {
-    await scanLimiter.consume(ip)
+    await limiter.consume(ip)
     return { limited: false }
   } catch (e: any) {
     if (isRateLimited(e)) return { limited: true }
@@ -49,6 +67,7 @@ export async function checkScanLimit(ip: string): Promise<{ limited: boolean }> 
  * race conditions across multiple gate instances. Returns true if lock acquired.
  */
 export async function acquireScanLock(qrCode: string): Promise<boolean> {
+  if (!redis) return true // No Redis — allow scan
   try {
     const key = `lock:scan:${qrCode}`
     const result = await redis.set(key, '1', 'EX', 5, 'NX')
@@ -58,3 +77,4 @@ export async function acquireScanLock(qrCode: string): Promise<boolean> {
     return true
   }
 }
+
