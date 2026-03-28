@@ -1,8 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import AdminLayout from './AdminLayout'
+
+const LocationPicker = dynamic(() => import('./LocationPicker'), { ssr: false })
 import {
   Plus, Calendar, MapPin, Ticket, Edit, Trash2,
   CheckCircle, Circle, Loader2, Check, X
@@ -144,13 +147,13 @@ export default function AdminEventsClient() {
                 <label>Poster Image URL</label>
                 <input value={form.posterImage} onChange={e => setForm((f: any) => ({ ...f, posterImage: e.target.value }))} placeholder="https://..." />
               </div>
-              <div>
-                <label>Latitude</label>
-                <input type="number" step="any" value={form.lat} onChange={e => setForm((f: any) => ({ ...f, lat: e.target.value }))} placeholder="-20.1553" />
-              </div>
-              <div>
-                <label>Longitude</label>
-                <input type="number" step="any" value={form.lng} onChange={e => setForm((f: any) => ({ ...f, lng: e.target.value }))} placeholder="28.5906" />
+              <div className="sm:col-span-2">
+                <label>Venue Location</label>
+                <LocationPicker
+                  lat={form.lat}
+                  lng={form.lng}
+                  onChange={(lat, lng) => setForm((f: any) => ({ ...f, lat, lng }))}
+                />
               </div>
               <div>
                 <label>Status</label>
