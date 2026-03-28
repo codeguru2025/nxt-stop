@@ -3,10 +3,8 @@ import { SignJWT, jwtVerify } from 'jose'
 import { prisma } from './db'
 import { env } from './env'
 
-const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET)
-
 function getJwtSecret(): Uint8Array {
-  return JWT_SECRET
+  return new TextEncoder().encode(env.JWT_SECRET)
 }
 
 export type SessionUser = {

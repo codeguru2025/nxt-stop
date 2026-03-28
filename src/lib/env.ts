@@ -1,7 +1,7 @@
 /**
  * Centralized environment validation.
- * Required vars throw at module load so the process fails fast at startup.
- * Optional vars degrade gracefully or throw only when the feature is used.
+ * All values are lazy getters so they are only evaluated at request time,
+ * not during `next build` (where env vars are not available).
  */
 
 function required(name: string): string {
@@ -10,35 +10,20 @@ function required(name: string): string {
   return value
 }
 
-function optional(name: string, fallback?: string): string | undefined {
-  return process.env[name] ?? fallback
-}
-
-// Checked at startup — these crash the app if missing
-const JWT_SECRET   = required('JWT_SECRET')
-const DATABASE_URL = required('DATABASE_URL')
-
 export const env = {
-  JWT_SECRET,
-  DATABASE_URL,
+  get JWT_SECRET()            { return required('JWT_SECRET') },
+  get DATABASE_URL()          { return required('DATABASE_URL') },
+  get PAYNOW_INTEGRATION_ID() { return required('PAYNOW_INTEGRATION_ID') },
+  get PAYNOW_INTEGRATION_KEY(){ return required('PAYNOW_INTEGRATION_KEY') },
 
-  // Redis (optional — rate limiting degrades gracefully without it)
-  REDIS_URL: optional('REDIS_URL'),
+  get PAYNOW_EMAIL()    { return process.env.PAYNOW_EMAIL ?? 'gustozw@gmail.com' },
+  get REDIS_URL()       { return process.env.REDIS_URL },
+  get APP_URL()         { return process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000' },
+  get SEED_SECRET()     { return process.env.SEED_SECRET },
 
-  // Paynow — validated lazily when first payment is initiated
-  get PAYNOW_INTEGRATION_ID()  { return required('PAYNOW_INTEGRATION_ID') },
-  get PAYNOW_INTEGRATION_KEY() { return required('PAYNOW_INTEGRATION_KEY') },
-  PAYNOW_EMAIL: optional('PAYNOW_EMAIL', 'gustozw@gmail.com') as string,
-
-  // DigitalOcean Spaces — optional in dev
-  DO_SPACES_KEY:      optional('DO_SPACES_KEY'),
-  DO_SPACES_SECRET:   optional('DO_SPACES_SECRET'),
-  DO_SPACES_ENDPOINT: optional('DO_SPACES_ENDPOINT'),
-  DO_SPACES_BUCKET:   optional('DO_SPACES_BUCKET'),
-  DO_SPACES_REGION:   optional('DO_SPACES_REGION'),
-
-  APP_URL: optional('NEXT_PUBLIC_APP_URL', 'http://localhost:3000') as string,
-
-  // Used only in seed route
-  SEED_SECRET: optional('SEED_SECRET'),
+  get DO_SPACES_KEY()      { return process.env.DO_SPACES_KEY },
+  get DO_SPACES_SECRET()   { return process.env.DO_SPACES_SECRET },
+  get DO_SPACES_ENDPOINT() { return process.env.DO_SPACES_ENDPOINT },
+  get DO_SPACES_BUCKET()   { return process.env.DO_SPACES_BUCKET },
+  get DO_SPACES_REGION()   { return process.env.DO_SPACES_REGION },
 } as const
