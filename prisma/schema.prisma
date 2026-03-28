@@ -79,6 +79,8 @@ model Event {
   virtualStreamUrl String?
   virtualActive    Boolean   @default(false)
   platformFee      Float     @default(0.10)
+  lat              Float?
+  lng              Float?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -92,15 +94,25 @@ model Event {
 }
 
 model EventMedia {
+  id         String   @id @default(cuid())
+  eventId    String
+  type       String   // image | video | teaser
+  url        String
+  youtubeUrl String?
+  caption    String?
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model GalleryPhoto {
   id        String   @id @default(cuid())
-  eventId   String
-  type      String   // image | video
   url       String
   caption   String?
   order     Int      @default(0)
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
-
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }
 
 // ─── TICKET TYPES ────────────────────────────────────────────────────────────

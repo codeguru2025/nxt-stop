@@ -379,6 +379,9 @@ export default function HomeClient() {
         </div>
       </section>
 
+      {/* Past Event Videos */}
+      <PastVideosSection />
+
       {/* Referral CTA */}
       <section className="py-20 border-t border-[#1a1a1a]">
         <div className="max-w-4xl mx-auto px-4 text-center">
@@ -407,6 +410,68 @@ export default function HomeClient() {
         </div>
       </section>
     </>
+  )
+}
+
+function PastVideosSection() {
+  const [teasers, setTeasers] = useState<any[]>([])
+
+  useEffect(() => {
+    fetch('/api/media/teasers').then(r => r.json()).then(d => {
+      if (d.success) setTeasers(d.data)
+    })
+  }, [])
+
+  if (teasers.length === 0) return null
+
+  return (
+    <section className="py-20 border-t border-[#1a1a1a]">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <p className="text-purple-400 text-sm font-medium uppercase tracking-widest mb-2">Relive The Night</p>
+            <h2 className="text-3xl sm:text-4xl font-black text-white">Past Events</h2>
+          </div>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {teasers.map(t => (
+            <a
+              key={t.id}
+              href={t.youtubeUrl ?? '#'}
+              target={t.youtubeUrl ? '_blank' : undefined}
+              rel="noopener noreferrer"
+              className="group relative rounded-2xl overflow-hidden bg-[#111] border border-[#2a2a2a] hover:border-purple-500/40 transition-all"
+            >
+              <div className="relative aspect-video bg-black overflow-hidden">
+                <video
+                  src={t.url}
+                  className="w-full h-full object-cover"
+                  muted
+                  loop
+                  playsInline
+                  onMouseEnter={e => (e.target as HTMLVideoElement).play()}
+                  onMouseLeave={e => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
+                />
+                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Play size={20} className="text-white ml-1" fill="white" />
+                  </div>
+                </div>
+              </div>
+              <div className="p-4">
+                <p className="text-white font-semibold truncate group-hover:text-purple-300 transition-colors">{t.event?.name}</p>
+                {t.caption && <p className="text-gray-500 text-sm truncate mt-0.5">{t.caption}</p>}
+                {t.youtubeUrl && (
+                  <p className="text-purple-400 text-xs mt-2 flex items-center gap-1">
+                    <Play size={10} fill="currentColor" /> Watch full video on YouTube
+                  </p>
+                )}
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
   )
 }
 

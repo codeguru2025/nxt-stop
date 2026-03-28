@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       name, description, venue, address, date, endDate,
       posterImage, bannerImage, videoUrl, lineup, hasVirtual,
       virtualPrice, virtualStreamUrl, platformFee, ticketTypes,
-      status,
+      status, lat, lng,
     } = body
 
     if (!name || !venue || !date) return error('name, venue, and date are required')
@@ -58,6 +58,8 @@ export async function POST(req: Request) {
         virtualStreamUrl,
         platformFee: platformFee ?? 0.10,
         status: status ?? 'draft',
+        lat: lat ? parseFloat(lat) : null,
+        lng: lng ? parseFloat(lng) : null,
         ticketTypes: ticketTypes
           ? {
               create: ticketTypes.map((t: any) => ({

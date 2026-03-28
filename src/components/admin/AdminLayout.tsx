@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, CalendarDays, Users, Package,
-  Gift, UserCircle2, BarChart3, QrCode, LogOut, Shield
+  Gift, UserCircle2, BarChart3, QrCode, LogOut, Shield,
+  ImageIcon, Video
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -15,6 +16,8 @@ const NAV = [
   { href: '/admin/store', icon: Package, label: 'Store' },
   { href: '/admin/rewards', icon: Gift, label: 'Rewards' },
   { href: '/admin/founders', icon: UserCircle2, label: 'Founders' },
+  { href: '/admin/gallery', icon: ImageIcon, label: 'Gallery' },
+  { href: '/admin/videos', icon: Video, label: 'Past Videos' },
   { href: '/gate', icon: QrCode, label: 'Gate Scanner' },
 ]
 

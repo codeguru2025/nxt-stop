@@ -25,7 +25,8 @@ const STATUS_COLORS: Record<string, string> = {
 const BLANK_FORM = {
   name: '', venue: '', address: '', date: '', endDate: '', description: '',
   posterImage: '', bannerImage: '', hasVirtual: false, virtualPrice: 5,
-  status: 'draft', ticketTypes: [
+  status: 'draft', lat: '', lng: '',
+  ticketTypes: [
     { name: 'General', price: 10, capacity: 500, color: '#8B5CF6' }
   ]
 }
@@ -142,6 +143,14 @@ export default function AdminEventsClient() {
               <div>
                 <label>Poster Image URL</label>
                 <input value={form.posterImage} onChange={e => setForm((f: any) => ({ ...f, posterImage: e.target.value }))} placeholder="https://..." />
+              </div>
+              <div>
+                <label>Latitude</label>
+                <input type="number" step="any" value={form.lat} onChange={e => setForm((f: any) => ({ ...f, lat: e.target.value }))} placeholder="-20.1553" />
+              </div>
+              <div>
+                <label>Longitude</label>
+                <input type="number" step="any" value={form.lng} onChange={e => setForm((f: any) => ({ ...f, lng: e.target.value }))} placeholder="28.5906" />
               </div>
               <div>
                 <label>Status</label>

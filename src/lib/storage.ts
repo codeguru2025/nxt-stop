@@ -14,7 +14,7 @@ const s3 = new S3Client({
 const BUCKET = process.env.DO_SPACES_BUCKET!
 const CDN_URL = process.env.DO_SPACES_CDN_URL ?? process.env.DO_SPACES_ENDPOINT!
 
-export type UploadFolder = 'events' | 'founders' | 'products' | 'rewards' | 'avatars' | 'social'
+export type UploadFolder = 'events' | 'founders' | 'products' | 'rewards' | 'avatars' | 'social' | 'gallery' | 'videos'
 
 /**
  * Upload a file buffer to DO Spaces. Returns the public CDN URL.

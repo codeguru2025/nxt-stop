@@ -24,7 +24,9 @@
       "Bash(grep -r 'Connection terminated' src --include=*.ts -l)",
       "Bash(grep -r \"use\\\\b\\\\|extends\\\\b\" node_modules/@prisma/adapter-pg/dist/*.d.ts)",
       "Bash(grep -n \"$use\\\\b\" node_modules/@prisma/client/runtime/client.d.ts)",
-      "Bash(grep -n \"^\\\\s*$use\\\\b\\\\|use\\\\?\\\\\\(middleware\\\\|Middleware\\\\\\)\" node_modules/@prisma/client/runtime/client.d.ts)"
+      "Bash(grep -n \"^\\\\s*$use\\\\b\\\\|use\\\\?\\\\\\(middleware\\\\|Middleware\\\\\\)\" node_modules/@prisma/client/runtime/client.d.ts)",
+      "Bash(grep -rn $use src/generated/prisma/)",
+      "Bash(ls:*)"
     ]
   }
 }

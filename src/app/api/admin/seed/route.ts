@@ -92,14 +92,14 @@ export async function POST(req: Request) {
     const eventSlug = 'nxt-stop-bulawayo-dlala-thukzin-2026'
     const event = await prisma.event.upsert({
       where: { slug: eventSlug },
-      update: {},
+      update: { date: new Date('2026-08-29T22:00:00') },
       create: {
         name: 'NXT STOP: Dlala Thukzin Live',
         slug: eventSlug,
         description: 'NXT STOP brings the heat to Bulawayo. Dlala Thukzin takes the stage at the iconic ZITF Pavilion — one night, one vibe, zero compromises. MC Mzoe7 holds it down on the mic.',
         venue: 'ZITF Pavilion',
         address: 'Centenary Park, Bulawayo',
-        date: new Date('2026-08-29T20:00:00'),
+        date: new Date('2026-08-29T22:00:00'),
         endDate: new Date('2026-08-30T04:00:00'),
         status: 'published',
         posterImage: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/DLALA%20THUKZIN.jpeg',

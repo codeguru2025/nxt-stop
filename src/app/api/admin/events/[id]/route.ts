@@ -47,6 +47,7 @@ export async function PATCH(
       name, description, venue, address, date, endDate, status,
       posterImage, bannerImage, videoUrl, lineup, hasVirtual,
       virtualPrice, virtualStreamUrl, virtualActive, platformFee,
+      lat, lng,
     } = body
 
     const event = await prisma.event.update({
@@ -68,6 +69,8 @@ export async function PATCH(
         ...(virtualStreamUrl !== undefined && { virtualStreamUrl }),
         ...(virtualActive !== undefined && { virtualActive }),
         ...(platformFee !== undefined && { platformFee }),
+        ...(lat !== undefined && { lat: lat ? parseFloat(lat) : null }),
+        ...(lng !== undefined && { lng: lng ? parseFloat(lng) : null }),
       },
     })
 
