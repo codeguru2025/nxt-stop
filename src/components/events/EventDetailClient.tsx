@@ -1,12 +1,15 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import {
   Calendar, MapPin, Clock, Users, Ticket, Share2,
   Check, AlertCircle, Loader2, Music, Video, Star, Phone, ExternalLink
 } from 'lucide-react'
 import { formatDate, formatCurrency, buildReferralUrl } from '@/lib/utils'
+
+const VenueMap = dynamic(() => import('./VenueMap'), { ssr: false })
 
 type TicketType = {
   id: string; name: string; description?: string; price: number
@@ -21,6 +24,7 @@ type Event = {
   platformFee: number; status: string; ticketTypes: TicketType[]
   media: { id: string; type: string; url: string; caption?: string }[]
   _count: { tickets: number; socialPosts: number }
+  lat?: number | null; lng?: number | null
 }
 
 const PAYMENT_METHODS = [
@@ -275,6 +279,16 @@ export default function EventDetailClient() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {event.lat && event.lng && (
+              <div className="mb-8">
+                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                  <MapPin size={20} className="text-purple-400" />
+                  Venue Location
+                </h2>
+                <VenueMap lat={event.lat} lng={event.lng} venueName={event.venue} address={event.address} />
               </div>
             )}
           </div>

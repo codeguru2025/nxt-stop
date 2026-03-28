@@ -5,7 +5,7 @@ import { uploadFile, deleteFile } from '@/lib/storage'
 
 export async function GET(
   _req: Request,
-  ctx: RouteContext<'/api/admin/events/[id]/media'>
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin().catch(() => null)
@@ -24,7 +24,7 @@ export async function GET(
 
 export async function POST(
   req: Request,
-  ctx: RouteContext<'/api/admin/events/[id]/media'>
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin().catch(() => null)
@@ -58,7 +58,7 @@ export async function POST(
 
 export async function DELETE(
   req: Request,
-  ctx: RouteContext<'/api/admin/events/[id]/media'>
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin().catch(() => null)

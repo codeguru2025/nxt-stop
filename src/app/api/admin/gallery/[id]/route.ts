@@ -5,7 +5,7 @@ import { deleteFile } from '@/lib/storage'
 
 export async function PATCH(
   req: Request,
-  ctx: RouteContext<'/api/admin/gallery/[id]'>
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin().catch(() => null)
@@ -29,7 +29,7 @@ export async function PATCH(
 
 export async function DELETE(
   _req: Request,
-  ctx: RouteContext<'/api/admin/gallery/[id]'>
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await requireAdmin().catch(() => null)
