@@ -35,7 +35,12 @@ export async function GET(req: Request) {
     const txStatus = await pollPaynowTransaction(order.paymentRef)
 
     if (txStatus === 'paid') {
-      await fulfillOrder(orderId, order.paymentMethod ?? 'paynow', order.paymentRef)
+      try {
+        await fulfillOrder(orderId, order.paymentMethod ?? 'paynow', order.paymentRef)
+      } catch (fulfillErr) {
+        console.error('fulfillOrder failed during poll — will retry on next poll', fulfillErr)
+        return ok({ status: 'pending' })
+      }
       return ok({ status: 'paid' })
     }
 

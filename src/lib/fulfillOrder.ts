@@ -32,7 +32,7 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
           include: { event: true },
         })
       }
-      if (!ticketType) continue
+      if (!ticketType) throw new Error(`Ticket type not found for order item ${item.id} — fulfillment aborted`)
 
       for (let i = 0; i < item.quantity; i++) {
         const ticketNumber = generateTicketNumber()

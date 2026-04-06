@@ -156,67 +156,71 @@ export default function EventDetailClient() {
 
     setStage({ name: 'processing' })
 
-    // 1. Create order
-    const orderBody: any = {
-      eventId: event!.id,
-      ticketTypeId: selectedType,
-      quantity,
-      referralCode: ref || undefined,
-      recipientName: forSomeoneElse && recipientName ? recipientName : undefined,
-    }
-    if (!user) {
-      orderBody.guestEmail = guestEmail
-      orderBody.guestName = guestName
-    }
+    try {
+      // 1. Create order
+      const orderBody: any = {
+        eventId: event!.id,
+        ticketTypeId: selectedType,
+        quantity,
+        referralCode: ref || undefined,
+        recipientName: forSomeoneElse && recipientName ? recipientName : undefined,
+      }
+      if (!user) {
+        orderBody.guestEmail = guestEmail
+        orderBody.guestName = guestName
+      }
 
-    const orderRes = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orderBody),
-    }).then(r => r.json())
+      const orderRes = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderBody),
+      }).then(r => r.json())
 
-    if (!orderRes.success) {
-      setStage({ name: 'error', message: orderRes.error ?? 'Could not create order.' })
-      return
-    }
+      if (!orderRes.success) {
+        setStage({ name: 'error', message: orderRes.error ?? 'Could not create order.' })
+        return
+      }
 
-    const orderId = orderRes.data.order.id
-    const guestToken = orderRes.data.guestToken ?? undefined
+      const orderId = orderRes.data.order.id
+      const guestToken = orderRes.data.guestToken ?? undefined
 
-    // 2. Initiate payment
-    const payRes = await fetch('/api/paynow/initiate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId,
-        method: paymentMethod,
-        phone: isMobile ? phone : undefined,
-        guestToken,
-      }),
-    }).then(r => r.json())
+      // 2. Initiate payment
+      const payRes = await fetch('/api/paynow/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          method: paymentMethod,
+          phone: isMobile ? phone : undefined,
+          guestToken,
+        }),
+      }).then(r => r.json())
 
-    if (!payRes.success) {
-      setStage({ name: 'error', message: payRes.error ?? 'Payment initiation failed.' })
-      return
-    }
+      if (!payRes.success) {
+        setStage({ name: 'error', message: payRes.error ?? 'Payment initiation failed.' })
+        return
+      }
 
-    const result = payRes.data
+      const result = payRes.data
 
-    if (result.type === 'redirect') {
-      setStage({ name: 'redirect', redirectUrl: result.redirectUrl, orderId, guestToken })
+      if (result.type === 'redirect') {
+        setStage({ name: 'redirect', redirectUrl: result.redirectUrl, orderId, guestToken })
+        startPolling(orderId, guestToken)
+        window.location.href = result.redirectUrl
+        return
+      }
+
+      if (result.type === 'innbucks') {
+        setStage({ name: 'innbucks_pending', code: result.innbucksCode, orderId, guestToken })
+        startPolling(orderId, guestToken)
+        return
+      }
+
+      setStage({ name: 'mobile_pending', instructions: result.instructions ?? 'Check your phone to complete payment.', orderId, guestToken })
       startPolling(orderId, guestToken)
-      window.location.href = result.redirectUrl
-      return
+    } catch (e: any) {
+      setStage({ name: 'error', message: e?.message ?? 'Something went wrong. Please try again.' })
     }
-
-    if (result.type === 'innbucks') {
-      setStage({ name: 'innbucks_pending', code: result.innbucksCode, orderId, guestToken })
-      startPolling(orderId, guestToken)
-      return
-    }
-
-    setStage({ name: 'mobile_pending', instructions: result.instructions, orderId, guestToken })
-    startPolling(orderId, guestToken)
   }
 
   const lineup: string[] = event?.lineup ? JSON.parse(event.lineup) : []
