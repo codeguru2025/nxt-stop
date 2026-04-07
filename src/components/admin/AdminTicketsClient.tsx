@@ -5,6 +5,22 @@ import AdminLayout from './AdminLayout'
 import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, Printer, Download } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
+const LOGO_URL = 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo.jpeg'
+
+async function fetchAsDataURL(url: string): Promise<string> {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return url
+  }
+}
+
 type TicketRow = {
   id: string
   ticketNumber: string
@@ -149,94 +165,141 @@ export default function AdminTicketsClient() {
     if (res.success) setHcBatch(res.data)
   }
 
-  const printBatch = () => {
+  const printBatch = async () => {
     if (!hcBatch) return
-    const printWin = window.open('', '_blank', 'width=900,height=700')
+    const printWin = window.open('', '_blank', 'width=1000,height=800')
     if (!printWin) return
 
-    const dateStr = new Date(hcBatch.event.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+    const logoDataUrl = await fetchAsDataURL(LOGO_URL)
+    const d = new Date(hcBatch.event.date)
+    const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    const priceStr = `$${hcBatch.ticketType.price.toFixed(2)}`
 
     const ticketHtml = hcBatch.tickets.map(t => `
       <div class="ticket">
-        <!-- BUYER HALF -->
-        <div class="ticket-header">
-          <div class="badge" style="background:${hcBatch.ticketType.color}">${hcBatch.ticketType.name}</div>
-          <div class="event">${hcBatch.event.name}</div>
-          <div class="meta">${dateStr} · ${hcBatch.event.venue}</div>
+        <div class="t-head">
+          <img src="${logoDataUrl}" class="t-logo" />
+          <div class="t-head-text">
+            <div class="t-brand">NXT STOP</div>
+            <div class="t-event">${hcBatch.event.name}</div>
+          </div>
+          <div class="t-badge" style="background:${hcBatch.ticketType.color}">${hcBatch.ticketType.name}</div>
         </div>
-        <div class="ticket-body">
-          <img src="${t.qrDataUrl}" class="qr" />
-          <div class="info">
-            <div class="label">Ticket No.</div>
-            <div class="number">${t.ticketNumber}</div>
-            <div class="label">Price</div>
-            <div class="price">$${hcBatch.ticketType.price.toFixed(2)}</div>
-            <div class="label">Payment</div>
-            <div class="cash">CASH</div>
+        <div class="t-body">
+          <div class="t-details">
+            <div class="t-row"><span class="t-icon">&#128197;</span><span>${dateStr}</span></div>
+            <div class="t-row"><span class="t-icon">&#128336;</span><span>${timeStr}</span></div>
+            <div class="t-row"><span class="t-icon">&#128205;</span><span>${hcBatch.event.venue}</span></div>
+            <div class="t-price">${priceStr}</div>
+            <div class="t-num">${t.ticketNumber}</div>
+          </div>
+          <div class="t-qr-wrap">
+            <img src="${t.qrDataUrl}" class="t-qr" />
+            <div class="t-cash">CASH</div>
           </div>
         </div>
-        <div class="ticket-footer">NXT STOP · Present QR code at the gate · nxtstop.com</div>
-        <!-- SELLER STUB (tear off) -->
+        <div class="t-foot">NXT STOP &nbsp;·&nbsp; nxtstop.com &nbsp;·&nbsp; Present QR code at the gate</div>
         <div class="stub">
           <div class="stub-row">
             <div>
-              <div class="stub-label">ACTIVATION CODE</div>
+              <div class="stub-lbl">Activation Code</div>
               <div class="stub-code">${t.activationCode}</div>
             </div>
             <div class="stub-right">
-              <div class="stub-label">Ticket</div>
+              <div class="stub-lbl">Ticket No.</div>
               <div class="stub-num">${t.ticketNumber}</div>
-              <div class="stub-label" style="margin-top:4px">Price</div>
-              <div class="stub-price">$${hcBatch.ticketType.price.toFixed(2)}</div>
+              <div class="stub-lbl" style="margin-top:1.5mm">Price</div>
+              <div class="stub-price">${priceStr}</div>
             </div>
           </div>
-          <div class="stub-note">SELLER STUB — tear off &amp; keep when ticket is sold. Enter code at /gate/activate to record sale.</div>
+          <div class="stub-note">&#9988; SELLER STUB &mdash; tear off &amp; keep when sold &nbsp;&middot;&nbsp; Enter code at /gate/activate to record cash sale</div>
         </div>
       </div>
     `).join('')
 
-    printWin.document.write(`<!DOCTYPE html><html><head><title>NXT STOP Hard Copy Tickets</title>
-    <style>
-      *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,sans-serif}
-      body{background:#f5f5f5;padding:16px}
-      h1{font-size:18px;font-weight:900;color:#111;margin-bottom:4px}
-      .subtitle{font-size:12px;color:#6b7280;margin-bottom:16px}
-      .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-      .ticket{background:#fff;border:1.5px solid #e5e7eb;border-radius:12px;overflow:hidden;break-inside:avoid}
-      .ticket-header{padding:12px 14px 10px;border-bottom:2px dashed #e5e7eb}
-      .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;color:#fff;margin-bottom:4px}
-      .event{font-size:13px;font-weight:900;color:#111}
-      .meta{font-size:10px;color:#6b7280;margin-top:2px}
-      .ticket-body{padding:10px 14px;display:flex;gap:12px;align-items:center}
-      .qr{width:80px;height:80px;border:1px solid #e5e7eb;padding:2px;border-radius:6px}
-      .info{flex:1}
-      .label{font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-top:6px}
-      .label:first-child{margin-top:0}
-      .number{font-size:11px;font-family:monospace;color:#374151;font-weight:700}
-      .price{font-size:16px;font-weight:900;color:#7c3aed}
-      .cash{font-size:9px;color:#6b7280}
-      .ticket-footer{background:#f9fafb;padding:6px 14px;font-size:9px;color:#9ca3af;border-top:1px solid #f3f4f6}
-      .label{font-size:8px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-top:6px}
-      .label:first-child{margin-top:0}
-      .number{font-size:11px;font-family:monospace;color:#374151;font-weight:700}
-      .price{font-size:16px;font-weight:900;color:#7c3aed}
-      .cash{font-size:9px;color:#6b7280}
-      .ticket-footer{background:#f9fafb;padding:6px 14px;font-size:9px;color:#9ca3af;border-top:1px solid #f3f4f6}
-      .stub{background:#fff7ed;border-top:2px dashed #f97316;padding:8px 14px}
-      .stub-row{display:flex;justify-content:space-between;align-items:flex-start}
-      .stub-label{font-size:7px;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:1px}
-      .stub-code{font-size:22px;font-weight:900;font-family:monospace;color:#ea580c;letter-spacing:3px}
-      .stub-right{text-align:right}
-      .stub-num{font-size:9px;font-family:monospace;color:#374151;font-weight:700}
-      .stub-price{font-size:13px;font-weight:900;color:#7c3aed}
-      .stub-note{font-size:7px;color:#9ca3af;margin-top:4px;border-top:1px solid #fed7aa;padding-top:4px}
-      @media print{body{background:#fff;padding:0}@page{margin:10mm}}
-    </style></head><body>
-    <h1>NXT STOP Physical Tickets — ${hcBatch.event.name}</h1>
-    <p class="subtitle">${hcBatch.tickets.length} tickets · Printed ${new Date().toLocaleString()} · NOT YET SOLD — activate each ticket when cash is collected</p>
-    <div class="grid">${ticketHtml}</div>
-    <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),1000)}</script>
-    </body></html>`)
+    printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>NXT STOP &mdash; ${hcBatch.event.name}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  @page{size:A4 portrait;margin:8mm}
+  body{
+    font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;
+    background:#fff;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+    color-adjust:exact;
+  }
+  .page-hd{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    padding-bottom:3mm;margin-bottom:4mm;
+    border-bottom:.4mm solid #e5e7eb;
+  }
+  .page-title{font-size:10pt;font-weight:900;color:#111}
+  .page-sub{font-size:7pt;color:#6b7280;margin-top:.5mm}
+  .page-meta{font-size:6.5pt;color:#9ca3af;text-align:right;line-height:1.5}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+  .ticket{
+    border:.4mm solid #d1d5db;border-radius:2.5mm;
+    overflow:hidden;background:#fff;
+    page-break-inside:avoid;break-inside:avoid;
+  }
+  /* ── Header ── */
+  .t-head{
+    background:linear-gradient(135deg,#7c3aed 0%,#9333ea 55%,#db2777 100%);
+    padding:2.5mm 3mm;display:flex;align-items:center;gap:2mm;
+  }
+  .t-logo{width:8mm;height:8mm;border-radius:1.5mm;object-fit:cover;flex-shrink:0;background:#fff}
+  .t-head-text{flex:1;min-width:0}
+  .t-brand{font-size:5pt;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.1em;line-height:1;margin-bottom:.5mm}
+  .t-event{font-size:8.5pt;font-weight:900;color:#fff;line-height:1.15;
+    overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .t-badge{
+    font-size:5.5pt;font-weight:700;color:#fff;
+    padding:.8mm 2.5mm;border-radius:10mm;
+    background:rgba(0,0,0,.28);white-space:nowrap;flex-shrink:0
+  }
+  /* ── Body ── */
+  .t-body{display:flex;padding:2.5mm 3mm;gap:2.5mm;align-items:center}
+  .t-details{flex:1;min-width:0}
+  .t-row{
+    font-size:6.5pt;color:#4b5563;
+    margin-bottom:1mm;display:flex;align-items:flex-start;gap:1.5mm;line-height:1.3
+  }
+  .t-icon{flex-shrink:0}
+  .t-price{font-size:14pt;font-weight:900;color:#7c3aed;margin-top:2.5mm;line-height:1}
+  .t-num{font-family:'Courier New',monospace;font-size:5.5pt;color:#9ca3af;margin-top:1.5mm;letter-spacing:.02em}
+  .t-qr-wrap{flex-shrink:0;text-align:center}
+  .t-qr{width:21mm;height:21mm;display:block;border:.3mm solid #e5e7eb;padding:.5mm;border-radius:1mm}
+  .t-cash{font-size:5.5pt;font-weight:700;color:#6b7280;text-align:center;margin-top:1mm;text-transform:uppercase;letter-spacing:.05em}
+  /* ── Footer ── */
+  .t-foot{
+    background:#f9fafb;border-top:.3mm solid #f3f4f6;
+    padding:1.2mm 3mm;font-size:5pt;color:#9ca3af;text-align:center;letter-spacing:.02em
+  }
+  /* ── Stub ── */
+  .stub{border-top:.5mm dashed #f97316;background:#fff7ed;padding:2mm 3mm 1.5mm}
+  .stub-row{display:flex;justify-content:space-between;align-items:flex-start}
+  .stub-lbl{font-size:5pt;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:.5mm;line-height:1}
+  .stub-code{font-size:15pt;font-weight:900;font-family:'Courier New',monospace;color:#ea580c;letter-spacing:2mm;line-height:1}
+  .stub-right{text-align:right}
+  .stub-num{font-size:5.5pt;font-family:'Courier New',monospace;color:#374151;font-weight:700}
+  .stub-price{font-size:10pt;font-weight:900;color:#7c3aed;margin-top:1mm}
+  .stub-note{font-size:5pt;color:#9ca3af;margin-top:1.5mm;border-top:.3mm solid #fed7aa;padding-top:1mm}
+  @media print{body{background:#fff}}
+</style></head><body>
+<div class="page-hd">
+  <div>
+    <div class="page-title">NXT STOP &mdash; Physical Tickets</div>
+    <div class="page-sub">${hcBatch.event.name} &nbsp;&middot;&nbsp; ${hcBatch.ticketType.name} &nbsp;&middot;&nbsp; ${hcBatch.tickets.length} tickets</div>
+  </div>
+  <div class="page-meta">
+    Printed ${new Date().toLocaleString()}<br>
+    &#9888; NOT YET SOLD &mdash; activate each ticket when cash is collected
+  </div>
+</div>
+<div class="grid">${ticketHtml}</div>
+<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),1200)}</script>
+</body></html>`)
     printWin.document.close()
   }
 

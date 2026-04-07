@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Calendar, MapPin, Printer, Download, X, ExternalLink, Ticket } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
@@ -22,39 +22,158 @@ type TicketData = {
 
 const LOGO_URL = 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo.jpeg'
 
-function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => void }) {
-  const printRef = useRef<HTMLDivElement>(null)
+async function fetchAsDataURL(url: string): Promise<string> {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return url
+  }
+}
 
-  const handlePrint = () => {
-    const printWin = window.open('', '_blank', 'width=640,height=960')
-    if (!printWin || !printRef.current) return
-    printWin.document.write(`<!DOCTYPE html><html><head><title>Ticket</title>
-    <style>
-      *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,sans-serif}
-      body{background:#fff;padding:24px}
-      .ticket{max-width:480px;margin:0 auto;border:2px solid #e5e7eb;border-radius:16px;overflow:hidden}
-      .poster{width:100%;height:160px;object-fit:cover}
-      .noposter{width:100%;height:100px;background:linear-gradient(135deg,#7c3aed,#db2777)}
-      .body{padding:20px}
-      .logo{width:44px;height:44px;border-radius:8px;object-fit:cover}
-      h2{font-size:20px;font-weight:900;color:#111;line-height:1.2}
-      .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;margin-top:6px}
-      .row{display:flex;align-items:center;gap:6px;font-size:13px;color:#555;margin-bottom:6px}
-      hr{border:none;border-top:2px dashed #e5e7eb;margin:16px 0}
-      .qr-wrap{display:flex;gap:16px;align-items:center}
-      .qr{width:110px;height:110px;border:1px solid #e5e7eb;padding:3px;border-radius:8px}
-      .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:2px}
-      .val{font-size:13px;font-weight:700;color:#111;margin-bottom:8px}
-      .mono{font-family:monospace;font-size:12px;color:#555}
-      .price{font-size:24px;font-weight:900;color:#7c3aed}
-      .status{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:6px}
-      .valid{background:#dcfce7;color:#16a34a}
-      .used{background:#f3f4f6;color:#6b7280}
-      .footer{background:#f9fafb;padding:10px;text-align:center;font-size:10px;color:#9ca3af;border-top:1px solid #f3f4f6}
-    </style></head><body>
-    ${printRef.current.innerHTML}
-    <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}</script>
-    </body></html>`)
+function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => void }) {
+  const handlePrint = async () => {
+    const printWin = window.open('', '_blank', 'width=700,height=1000')
+    if (!printWin) return
+
+    const logoDataUrl = await fetchAsDataURL(LOGO_URL)
+    const posterDataUrl = ticket.event.posterImage ? await fetchAsDataURL(ticket.event.posterImage) : null
+
+    const d = new Date(ticket.event.date)
+    const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    const endTimeStr = ticket.event.endDate
+      ? ` \u2013 ${new Date(ticket.event.endDate).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+      : ''
+
+    const holderName = ticket.order?.recipientName || ''
+    const statusClass = ticket.status === 'valid' ? 'status-valid' : ticket.status === 'used' ? 'status-used' : 'status-cancelled'
+
+    printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>NXT STOP Ticket &mdash; ${ticket.event.name}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  @page{size:A4 portrait;margin:12mm}
+  body{
+    font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;
+    background:#f3f4f6;
+    display:flex;align-items:center;justify-content:center;min-height:100vh;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;
+  }
+  .wrap{width:100%;max-width:480px}
+  .ticket{
+    background:#fff;border-radius:16px;overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,.15);
+  }
+  /* Poster / gradient banner */
+  .poster{width:100%;height:180px;object-fit:cover;display:block}
+  .no-poster{
+    width:100%;height:120px;
+    background:linear-gradient(135deg,#7c3aed 0%,#9333ea 50%,#db2777 100%);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .no-poster-text{font-size:28px;font-weight:900;color:rgba(255,255,255,.15);letter-spacing:.05em;text-transform:uppercase}
+  /* Body */
+  .body{padding:22px 24px}
+  .header-row{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px}
+  .logo{width:48px;height:48px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#f3f4f6}
+  .header-text{flex:1;min-width:0}
+  .brand-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#9ca3af;margin-bottom:3px}
+  .event-name{font-size:20px;font-weight:900;color:#111;line-height:1.2}
+  .type-badge{
+    display:inline-block;padding:3px 12px;border-radius:20px;
+    font-size:11px;font-weight:700;color:#fff;margin-top:6px
+  }
+  /* Details */
+  .details{margin-bottom:20px}
+  .det-row{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#4b5563;margin-bottom:8px;line-height:1.4}
+  .det-icon{font-size:14px;flex-shrink:0;margin-top:1px}
+  /* Divider */
+  .divider{
+    border:none;border-top:2px dashed #e5e7eb;
+    margin:18px 0;position:relative;
+  }
+  /* QR section */
+  .qr-section{display:flex;gap:20px;align-items:center}
+  .qr-img{width:120px;height:120px;border:1px solid #e5e7eb;padding:4px;border-radius:10px;flex-shrink:0}
+  .qr-info{flex:1;min-width:0}
+  .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#9ca3af;margin-bottom:2px}
+  .val{font-size:13px;font-weight:700;color:#111;margin-bottom:10px;line-height:1.3}
+  .price{font-size:26px;font-weight:900;color:#7c3aed;line-height:1;margin-bottom:6px}
+  .mono{font-family:'Courier New',monospace;font-size:11px;color:#6b7280;word-break:break-all;margin-bottom:8px}
+  .status-valid{background:#dcfce7;color:#16a34a;font-size:10px;font-weight:700;padding:2px 10px;border-radius:12px;display:inline-block}
+  .status-used{background:#f3f4f6;color:#6b7280;font-size:10px;font-weight:700;padding:2px 10px;border-radius:12px;display:inline-block}
+  .status-cancelled{background:#fee2e2;color:#dc2626;font-size:10px;font-weight:700;padding:2px 10px;border-radius:12px;display:inline-block}
+  /* Footer */
+  .t-footer{
+    background:linear-gradient(135deg,#7c3aed,#9333ea 50%,#db2777);
+    padding:12px 24px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .f-logo{display:flex;align-items:center;gap:8px}
+  .f-logo-img{width:28px;height:28px;border-radius:6px;object-fit:cover;background:#fff;padding:1px}
+  .f-brand{font-size:11px;font-weight:900;color:#fff;letter-spacing:.03em}
+  .f-tagline{font-size:9px;color:rgba(255,255,255,.65);margin-top:1px}
+  .f-instructions{font-size:9px;color:rgba(255,255,255,.8);text-align:right;line-height:1.5}
+  /* Print hint */
+  .print-hint{text-align:center;margin-top:12px;font-size:9px;color:#9ca3af}
+  @media print{
+    body{background:#fff;display:block;min-height:unset}
+    .wrap{max-width:100%}
+    .ticket{box-shadow:none;border:1px solid #e5e7eb}
+    .print-hint{display:none}
+  }
+</style></head><body>
+<div class="wrap">
+  <div class="ticket">
+    ${posterDataUrl
+      ? `<img src="${posterDataUrl}" class="poster" alt="${ticket.event.name}" />`
+      : `<div class="no-poster"><div class="no-poster-text">NXT STOP</div></div>`
+    }
+    <div class="body">
+      <div class="header-row">
+        <img src="${logoDataUrl}" class="logo" alt="NXT STOP" />
+        <div class="header-text">
+          <div class="brand-lbl">NXT STOP</div>
+          <div class="event-name">${ticket.event.name}</div>
+          <span class="type-badge" style="background:${ticket.ticketType.color}">${ticket.ticketType.name}</span>
+        </div>
+      </div>
+      <div class="details">
+        <div class="det-row"><span class="det-icon">&#128197;</span><span>${dateStr}</span></div>
+        <div class="det-row"><span class="det-icon">&#128336;</span><span>${timeStr}${endTimeStr}</span></div>
+        <div class="det-row"><span class="det-icon">&#128205;</span><span>${ticket.event.venue}${ticket.event.address ? ', ' + ticket.event.address : ''}</span></div>
+      </div>
+      <hr class="divider" />
+      <div class="qr-section">
+        <img src="${ticket.qrDataUrl}" class="qr-img" alt="QR Code" />
+        <div class="qr-info">
+          ${holderName ? `<div class="lbl">Ticket For</div><div class="val">${holderName}</div>` : ''}
+          <div class="price">$${ticket.ticketType.price.toFixed(2)}</div>
+          <div class="mono">${ticket.ticketNumber}</div>
+          <span class="${statusClass}">${ticket.status.toUpperCase()}</span>
+        </div>
+      </div>
+    </div>
+    <div class="t-footer">
+      <div class="f-logo">
+        <img src="${logoDataUrl}" class="f-logo-img" alt="NXT STOP" />
+        <div>
+          <div class="f-brand">NXT STOP</div>
+          <div class="f-tagline">nxtstop.com</div>
+        </div>
+      </div>
+      <div class="f-instructions">Present this QR code at the gate<br>One entry per ticket</div>
+    </div>
+  </div>
+  <div class="print-hint">To save as PDF: File &rarr; Print &rarr; Save as PDF</div>
+</div>
+<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),800)}</script>
+</body></html>`)
     printWin.document.close()
   }
 
@@ -86,8 +205,8 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
           </button>
         </div>
 
-        {/* The actual printable ticket */}
-        <div ref={printRef}>
+        {/* In-app ticket preview */}
+        <div>
           <div className="ticket bg-white rounded-2xl overflow-hidden shadow-2xl">
             {ticket.event.posterImage ? (
               <img src={ticket.event.posterImage} alt={ticket.event.name} className="poster w-full h-44 object-cover" />
