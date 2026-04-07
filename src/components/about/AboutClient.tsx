@@ -77,7 +77,6 @@ export default function AboutClient() {
                 gallery: [
                   'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
                   'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%204.jpeg',
                 ],
               },
             ].map(dj => (

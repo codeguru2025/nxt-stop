@@ -359,7 +359,6 @@ export default function HomeClient() {
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%205.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%207.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%204.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/BigQ%20on%20deck.jpeg',
             ].map((url, i) => (
               <div
