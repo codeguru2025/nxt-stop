@@ -54,6 +54,7 @@ export default function EventDetailClient() {
 
   const [event, setEvent] = useState<Event | null>(null)
   const [loading, setLoading] = useState(true)
+  const [imgError, setImgError] = useState(false)
   const [selectedType, setSelectedType] = useState<string>('')
   const [quantity, setQuantity] = useState(1)
   const [paymentMethod, setPaymentMethod] = useState('ecocash')
@@ -243,10 +244,15 @@ export default function EventDetailClient() {
     <div>
       {/* Hero Banner */}
       <div className="relative h-[50vh] min-h-[300px] overflow-hidden">
-        {event.bannerImage || event.posterImage ? (
-          <img src={event.bannerImage ?? event.posterImage!} alt={event.name} className="w-full h-full object-cover" />
+        {(event.bannerImage || event.posterImage) && !imgError ? (
+          <img
+            src={event.bannerImage ?? event.posterImage!}
+            alt={event.name}
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+          />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-purple-900/60 via-[#0a0a0a] to-pink-900/40 flex items-center justify-center">
+          <div className="w-full h-full bg-gradient-to-br from-purple-900/60 via-[#0a0a0a] to-[#1A6B5A]/20 flex items-center justify-center">
             <div className="text-8xl">🎧</div>
           </div>
         )}

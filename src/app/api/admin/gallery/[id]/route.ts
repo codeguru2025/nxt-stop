@@ -39,7 +39,7 @@ export async function DELETE(
     const photo = await prisma.galleryPhoto.findUnique({ where: { id } })
     if (!photo) return Response.json({ error: 'Not found' }, { status: 404 })
 
-    const key = photo.url.split(`/${process.env.DO_SPACES_BUCKET!}/`)[1]
+    const key = new URL(photo.url).pathname.replace(/^\//, '')
     if (key) await deleteFile(key).catch(() => {})
 
     await prisma.galleryPhoto.delete({ where: { id } })

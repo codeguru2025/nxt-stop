@@ -35,7 +35,7 @@ export async function uploadFile(
       ACL: 'public-read',
     })
   )
-  return `${CDN_URL}/${BUCKET}/${key}`
+  return `${CDN_URL}/${key}`
 }
 
 /**
@@ -67,5 +67,5 @@ export async function deleteFile(key: string): Promise<void> {
  * Build the public CDN URL for a given key.
  */
 export function getPublicUrl(key: string): string {
-  return `${CDN_URL}/${BUCKET}/${key}`
+  return `${CDN_URL}/${key}`
 }

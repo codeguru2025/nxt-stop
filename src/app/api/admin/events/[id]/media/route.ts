@@ -68,8 +68,8 @@ export async function DELETE(
     const media = await prisma.eventMedia.findUnique({ where: { id: mediaId } })
     if (!media) return Response.json({ error: 'Not found' }, { status: 404 })
 
-    // Extract key from URL and delete from Spaces
-    const key = media.url.split(`/${process.env.DO_SPACES_BUCKET!}/`)[1]
+    // Extract S3 key from the CDN URL (pathname without leading slash)
+    const key = new URL(media.url).pathname.replace(/^\//, '')
     if (key) await deleteFile(key).catch(() => {})
 
     await prisma.eventMedia.delete({ where: { id: mediaId } })
