@@ -83,7 +83,16 @@ export async function POST(req: Request) {
 
       if (!ticketType) throw Object.assign(new Error('Ticket type not found'), { status: 404 })
       if (!ticketType.active) throw Object.assign(new Error('Ticket type is no longer available'), { status: 409 })
-      if (ticketType.sold + quantity > ticketType.capacity) {
+
+      // Count pending (unpaid) orders that have already reserved this ticket type
+      // so concurrent checkouts don't jointly exceed capacity
+      const pendingReserved = await tx.orderItem.aggregate({
+        where: { ticketTypeId, order: { status: 'pending' } },
+        _sum: { quantity: true },
+      })
+      const reserved = pendingReserved._sum.quantity ?? 0
+
+      if (ticketType.sold + reserved + quantity > ticketType.capacity) {
         throw Object.assign(new Error('Not enough tickets available'), { status: 409 })
       }
 

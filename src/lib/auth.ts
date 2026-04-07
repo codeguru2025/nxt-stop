@@ -65,5 +65,10 @@ export async function requireGateOrAdmin(): Promise<SessionUser> {
   if (!['admin', 'gate_staff'].includes(session.role)) {
     throw new Error('Forbidden')
   }
+  // Re-verify role from DB — same as requireAdmin — so a downgraded user's JWT can't be used
+  const user = await prisma.user.findUnique({ where: { id: session.id }, select: { role: true } })
+  if (!user || !['admin', 'gate_staff'].includes(user.role)) {
+    throw new Error('Forbidden')
+  }
   return session
 }

@@ -14,8 +14,11 @@ export async function POST(req: Request) {
     const { activationCode } = await req.json()
     if (!activationCode?.trim()) return error('Activation code is required')
 
+    const clean = activationCode.trim().toUpperCase()
+
+    // Look up ticket details first (read-only, outside transaction)
     const ticket = await prisma.ticket.findUnique({
-      where: { activationCode: activationCode.trim().toUpperCase() },
+      where: { activationCode: clean },
       include: {
         event:      { select: { id: true, name: true, date: true, venue: true } },
         ticketType: { select: { id: true, name: true, color: true, price: true } },
@@ -30,48 +33,48 @@ export async function POST(req: Request) {
       return error(`Cannot activate ticket with status: ${ticket.status}`)
     }
 
-    // Create a cash sale order to record the revenue
+    // Wrap all mutations in a transaction. The atomic updateMany with WHERE status='physical'
+    // is the idempotency guard — if two requests race, only one gets count=1.
     const orderNumber = generateOrderNumber()
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        userId: ticket.userId,
-        subtotal: ticket.ticketType.price,
-        platformFees: 0,
-        total: ticket.ticketType.price,
-        status: 'paid',
-        paymentMethod: 'cash',
-        paidAt: new Date(),
-        items: {
-          create: {
-            ticketTypeId: ticket.ticketTypeId,
-            name: `${ticket.ticketType.name} - ${ticket.event.name}`,
-            price: ticket.ticketType.price,
-            quantity: 1,
+    const result = await prisma.$transaction(async (tx) => {
+      // Atomically claim the ticket — only succeeds if it's still 'physical'
+      const { count } = await tx.ticket.updateMany({
+        where: { id: ticket.id, status: 'physical' },
+        data: { status: 'valid', activatedAt: new Date(), activatedById: session.id },
+      })
+      if (count === 0) throw Object.assign(new Error('Ticket is already activated and sold'), { status: 409 })
+
+      // Create the cash sale order
+      const order = await tx.order.create({
+        data: {
+          orderNumber,
+          userId: ticket.userId,
+          subtotal: ticket.ticketType.price,
+          platformFees: 0,
+          total: ticket.ticketType.price,
+          status: 'paid',
+          paymentMethod: 'cash',
+          paidAt: new Date(),
+          items: {
+            create: {
+              ticketTypeId: ticket.ticketTypeId,
+              name: `${ticket.ticketType.name} - ${ticket.event.name}`,
+              price: ticket.ticketType.price,
+              quantity: 1,
+            },
           },
         },
-      },
-    })
+      })
 
-    // Activate the ticket
-    await prisma.ticket.update({
-      where: { id: ticket.id },
-      data: {
-        status: 'valid',
-        activatedAt: new Date(),
-        activatedById: session.id,
-        orderId: order.id,
-      },
-    })
+      // Link order to ticket and increment sold counter
+      await tx.ticket.update({ where: { id: ticket.id }, data: { orderId: order.id } })
+      await tx.ticketType.update({ where: { id: ticket.ticketTypeId }, data: { sold: { increment: 1 } } })
 
-    // Now it's a real sale — increment sold counter
-    await prisma.ticketType.update({
-      where: { id: ticket.ticketTypeId },
-      data: { sold: { increment: 1 } },
+      return order
     })
 
     return ok({
-      orderNumber,
+      orderNumber: result.orderNumber,
       ticket: {
         number: ticket.ticketNumber,
         event: ticket.event.name,
@@ -82,7 +85,8 @@ export async function POST(req: Request) {
         price: ticket.ticketType.price,
       },
     })
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.status === 409) return error(e.message, 409)
     return serverError(e)
   }
 }

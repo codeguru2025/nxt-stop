@@ -4,7 +4,8 @@ import { ok, error, forbidden, serverError } from '@/lib/api'
 import { generateQRDataURL, generateTicketNumber } from '@/lib/qr'
 import crypto from 'crypto'
 
-// GET /api/admin/tickets?search=&eventId=&status=&page=
+// GET /api/admin/tickets?search=&eventId=&status=&page=&includeQR=true
+// When includeQR=true is set alongside status=physical, returns tickets with regenerated qrDataUrl
 export async function GET(req: Request) {
   try {
     const session = await requireAdmin().catch(() => null)
@@ -15,6 +16,7 @@ export async function GET(req: Request) {
     const eventId = searchParams.get('eventId') ?? ''
     const status = searchParams.get('status') ?? ''
     const page = parseInt(searchParams.get('page') ?? '1')
+    const includeQR = searchParams.get('includeQR') === 'true'
     const limit = 50
 
     const where: any = {}
@@ -27,6 +29,42 @@ export async function GET(req: Request) {
         { user: { email: { contains: search, mode: 'insensitive' } } },
         { order: { recipientName: { contains: search, mode: 'insensitive' } } },
       ]
+    }
+
+    // Physical ticket batch fetch — regenerate QR data URLs
+    if (includeQR && status === 'physical') {
+      const physicalTickets = await prisma.ticket.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+        select: {
+          ticketNumber: true,
+          qrCode: true,
+          activationCode: true,
+          event: { select: { name: true, date: true, venue: true } },
+          ticketType: { select: { name: true, color: true, price: true } },
+        },
+      })
+
+      const withQR = await Promise.all(
+        physicalTickets.map(async t => ({
+          ticketNumber: t.ticketNumber,
+          qrCode: t.qrCode,
+          activationCode: t.activationCode ?? '',
+          qrDataUrl: await generateQRDataURL(t.qrCode),
+          event: t.event,
+          ticketType: t.ticketType,
+        }))
+      )
+
+      // Group by event (first record's event, since all share the same event when filtered)
+      const first = withQR[0]
+      return ok({
+        event: first?.event ?? null,
+        ticketType: first?.ticketType ?? null,
+        tickets: withQR.map(t => ({ ticketNumber: t.ticketNumber, qrCode: t.qrCode, activationCode: t.activationCode, qrDataUrl: t.qrDataUrl })),
+        total: withQR.length,
+      })
     }
 
     const [tickets, total] = await Promise.all([

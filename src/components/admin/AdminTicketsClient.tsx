@@ -77,6 +77,8 @@ export default function AdminTicketsClient() {
   const [hcQty, setHcQty] = useState(1)
   const [hcGenerating, setHcGenerating] = useState(false)
   const [hcBatch, setHcBatch] = useState<GeneratedBatch | null>(null)
+  const [hcLoadingExisting, setHcLoadingExisting] = useState(false)
+  const [hcExistingCount, setHcExistingCount] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     if (tab === 'hardcopy') return
@@ -111,6 +113,28 @@ export default function AdminTicketsClient() {
 
   const selectedEvent = events.find(e => e.id === hcEventId)
   const selectedTicketType = selectedEvent?.ticketTypes.find(t => t.id === hcTicketTypeId)
+
+  // Check how many unsold physical tickets already exist for the selected event
+  const checkExisting = async (eventId: string, ticketTypeId: string) => {
+    if (!eventId || !ticketTypeId) { setHcExistingCount(null); return }
+    const res = await fetch(`/api/admin/tickets?status=physical&eventId=${eventId}`).then(r => r.json())
+    if (res.success) setHcExistingCount(res.data.total ?? 0)
+  }
+
+  const loadExistingBatch = async () => {
+    if (!hcEventId || !hcTicketTypeId) return
+    setHcLoadingExisting(true)
+    setHcBatch(null)
+    const res = await fetch(`/api/admin/tickets?status=physical&eventId=${hcEventId}&includeQR=true`).then(r => r.json())
+    setHcLoadingExisting(false)
+    if (res.success && res.data.tickets?.length > 0) {
+      setHcBatch({
+        event: res.data.event,
+        ticketType: res.data.ticketType,
+        tickets: res.data.tickets,
+      })
+    }
+  }
 
   const generateHardCopy = async () => {
     if (!hcEventId || !hcTicketTypeId || hcQty < 1) return
@@ -278,7 +302,7 @@ export default function AdminTicketsClient() {
               <div className="grid sm:grid-cols-3 gap-4">
                 <div>
                   <label>Event *</label>
-                  <select value={hcEventId} onChange={e => { setHcEventId(e.target.value); setHcTicketTypeId('') }}>
+                  <select value={hcEventId} onChange={e => { setHcEventId(e.target.value); setHcTicketTypeId(''); setHcBatch(null); setHcExistingCount(null) }}>
                     <option value="">Select event…</option>
                     {events.map(ev => (
                       <option key={ev.id} value={ev.id}>{ev.name}</option>
@@ -287,7 +311,7 @@ export default function AdminTicketsClient() {
                 </div>
                 <div>
                   <label>Ticket Type *</label>
-                  <select value={hcTicketTypeId} onChange={e => setHcTicketTypeId(e.target.value)} disabled={!hcEventId}>
+                  <select value={hcTicketTypeId} onChange={e => { setHcTicketTypeId(e.target.value); setHcBatch(null); checkExisting(hcEventId, e.target.value) }} disabled={!hcEventId}>
                     <option value="">Select type…</option>
                     {selectedEvent?.ticketTypes.map(tt => (
                       <option key={tt.id} value={tt.id}>{tt.name} — {formatCurrency(tt.price)}</option>
@@ -303,6 +327,21 @@ export default function AdminTicketsClient() {
                 <div className="mt-4 p-3 bg-[#111] rounded-xl text-sm text-gray-400 flex gap-6">
                   <span>Total cash value: <span className="text-white font-bold">{formatCurrency(selectedTicketType.price * hcQty)}</span></span>
                   <span>Tickets: <span className="text-white font-bold">{hcQty}</span></span>
+                </div>
+              )}
+              {hcExistingCount !== null && hcExistingCount > 0 && !hcBatch && (
+                <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-between gap-3">
+                  <span className="text-sm text-blue-300">
+                    <span className="font-bold">{hcExistingCount}</span> unsold physical ticket{hcExistingCount !== 1 ? 's' : ''} already exist for this event
+                  </span>
+                  <button
+                    onClick={loadExistingBatch}
+                    disabled={hcLoadingExisting}
+                    className="flex items-center gap-1.5 text-xs bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300 rounded-lg px-3 py-1.5 transition-colors shrink-0"
+                  >
+                    {hcLoadingExisting ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                    {hcLoadingExisting ? 'Loading…' : 'Reload & Reprint'}
+                  </button>
                 </div>
               )}
               <div className="flex flex-wrap gap-2 mt-5">
@@ -340,7 +379,7 @@ export default function AdminTicketsClient() {
                   </div>
                 </div>
                 <p className="text-xs text-orange-400/80 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2 mb-2">
-                  These tickets are <strong>NOT yet sold</strong>. They will only count as sales once activated using the code on the stub.
+                  These tickets are <strong>NOT yet sold</strong>. They will only count as sales once the activation code on the stub is entered at <strong>/gate/activate</strong>.
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {hcBatch.tickets.map(t => (

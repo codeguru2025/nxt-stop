@@ -95,10 +95,34 @@ export async function POST(req: Request) {
       return ok(payload)
     }
 
-    await prisma.ticket.update({
-      where: { id: ticket.id },
-      data: { status: 'used', usedAt: new Date() },
+    // Atomic: only mark used if status is still 'valid' — guards against race between two scanners
+    const usedAt = new Date()
+    const { count } = await prisma.ticket.updateMany({
+      where: { id: ticket.id, status: 'valid' },
+      data: { status: 'used', usedAt },
     })
+
+    if (count === 0) {
+      // Another scanner beat us — treat as already_used
+      await logScan(ticket.id, ticket.eventId, session.id, 'already_used', deviceId)
+      const holderName = (ticket.order as any)?.recipientName || (ticket.order as any)?.guestName || ticket.user.name
+      const payload = {
+        result: 'already_used',
+        message: 'Ticket has already been used',
+        usedAt,
+        ticket: {
+          number: ticket.ticketNumber,
+          holder: holderName,
+          type: ticket.ticketType.name,
+          color: (ticket.ticketType as any).color,
+          price: (ticket.ticketType as any).price,
+          event: ticket.event.name,
+          venue: (ticket.event as any).venue,
+        },
+      }
+      emitScanEvent(ticket.eventId, payload)
+      return ok(payload)
+    }
 
     await logScan(ticket.id, ticket.eventId, session.id, 'valid', deviceId)
 
