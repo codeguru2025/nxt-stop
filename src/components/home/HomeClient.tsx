@@ -354,7 +354,7 @@ export default function HomeClient() {
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%203.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%203.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%202.jpeg',
+              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%206.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%205.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',

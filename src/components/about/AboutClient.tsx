@@ -75,7 +75,7 @@ export default function AboutClient() {
                 role: 'Dance Music DJ',
                 image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
                 gallery: [
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%202.jpeg',
+                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
                   'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',
                   'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%204.jpeg',
                 ],
