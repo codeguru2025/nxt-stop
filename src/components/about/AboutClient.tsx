@@ -24,7 +24,7 @@ export default function AboutClient() {
       {/* Hero */}
       <section className="relative py-24 overflow-hidden">
         <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-[#0a0a0a] to-pink-900/10" />
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-[#0a0a0a] to-[#1A6B5A]/10" />
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[120px]" />
         </div>
         <div className="relative max-w-4xl mx-auto px-4 text-center">
@@ -46,13 +46,13 @@ export default function AboutClient() {
         <div className="max-w-5xl mx-auto px-4">
           <div className="text-center mb-14">
             <h2 className="text-3xl font-black text-white mb-2">The DJs</h2>
-            <p className="text-gray-500">The talent behind the NXT STOP sound</p>
+            <p className="text-gray-500">The dance music talent behind the NXT STOP sound</p>
           </div>
           <div className="grid sm:grid-cols-3 gap-8">
             {[
               {
-                name: 'Corrason',
-                role: 'Resident DJ',
+                name: 'Corason',
+                role: 'Dance Music DJ',
                 image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason.jpeg',
                 gallery: [
                   'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%202.jpeg',
@@ -62,7 +62,7 @@ export default function AboutClient() {
               },
               {
                 name: 'Big Q',
-                role: 'Resident DJ',
+                role: 'Dance Music DJ',
                 image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q.jpeg',
                 gallery: [
                   'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
@@ -71,9 +71,9 @@ export default function AboutClient() {
                 ],
               },
               {
-                name: 'Yugo',
-                role: 'Resident DJ',
-                image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo.jpeg',
+                name: 'Yugoe',
+                role: 'Dance Music DJ',
+                image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
                 gallery: [
                   'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%202.jpeg',
                   'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',

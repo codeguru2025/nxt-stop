@@ -2,28 +2,30 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 import {
   LayoutDashboard, CalendarDays, Users, Package,
   Gift, UserCircle2, QrCode, LogOut, Shield,
-  ImageIcon, Video, Ticket
+  ImageIcon, Video, Ticket, Menu, X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV = [
-  { href: '/admin', icon: LayoutDashboard, label: 'Overview', exact: true },
-  { href: '/admin/events', icon: CalendarDays, label: 'Events' },
-  { href: '/admin/partners', icon: Users, label: 'Partners' },
-  { href: '/admin/store', icon: Package, label: 'Store' },
-  { href: '/admin/rewards', icon: Gift, label: 'Rewards' },
-  { href: '/admin/founders', icon: UserCircle2, label: 'Founders' },
-  { href: '/admin/tickets', icon: Ticket, label: 'Tickets & Orders' },
-  { href: '/admin/gallery', icon: ImageIcon, label: 'Gallery' },
-  { href: '/admin/videos', icon: Video, label: 'Past Videos' },
-  { href: '/gate', icon: QrCode, label: 'Gate Scanner' },
+  { href: '/admin',           icon: LayoutDashboard, label: 'Overview',       exact: true },
+  { href: '/admin/events',    icon: CalendarDays,    label: 'Events' },
+  { href: '/admin/partners',  icon: Users,           label: 'Partners' },
+  { href: '/admin/store',     icon: Package,         label: 'Store' },
+  { href: '/admin/rewards',   icon: Gift,            label: 'Rewards' },
+  { href: '/admin/founders',  icon: UserCircle2,     label: 'Founders' },
+  { href: '/admin/tickets',   icon: Ticket,          label: 'Tickets & Orders' },
+  { href: '/admin/gallery',   icon: ImageIcon,       label: 'Gallery' },
+  { href: '/admin/videos',    icon: Video,           label: 'Past Videos' },
+  { href: '/gate',            icon: QrCode,          label: 'Gate Scanner' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const [open, setOpen] = useState(false)
 
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -31,28 +33,50 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex bg-[#0a0a0a]">
+
+      {/* Mobile backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/70 z-30 md:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-60 bg-[#111] border-r border-[#2a2a2a] fixed inset-y-0 left-0 z-40 flex flex-col">
+      <aside className={cn(
+        'w-60 bg-[#111] border-r border-[#2a2a2a] fixed inset-y-0 left-0 z-40 flex flex-col transition-transform duration-300 ease-in-out',
+        open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      )}>
         {/* Logo */}
-        <div className="p-5 border-b border-[#2a2a2a]">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center">
-              <span className="text-white font-black text-xs">N</span>
-            </div>
-            <span className="font-black text-white text-sm">NXT STOP</span>
-            <span className="text-xs bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded-md font-medium ml-auto">Admin</span>
+        <div className="p-5 border-b border-[#2a2a2a] flex items-center justify-between gap-2 min-h-[64px]">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <img
+              src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
+              alt="NXT STOP"
+              className="h-6 w-auto object-contain invert shrink-0"
+            />
+            <span className="text-xs bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded-md font-medium ml-auto shrink-0">Admin</span>
           </div>
+          {/* Close button — mobile only */}
+          <button
+            onClick={() => setOpen(false)}
+            className="md:hidden shrink-0 text-gray-500 hover:text-white transition-colors ml-1"
+            aria-label="Close sidebar"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-0.5">
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {NAV.map(item => {
             const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => setOpen(false)}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
                   active
@@ -60,8 +84,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     : 'text-gray-500 hover:text-gray-200 hover:bg-white/5'
                 )}
               >
-                <item.icon size={16} />
-                {item.label}
+                <item.icon size={16} className="shrink-0" />
+                <span className="truncate">{item.label}</span>
               </Link>
             )
           })}
@@ -69,21 +93,47 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Footer */}
         <div className="p-3 border-t border-[#2a2a2a]">
-          <Link href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-500 hover:text-gray-200 hover:bg-white/5 transition-all mb-1">
-            <Shield size={16} />
+          <Link
+            href="/"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-500 hover:text-gray-200 hover:bg-white/5 transition-all mb-1"
+          >
+            <Shield size={16} className="shrink-0" />
             View Site
           </Link>
-          <button onClick={logout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-500 hover:text-red-400 hover:bg-red-500/5 transition-all">
-            <LogOut size={16} />
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-500 hover:text-red-400 hover:bg-red-500/5 transition-all"
+          >
+            <LogOut size={16} className="shrink-0" />
             Logout
           </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 ml-60 min-h-screen">
-        {children}
-      </main>
+      {/* Page content */}
+      <div className="flex flex-col flex-1 md:ml-60 min-h-screen min-w-0">
+
+        {/* Mobile top bar */}
+        <header className="md:hidden sticky top-0 z-20 bg-[#111] border-b border-[#2a2a2a] px-4 h-14 flex items-center gap-3">
+          <button
+            onClick={() => setOpen(true)}
+            className="text-gray-400 hover:text-white transition-colors"
+            aria-label="Open sidebar"
+          >
+            <Menu size={22} />
+          </button>
+          <img
+            src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
+            alt="NXT STOP"
+            className="h-6 w-auto object-contain invert"
+          />
+        </header>
+
+        <main className="flex-1 w-full overflow-x-hidden">
+          {children}
+        </main>
+      </div>
     </div>
   )
 }

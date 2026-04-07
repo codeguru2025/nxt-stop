@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
-import { ok, forbidden, serverError } from '@/lib/api'
-import { generateQRDataURL } from '@/lib/qr'
+import { ok, error, forbidden, serverError } from '@/lib/api'
+import { generateQRDataURL, generateTicketNumber } from '@/lib/qr'
+import crypto from 'crypto'
 
 // GET /api/admin/tickets?search=&eventId=&status=&page=
 export async function GET(req: Request) {
@@ -45,6 +46,60 @@ export async function GET(req: Request) {
     ])
 
     return ok({ tickets, total, page, pages: Math.ceil(total / limit) })
+  } catch (e) {
+    return serverError(e)
+  }
+}
+
+// POST /api/admin/tickets — generate physical (inventory) tickets for cash sale
+// Tickets are created with status='physical' — NOT counted as sales yet.
+// Each ticket gets an activationCode that must be entered when the ticket is sold.
+export async function POST(req: Request) {
+  try {
+    const session = await requireAdmin().catch(() => null)
+    if (!session) return forbidden()
+
+    const { eventId, ticketTypeId, quantity } = await req.json()
+    if (!eventId || !ticketTypeId || !quantity || quantity < 1 || quantity > 200) {
+      return error('eventId, ticketTypeId, and quantity (1–200) are required')
+    }
+
+    const [ticketType, event] = await Promise.all([
+      prisma.ticketType.findUnique({ where: { id: ticketTypeId } }),
+      prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, date: true, venue: true } }),
+    ])
+    if (!ticketType || !event) return error('Event or ticket type not found')
+
+    // Generate tickets as inventory (no order, no sold increment, status=physical)
+    const generated: { ticketNumber: string; qrCode: string; qrDataUrl: string; activationCode: string }[] = []
+    for (let i = 0; i < quantity; i++) {
+      const ticketNumber = generateTicketNumber()
+      const qrCode = crypto.randomUUID()
+      const qrDataUrl = await generateQRDataURL(qrCode)
+      // Short 6-char activation code — easy to type, hard to guess
+      const activationCode = crypto.randomBytes(3).toString('hex').toUpperCase()
+
+      await prisma.ticket.create({
+        data: {
+          ticketNumber,
+          qrCode,
+          activationCode,
+          userId: session.id,
+          eventId,
+          ticketTypeId,
+          status: 'physical', // inventory — not yet sold
+          // orderId intentionally omitted — set on activation
+        },
+      })
+
+      generated.push({ ticketNumber, qrCode, qrDataUrl, activationCode })
+    }
+
+    return ok({
+      event: { name: event.name, date: event.date, venue: event.venue },
+      ticketType: { name: ticketType.name, color: ticketType.color, price: ticketType.price },
+      tickets: generated,
+    }, 201)
   } catch (e) {
     return serverError(e)
   }

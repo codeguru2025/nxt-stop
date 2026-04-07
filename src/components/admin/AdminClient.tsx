@@ -58,7 +58,7 @@ export default function AdminClient() {
 
   return (
     <AdminLayout>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -122,7 +122,7 @@ export default function AdminClient() {
                             className="h-full rounded-full"
                             style={{
                               width: `${pct}%`,
-                              background: pct > 80 ? '#EF4444' : pct > 50 ? '#F59E0B' : '#8B5CF6'
+                              background: pct > 80 ? '#EF4444' : pct > 50 ? '#F59E0B' : '#E8174A'
                             }}
                           />
                         </div>

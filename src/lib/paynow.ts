@@ -68,9 +68,9 @@ export type PollStatus = 'paid' | 'failed' | 'cancelled' | 'pending'
 export async function pollPaynowTransaction(pollUrl: string): Promise<PollStatus> {
   const client = createClient()
   const res = await client.pollTransaction(pollUrl)
-  if (res.paid()) return 'paid'
-  const s: string = (res.status ?? '').toLowerCase()
+  // pollTransaction returns an InitResponse — check .status directly (no .paid() method exists)
+  const s: string = (res?.status ?? '').toLowerCase()
+  if (s === 'paid') return 'paid'
   if (['failed', 'voided', 'error', 'disputed', 'cancelled'].includes(s)) return 'failed'
-  if (s === 'cancelled') return 'cancelled'
   return 'pending'
 }

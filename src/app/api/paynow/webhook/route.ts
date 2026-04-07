@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { fulfillOrder } from '@/lib/fulfillOrder'
-import crypto from 'crypto'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { sha512 } = require('js-sha512')
 
 // POST /api/paynow/webhook
 // Paynow posts status updates here (resultUrl).
@@ -17,7 +18,8 @@ export async function POST(req: Request) {
 
     if (!reference || !status || !receivedHash) return new Response('Bad Request', { status: 400 })
 
-    // Verify Paynow hash: MD5 of status+reference+amount+paynowreference+pollurl+integrationKey (uppercase)
+    // Verify Paynow hash: SHA512 of status+reference+amount+paynowreference+pollurl+integrationKey(lower) (uppercase)
+    // PayNow uses SHA512 (same algorithm as the paynow npm library's generateHash function)
     const integrationKey = process.env.PAYNOW_INTEGRATION_KEY
     if (!integrationKey) {
       console.error('PAYNOW_INTEGRATION_KEY not set — rejecting webhook')
@@ -30,9 +32,9 @@ export async function POST(req: Request) {
       params.get('amount') ?? '',
       params.get('paynowreference') ?? '',
       params.get('pollurl') ?? '',
-    ].join('') + integrationKey
+    ].join('') + integrationKey.toLowerCase()
 
-    const computedHash = crypto.createHash('md5').update(hashInput).digest('hex').toUpperCase()
+    const computedHash = sha512(hashInput).toUpperCase()
 
     if (computedHash !== receivedHash.toUpperCase()) {
       console.warn('Paynow webhook hash mismatch — possible spoofing attempt')

@@ -53,9 +53,9 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <img
-              src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo.jpeg"
+              src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
               alt="NXT STOP"
-              className="h-9 w-auto object-contain"
+              className="h-9 w-auto object-contain invert"
             />
           </Link>
 

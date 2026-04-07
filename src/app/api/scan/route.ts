@@ -81,6 +81,13 @@ export async function POST(req: Request) {
       return ok(payload)
     }
 
+    if (ticket.status === 'physical') {
+      await logScan(ticket.id, ticket.eventId, session.id, 'invalid', deviceId)
+      const payload = { result: 'invalid', message: 'Ticket not activated — not yet sold. Activate it at the sales desk.' }
+      emitScanEvent(ticket.eventId, payload)
+      return ok(payload)
+    }
+
     if (ticket.status !== 'valid') {
       await logScan(ticket.id, ticket.eventId, session.id, 'invalid', deviceId)
       const payload = { result: 'invalid', message: `Ticket status: ${ticket.status}` }

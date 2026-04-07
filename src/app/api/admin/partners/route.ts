@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     if (!session) return forbidden()
 
     const {
-      name, email, phone, type, businessName, commissionRate, password,
+      name, email, phone, type, businessName, commissionRate, commissionPerTicket, password,
     } = await req.json()
 
     if (!name || !email || !type || !password) {
@@ -59,11 +59,36 @@ export async function POST(req: Request) {
         referralCode,
         qrCode: qrDataUrl,
         commissionRate: commissionRate ?? 10,
+        commissionPerTicket: commissionPerTicket ?? 0,
       },
       include: { user: { select: { name: true, email: true } } },
     })
 
     return ok(partner, 201)
+  } catch (e) {
+    return serverError(e)
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    const session = await requireAdmin().catch(() => null)
+    if (!session) return forbidden()
+
+    const { partnerId, commissionRate, commissionPerTicket, active } = await req.json()
+    if (!partnerId) return error('partnerId is required')
+
+    const partner = await prisma.partner.update({
+      where: { id: partnerId },
+      data: {
+        ...(commissionRate !== undefined && { commissionRate }),
+        ...(commissionPerTicket !== undefined && { commissionPerTicket }),
+        ...(active !== undefined && { active }),
+      },
+      include: { user: { select: { name: true, email: true } } },
+    })
+
+    return ok(partner)
   } catch (e) {
     return serverError(e)
   }

@@ -146,29 +146,33 @@ model TicketType {
 // ─── TICKETS ─────────────────────────────────────────────────────────────────
 
 model Ticket {
-  id           String    @id @default(cuid())
-  ticketNumber String    @unique
-  qrCode       String    @unique
-  userId       String
-  eventId      String
-  ticketTypeId String
-  orderId      String
-  status       String    @default("valid") // valid | used | cancelled | refunded
-  usedAt       DateTime?
-  partnerId    String?
-  referralCode String?
-  createdAt    DateTime  @default(now())
+  id             String    @id @default(cuid())
+  ticketNumber   String    @unique
+  qrCode         String    @unique
+  userId         String
+  eventId        String
+  ticketTypeId   String
+  orderId        String?   // null for physical/inventory tickets before activation
+  status         String    @default("valid") // valid | used | cancelled | refunded | physical
+  usedAt         DateTime?
+  partnerId      String?
+  referralCode   String?
+  activationCode String?   @unique  // short code printed on physical ticket stub
+  activatedAt    DateTime?
+  activatedById  String?
+  createdAt      DateTime  @default(now())
 
-  user       User       @relation(fields: [userId], references: [id])
-  event      Event      @relation(fields: [eventId], references: [id])
-  ticketType TicketType @relation(fields: [ticketTypeId], references: [id])
-  order      Order      @relation(fields: [orderId], references: [id])
-  partner    Partner?   @relation(fields: [partnerId], references: [id])
-  scanLogs   ScanLog[]
+  user        User       @relation(fields: [userId], references: [id])
+  event       Event      @relation(fields: [eventId], references: [id])
+  ticketType  TicketType @relation(fields: [ticketTypeId], references: [id])
+  order       Order?     @relation(fields: [orderId], references: [id])
+  partner     Partner?   @relation(fields: [partnerId], references: [id])
+  scanLogs    ScanLog[]
 
   @@index([userId])
   @@index([eventId, status])
   @@index([orderId])
+  @@index([activationCode])
 }
 
 model ScanLog {
@@ -244,8 +248,9 @@ model Partner {
   businessName   String?
   referralCode   String   @unique
   qrCode         String?
-  commissionRate Float    @default(10)
-  totalSales     Int      @default(0)
+  commissionRate      Float    @default(10)  // percentage of subtotal
+  commissionPerTicket Float    @default(0)   // flat amount per ticket (overrides rate when > 0)
+  totalSales          Int      @default(0)
   totalEarned    Float    @default(0)
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())

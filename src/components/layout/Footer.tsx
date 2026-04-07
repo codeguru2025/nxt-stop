@@ -43,9 +43,9 @@ export default function Footer() {
           <div className="md:col-span-2">
             <div className="mb-4">
               <img
-                src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo.jpeg"
+                src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
                 alt="NXT STOP"
-                className="h-10 w-auto object-contain"
+                className="h-10 w-auto object-contain invert"
               />
             </div>
             <p className="text-gray-500 text-sm leading-relaxed max-w-xs">
@@ -59,7 +59,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="w-9 h-9 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-gray-500 hover:text-purple-400 hover:border-purple-500/30 transition-all"
+                  className="w-9 h-9 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-gray-500 hover:text-purple-400 hover:border-purple-500/40 transition-all"
                 >
                   {svg}
                 </a>

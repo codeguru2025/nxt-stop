@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from './AdminLayout'
-import { Plus, Users, TrendingUp, DollarSign, Loader2, Check, X } from 'lucide-react'
+import { Plus, Users, TrendingUp, DollarSign, Loader2, Check, X, Edit2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
 type Partner = {
   id: string; type: string; businessName?: string; referralCode: string
-  commissionRate: number; totalSales: number; totalEarned: number; active: boolean
+  commissionRate: number; commissionPerTicket: number
+  totalSales: number; totalEarned: number; active: boolean
   user: { name: string; email: string; phone?: string }
   _count: { tickets: number }
   commissions: { amount: number; status: string }[]
@@ -22,9 +23,11 @@ export default function AdminPartnersClient() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ commissionRate: 0, commissionPerTicket: 0 })
   const [form, setForm] = useState({
     name: '', email: '', phone: '', password: '',
-    type: 'dj', businessName: '', commissionRate: 10
+    type: 'dj', businessName: '', commissionRate: 10, commissionPerTicket: 0
   })
 
   const load = () => {
@@ -51,12 +54,29 @@ export default function AdminPartnersClient() {
     if (res.success) { load(); setShowForm(false) }
   }
 
+  const startEdit = (p: Partner) => {
+    setEditing(p.id)
+    setEditForm({ commissionRate: p.commissionRate, commissionPerTicket: p.commissionPerTicket ?? 0 })
+  }
+
+  const saveEdit = async (partnerId: string) => {
+    setSaving(true)
+    await fetch('/api/admin/partners', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ partnerId, ...editForm }),
+    })
+    setSaving(false)
+    setEditing(null)
+    load()
+  }
+
   const pendingCommissions = (p: Partner) =>
     p.commissions.filter(c => c.status === 'pending').reduce((s, c) => s + c.amount, 0)
 
   return (
     <AdminLayout>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-black text-white">Partners & Affiliates</h1>
@@ -86,6 +106,12 @@ export default function AdminPartnersClient() {
               <div>
                 <label>Commission Rate (%)</label>
                 <input type="number" min={0} max={50} value={form.commissionRate} onChange={e => setForm(f => ({ ...f, commissionRate: parseFloat(e.target.value) }))} />
+                <p className="text-xs text-gray-500 mt-1">Percentage of ticket subtotal</p>
+              </div>
+              <div>
+                <label>Flat Commission per Ticket ($)</label>
+                <input type="number" min={0} step={0.01} value={form.commissionPerTicket} onChange={e => setForm(f => ({ ...f, commissionPerTicket: parseFloat(e.target.value) }))} />
+                <p className="text-xs text-gray-500 mt-1">Fixed $ per ticket sold — overrides % rate when &gt; 0</p>
               </div>
             </div>
             <div className="flex gap-2 mt-4">
@@ -131,6 +157,7 @@ export default function AdminPartnersClient() {
                     <th className="text-left p-4">Sales</th>
                     <th className="text-left p-4">Earned</th>
                     <th className="text-left p-4">Pending</th>
+                    <th className="text-left p-4"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1a1a1a]">
@@ -144,10 +171,50 @@ export default function AdminPartnersClient() {
                         <span className="capitalize text-gray-300 bg-[#2a2a2a] rounded-md px-2 py-0.5 text-xs">{p.type}</span>
                       </td>
                       <td className="p-4 font-mono text-purple-400 text-xs">{p.referralCode}</td>
-                      <td className="p-4 text-gray-300">{p.commissionRate}%</td>
+                      <td className="p-4 text-gray-300">
+                        {editing === p.id ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1">
+                              <input type="number" min={0} max={100} step={0.1} value={editForm.commissionRate}
+                                onChange={e => setEditForm(f => ({ ...f, commissionRate: parseFloat(e.target.value) }))}
+                                className="w-20 text-xs py-1 px-2" />
+                              <span className="text-xs text-gray-500">%</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <input type="number" min={0} step={0.01} value={editForm.commissionPerTicket}
+                                onChange={e => setEditForm(f => ({ ...f, commissionPerTicket: parseFloat(e.target.value) }))}
+                                className="w-20 text-xs py-1 px-2" />
+                              <span className="text-xs text-gray-500">$/ticket</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div>{p.commissionRate}%</div>
+                            {(p.commissionPerTicket ?? 0) > 0 && (
+                              <div className="text-xs text-purple-400">{formatCurrency(p.commissionPerTicket)}/ticket</div>
+                            )}
+                          </div>
+                        )}
+                      </td>
                       <td className="p-4 font-bold text-white">{p.totalSales}</td>
                       <td className="p-4 text-green-400">{formatCurrency(p.totalEarned)}</td>
                       <td className="p-4 text-yellow-400">{formatCurrency(pendingCommissions(p))}</td>
+                      <td className="p-4">
+                        {editing === p.id ? (
+                          <div className="flex gap-1">
+                            <button onClick={() => saveEdit(p.id)} disabled={saving} className="flex items-center gap-1 text-xs bg-green-500/10 border border-green-500/20 text-green-400 rounded-lg px-2 py-1">
+                              {saving ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />} Save
+                            </button>
+                            <button onClick={() => setEditing(null)} className="flex items-center gap-1 text-xs border border-[#2a2a2a] text-gray-500 rounded-lg px-2 py-1">
+                              <X size={10} /> Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => startEdit(p)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-white transition-colors">
+                            <Edit2 size={12} /> Edit
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

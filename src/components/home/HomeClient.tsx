@@ -81,9 +81,9 @@ export default function HomeClient() {
             priority
             className="object-cover object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-purple-900/50" />
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px]" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-pink-600/20 rounded-full blur-[120px]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-[#E8174A]/20" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/15 rounded-full blur-[120px]" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#1A6B5A]/15 rounded-full blur-[120px]" />
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4 pt-24 pb-16 w-full">
@@ -143,8 +143,8 @@ export default function HomeClient() {
             {/* Featured event card */}
             {featured && (
               <div className="relative">
-                <div className="relative bg-gradient-to-br from-[#1a1a2e] to-[#16213e] rounded-2xl border border-purple-500/20 overflow-hidden glow-purple">
-                  <div className="relative h-48 bg-gradient-to-br from-purple-900/50 to-pink-900/30">
+                <div className="relative bg-gradient-to-br from-[#1a0a10] to-[#0d1a15] rounded-2xl border border-purple-500/20 overflow-hidden glow-purple">
+                  <div className="relative h-48 bg-gradient-to-br from-purple-900/40 to-[#1A6B5A]/20">
                     {featured.posterImage ? (
                       <Image
                         src={featured.posterImage}
@@ -210,7 +210,7 @@ export default function HomeClient() {
       </section>
 
       {/* Next Event Spotlight */}
-      <section className="py-20 border-t border-[#1a1a1a] bg-gradient-to-b from-[#0a0a0a] to-[#0f0a1a]">
+      <section className="py-20 border-t border-[#1a1a1a] bg-gradient-to-b from-[#0a0a0a] to-[#0a100e]">
         <div className="max-w-7xl mx-auto px-4">
           <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-1.5 mb-8">
             <div className="w-2 h-2 rounded-full bg-green-400 pulse-glow" />
@@ -385,7 +385,7 @@ export default function HomeClient() {
       {/* Referral CTA */}
       <section className="py-20 border-t border-[#1a1a1a]">
         <div className="max-w-4xl mx-auto px-4 text-center">
-          <div className="relative bg-gradient-to-br from-purple-900/30 to-pink-900/20 rounded-2xl border border-purple-500/20 p-12 overflow-hidden">
+          <div className="relative bg-gradient-to-br from-purple-900/20 to-[#1A6B5A]/10 rounded-2xl border border-purple-500/20 p-12 overflow-hidden">
             <div className="absolute inset-0 opacity-10" style={{
               backgroundImage: 'radial-gradient(circle, rgba(139,92,246,0.5) 1px, transparent 1px)',
               backgroundSize: '30px 30px'

@@ -30,7 +30,7 @@ const BLANK_FORM = {
   posterImage: '', bannerImage: '', hasVirtual: false, virtualPrice: 5,
   status: 'draft', lat: '', lng: '',
   ticketTypes: [
-    { name: 'General', price: 10, capacity: 500, color: '#8B5CF6' }
+    { name: 'General', price: 10, capacity: 500, color: '#E8174A' }
   ]
 }
 
@@ -115,7 +115,7 @@ export default function AdminEventsClient() {
   const addTicketType = () => {
     setForm((f: any) => ({
       ...f,
-      ticketTypes: [...f.ticketTypes, { name: '', price: 0, capacity: 100, color: '#8B5CF6' }]
+      ticketTypes: [...f.ticketTypes, { name: '', price: 0, capacity: 100, color: '#E8174A' }]
     }))
   }
 
@@ -128,7 +128,7 @@ export default function AdminEventsClient() {
 
   return (
     <AdminLayout>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-black text-white">Events</h1>

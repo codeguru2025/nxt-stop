@@ -129,7 +129,7 @@ export default function EventsClient() {
                           className="h-full rounded-full transition-all"
                           style={{
                             width: `${pct}%`,
-                            background: pct > 80 ? '#EF4444' : pct > 50 ? '#F59E0B' : '#8B5CF6'
+                            background: pct > 80 ? '#EF4444' : pct > 50 ? '#F59E0B' : '#E8174A'
                           }}
                         />
                       </div>

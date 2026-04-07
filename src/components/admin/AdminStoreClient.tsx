@@ -149,7 +149,7 @@ export default function AdminStoreClient() {
 
   return (
     <AdminLayout>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -359,7 +359,7 @@ export default function AdminStoreClient() {
                       </span>
                     </div>
                     <div className="h-1.5 bg-[#2a2a2a] rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: isLow ? '#F59E0B' : '#8B5CF6' }} />
+                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: isLow ? '#F59E0B' : '#E8174A' }} />
                     </div>
                     <div className="flex justify-between text-xs text-gray-600">
                       <span>{p.sold} sold</span>
