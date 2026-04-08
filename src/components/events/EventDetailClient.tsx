@@ -224,7 +224,9 @@ export default function EventDetailClient() {
     }
   }
 
-  const lineup: string[] = event?.lineup ? JSON.parse(event.lineup) : []
+  type LineupArtist = { name: string; role: string; image?: string }
+  let lineup: LineupArtist[] = []
+  try { lineup = event?.lineup ? JSON.parse(event.lineup) : [] } catch {}
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -310,12 +312,9 @@ export default function EventDetailClient() {
                 <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                   <Music size={20} className="text-purple-400" />Lineup
                 </h2>
-                <div className="flex flex-wrap gap-2">
-                  {lineup.map((artist: string) => (
-                    <div key={artist} className="flex items-center gap-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-2">
-                      <Star size={14} className="text-yellow-400" />
-                      <span className="font-medium text-white">{artist}</span>
-                    </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {lineup.map((artist, idx) => (
+                    <ArtistCard key={idx} artist={artist} />
                   ))}
                 </div>
               </div>
@@ -577,6 +576,48 @@ export default function EventDetailClient() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  headline: 'Headline Act',
+  mc: 'MC',
+  support_dj: 'Support DJ',
+  special_guest: 'Special Guest',
+}
+
+function ArtistCard({ artist }: { artist: { name: string; role: string; image?: string } }) {
+  const [imgErr, setImgErr] = useState(false)
+  const isHeadline = artist.role === 'headline'
+  const isMC = artist.role === 'mc'
+
+  return (
+    <div className={`relative rounded-xl overflow-hidden aspect-[3/4] bg-[#1a1a1a] border ${isHeadline ? 'border-purple-500/40' : isMC ? 'border-pink-500/30' : 'border-[#2a2a2a]'}`}>
+      {artist.image && !imgErr ? (
+        <img
+          src={artist.image}
+          alt={artist.name}
+          className="w-full h-full object-cover"
+          onError={() => setImgErr(true)}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-4xl">
+          {isMC ? '🎤' : '🎵'}
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+      <div className="absolute bottom-3 left-3 right-3">
+        <p className={`text-xs font-medium uppercase tracking-wider mb-0.5 ${isHeadline ? 'text-purple-400' : isMC ? 'text-pink-400' : 'text-gray-400'}`}>
+          {ROLE_LABELS[artist.role] ?? artist.role}
+        </p>
+        <p className="text-white font-black text-sm leading-tight">{artist.name}</p>
+      </div>
+      {isHeadline && (
+        <div className="absolute top-2 right-2 bg-purple-600/80 text-white text-xs font-bold px-2 py-0.5 rounded-md">
+          ★ HEADLINER
+        </div>
+      )}
     </div>
   )
 }
