@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import AdminLayout from './AdminLayout'
@@ -8,7 +8,7 @@ import AdminLayout from './AdminLayout'
 const LocationPicker = dynamic(() => import('./LocationPicker'), { ssr: false })
 import {
   Plus, Calendar, MapPin, Ticket, Edit, Trash2,
-  CheckCircle, Circle, Loader2, Check, X
+  CheckCircle, Circle, Loader2, Check, X, ImagePlus
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
@@ -42,6 +42,8 @@ export default function AdminEventsClient() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<any>(BLANK_FORM)
   const [editing, setEditing] = useState<string | null>(null)
+  const [posterUploading, setPosterUploading] = useState(false)
+  const posterInputRef = useRef<HTMLInputElement>(null)
 
   const load = () => {
     fetch('/api/admin/events').then(r => r.json()).then(d => {
@@ -112,6 +114,23 @@ export default function AdminEventsClient() {
     load()
   }
 
+  const uploadPoster = async (file: File) => {
+    setPosterUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('folder', 'events')
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd }).then(r => r.json())
+      if (res.success) {
+        setForm((f: any) => ({ ...f, posterImage: res.data.url }))
+      } else {
+        alert(res.error ?? 'Upload failed')
+      }
+    } finally {
+      setPosterUploading(false)
+    }
+  }
+
   const addTicketType = () => {
     setForm((f: any) => ({
       ...f,
@@ -170,8 +189,52 @@ export default function AdminEventsClient() {
                 <textarea rows={3} value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))} className="resize-none" placeholder="Event description..." />
               </div>
               <div>
-                <label>Poster Image URL</label>
-                <input value={form.posterImage} onChange={e => setForm((f: any) => ({ ...f, posterImage: e.target.value }))} placeholder="https://..." />
+                <label>Poster Image</label>
+                <input
+                  ref={posterInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    if (file) uploadPoster(file)
+                    e.target.value = ''
+                  }}
+                />
+                {form.posterImage ? (
+                  <div className="relative group w-full aspect-video rounded-lg overflow-hidden border border-[#2a2a2a]">
+                    <img src={form.posterImage} alt="Poster preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => posterInputRef.current?.click()}
+                        className="text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-md px-3 py-1.5 flex items-center gap-1.5"
+                      >
+                        <ImagePlus size={13} /> Replace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm((f: any) => ({ ...f, posterImage: '' }))}
+                        className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-md px-3 py-1.5 flex items-center gap-1.5"
+                      >
+                        <X size={13} /> Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => posterInputRef.current?.click()}
+                    disabled={posterUploading}
+                    className="w-full aspect-video rounded-lg border-2 border-dashed border-[#2a2a2a] hover:border-purple-500/50 flex flex-col items-center justify-center gap-2 text-gray-500 hover:text-purple-400 transition-colors"
+                  >
+                    {posterUploading ? (
+                      <><Loader2 size={22} className="animate-spin" /><span className="text-xs">Uploading…</span></>
+                    ) : (
+                      <><ImagePlus size={22} /><span className="text-xs">Click to upload poster</span><span className="text-xs opacity-60">JPG, PNG, WebP · max 10 MB</span></>
+                    )}
+                  </button>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <label>Venue Location</label>
@@ -225,7 +288,7 @@ export default function AdminEventsClient() {
             )}
 
             <div className="flex gap-2">
-              <button onClick={save} disabled={saving || !form.name || !form.venue || !form.date} className="btn-primary flex items-center gap-2 text-sm">
+              <button onClick={save} disabled={saving || posterUploading || !form.name || !form.venue || !form.date} className="btn-primary flex items-center gap-2 text-sm">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 {editing ? 'Save' : 'Create Event'}
               </button>

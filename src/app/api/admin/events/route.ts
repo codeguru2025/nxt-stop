@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import { slugify } from '@/lib/utils'
+import crypto from 'crypto'
 
 export async function GET() {
   try {
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
 
     if (!name || !venue || !date) return error('name, venue, and date are required')
 
-    const slug = slugify(name) + '-' + Date.now().toString(36)
+    const slug = slugify(name) + '-' + crypto.randomBytes(4).toString('hex')
 
     const event = await prisma.event.create({
       data: {

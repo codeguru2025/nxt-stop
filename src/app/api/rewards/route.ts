@@ -22,38 +22,38 @@ export async function POST(req: Request) {
     const { rewardId } = await req.json()
     if (!rewardId) return error('rewardId is required')
 
-    const reward = await prisma.reward.findUnique({ where: { id: rewardId, active: true } })
-    if (!reward) return error('Reward not found')
+    // All validation + mutation inside a single interactive transaction to prevent
+    // race conditions where two concurrent requests both pass the stock/points checks.
+    try {
+      await prisma.$transaction(async (tx) => {
+        const reward = await tx.reward.findUnique({ where: { id: rewardId } })
+        if (!reward) throw Object.assign(new Error('Reward not found'), { status: 404 })
+        if (!reward.active) throw Object.assign(new Error('Reward is no longer available'), { status: 410 })
+        if (reward.stock !== null && reward.stock <= 0) {
+          throw Object.assign(new Error('Reward is out of stock'), { status: 409 })
+        }
 
-    const user = await prisma.user.findUnique({ where: { id: session.id } })
-    if (!user) return unauthorized()
+        const user = await tx.user.findUnique({ where: { id: session.id } })
+        if (!user) throw Object.assign(new Error('User not found'), { status: 401 })
+        if (user.points < reward.pointsCost) {
+          throw Object.assign(
+            new Error(`Insufficient points. You need ${reward.pointsCost} but have ${user.points}`),
+            { status: 400 }
+          )
+        }
 
-    if (user.points < reward.pointsCost) {
-      return error(`Insufficient points. You need ${reward.pointsCost} but have ${user.points}`)
+        await tx.user.update({ where: { id: session.id }, data: { points: { decrement: reward.pointsCost } } })
+        await tx.redemption.create({
+          data: { userId: session.id, rewardId, points: reward.pointsCost, status: 'pending' },
+        })
+        if (reward.stock !== null) {
+          await tx.reward.update({ where: { id: rewardId }, data: { stock: { decrement: 1 } } })
+        }
+      })
+    } catch (e: any) {
+      if (e?.status) return error(e.message, e.status)
+      throw e
     }
-
-    if (reward.stock !== null && reward.stock <= 0) {
-      return error('Reward is out of stock')
-    }
-
-    // Deduct points and create redemption
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: session.id },
-        data: { points: { decrement: reward.pointsCost } },
-      }),
-      prisma.redemption.create({
-        data: {
-          userId: session.id,
-          rewardId,
-          points: reward.pointsCost,
-          status: 'pending',
-        },
-      }),
-      ...(reward.stock !== null
-        ? [prisma.reward.update({ where: { id: rewardId }, data: { stock: { decrement: 1 } } })]
-        : []),
-    ])
 
     return ok({ message: 'Reward redeemed successfully' }, 201)
   } catch (e) {

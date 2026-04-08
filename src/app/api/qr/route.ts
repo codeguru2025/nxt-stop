@@ -5,6 +5,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const data = url.searchParams.get('data')
   if (!data) return error('data param required')
+  if (data.length > 500) return error('data too long', 400)
 
   const dataUrl = await generateQRDataURL(data)
   // Return as PNG image

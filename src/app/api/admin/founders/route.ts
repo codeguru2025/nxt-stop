@@ -8,7 +8,6 @@ export async function GET() {
     if (!session) return forbidden()
 
     const founders = await prisma.founder.findMany({
-      where: { active: true },
       orderBy: { order: 'asc' },
     })
     return ok(founders)

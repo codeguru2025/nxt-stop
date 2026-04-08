@@ -31,6 +31,9 @@ export async function POST(
     if (!session) return forbidden()
     const { id } = await ctx.params
 
+    const event = await prisma.event.findUnique({ where: { id }, select: { id: true } })
+    if (!event) return Response.json({ error: 'Event not found' }, { status: 404 })
+
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     const youtubeUrl = formData.get('youtubeUrl') as string | null

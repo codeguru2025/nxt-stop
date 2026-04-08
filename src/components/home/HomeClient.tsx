@@ -280,7 +280,7 @@ export default function HomeClient() {
               </div>
 
               <div className="flex flex-wrap gap-2 mb-8">
-                {['Corrason', 'Dlala Thukzin', 'Big Q', 'Yugo'].map(a => (
+                {['Corason', 'Dlala Thukzin', 'Big Q', 'Yugoe'].map(a => (
                   <span key={a} className="bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm font-medium px-3 py-1 rounded-full">
                     {a}
                   </span>
@@ -352,7 +352,6 @@ export default function HomeClient() {
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%202.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%203.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%203.jpeg',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
               'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%206.jpeg',

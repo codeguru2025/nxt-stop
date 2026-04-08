@@ -7,8 +7,16 @@ export async function GET(req: Request) {
     const status = url.searchParams.get('status') ?? 'published'
     const limit = parseInt(url.searchParams.get('limit') ?? '20')
 
+    // 'published' means visible to users — include both published and live events
+    const where =
+      status === 'all'
+        ? undefined
+        : status === 'published'
+          ? { status: { in: ['published', 'live'] } }
+          : { status }
+
     const events = await prisma.event.findMany({
-      where: status === 'all' ? undefined : { status },
+      where,
       orderBy: { date: 'asc' },
       take: limit,
       include: {

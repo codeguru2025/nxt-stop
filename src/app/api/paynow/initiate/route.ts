@@ -39,8 +39,14 @@ export async function POST(req: Request) {
       return unauthorized()
     }
 
-    if (order.status === 'paid') return error('Order is already paid')
-    if (order.status === 'failed') return error('Order failed — please start a new order')
+    if (order.status !== 'pending') {
+      const msgs: Record<string, string> = {
+        paid:     'Order is already paid',
+        failed:   'Order failed — please start a new order',
+        refunded: 'Order has been refunded — please start a new order',
+      }
+      return error(msgs[order.status] ?? `Order cannot be paid (status: ${order.status})`)
+    }
 
     const isMobile = ['ecocash', 'onemoney', 'innbucks', 'omari'].includes(method)
     if (isMobile && !phone) return error('Phone number is required for mobile payments')
