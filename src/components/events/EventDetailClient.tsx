@@ -246,7 +246,7 @@ export default function EventDetailClient() {
       <div className="relative h-[50vh] min-h-[300px] overflow-hidden">
         {(event.bannerImage || event.posterImage) && !imgError ? (
           <img
-            src={event.bannerImage ?? event.posterImage!}
+            src={event.bannerImage || event.posterImage!}
             alt={event.name}
             className="w-full h-full object-cover"
             onError={() => setImgError(true)}

@@ -11,6 +11,7 @@ const FOLDER_MAP: Record<string, UploadFolder> = {
   products: 'products',
   rewards:  'rewards',
   gallery:  'gallery',
+  artists:  'artists',
 }
 
 export async function POST(req: Request) {

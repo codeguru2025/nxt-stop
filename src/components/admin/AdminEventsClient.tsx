@@ -8,9 +8,15 @@ import AdminLayout from './AdminLayout'
 const LocationPicker = dynamic(() => import('./LocationPicker'), { ssr: false })
 import {
   Plus, Calendar, MapPin, Ticket, Edit, Trash2,
-  CheckCircle, Circle, Loader2, Check, X, ImagePlus
+  Loader2, Check, X, ImagePlus, UserPlus, Mic2, Music2
 } from 'lucide-react'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
+
+type LineupArtist = {
+  name: string
+  role: 'headline' | 'mc' | 'support_dj' | 'special_guest'
+  image: string
+}
 
 type Event = {
   id: string; name: string; slug: string; date: string; venue: string
@@ -31,7 +37,15 @@ const BLANK_FORM = {
   status: 'draft', lat: '', lng: '',
   ticketTypes: [
     { name: 'General', price: 10, capacity: 500, color: '#E8174A' }
-  ]
+  ],
+  lineup: [] as LineupArtist[],
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  headline: 'Headline Act',
+  mc: 'MC',
+  support_dj: 'Support DJ',
+  special_guest: 'Special Guest',
 }
 
 export default function AdminEventsClient() {
@@ -43,7 +57,9 @@ export default function AdminEventsClient() {
   const [form, setForm] = useState<any>(BLANK_FORM)
   const [editing, setEditing] = useState<string | null>(null)
   const [posterUploading, setPosterUploading] = useState(false)
+  const [artistUploading, setArtistUploading] = useState<Record<number, boolean>>({})
   const posterInputRef = useRef<HTMLInputElement>(null)
+  const artistInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   const load = () => {
     fetch('/api/admin/events').then(r => r.json()).then(d => {
@@ -86,8 +102,9 @@ export default function AdminEventsClient() {
     const res = await fetch(`/api/admin/events/${id}`).then(r => r.json())
     if (!res.success) return
     const ev = res.data
-    // Format datetime-local value (strip seconds+timezone)
     const toLocal = (iso: string | null) => iso ? iso.slice(0, 16) : ''
+    let lineup: LineupArtist[] = []
+    try { lineup = ev.lineup ? JSON.parse(ev.lineup) : [] } catch {}
     setForm({
       name: ev.name ?? '',
       venue: ev.venue ?? '',
@@ -103,6 +120,7 @@ export default function AdminEventsClient() {
       lat: ev.lat != null ? String(ev.lat) : '',
       lng: ev.lng != null ? String(ev.lng) : '',
       ticketTypes: ev.ticketTypes ?? [],
+      lineup,
     })
     setEditing(id)
     setShowForm(true)
@@ -131,6 +149,47 @@ export default function AdminEventsClient() {
     }
   }
 
+  const uploadArtistImage = async (index: number, file: File) => {
+    setArtistUploading(prev => ({ ...prev, [index]: true }))
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('folder', 'artists')
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd }).then(r => r.json())
+      if (res.success) {
+        setForm((f: any) => ({
+          ...f,
+          lineup: f.lineup.map((a: LineupArtist, i: number) => i === index ? { ...a, image: res.data.url } : a)
+        }))
+      } else {
+        alert(res.error ?? 'Upload failed')
+      }
+    } finally {
+      setArtistUploading(prev => ({ ...prev, [index]: false }))
+    }
+  }
+
+  const addArtist = () => {
+    setForm((f: any) => ({
+      ...f,
+      lineup: [...f.lineup, { name: '', role: 'support_dj', image: '' }]
+    }))
+  }
+
+  const updateArtist = (i: number, key: string, value: string) => {
+    setForm((f: any) => ({
+      ...f,
+      lineup: f.lineup.map((a: LineupArtist, idx: number) => idx === i ? { ...a, [key]: value } : a)
+    }))
+  }
+
+  const removeArtist = (i: number) => {
+    setForm((f: any) => ({
+      ...f,
+      lineup: f.lineup.filter((_: any, idx: number) => idx !== i)
+    }))
+  }
+
   const addTicketType = () => {
     setForm((f: any) => ({
       ...f,
@@ -144,6 +203,8 @@ export default function AdminEventsClient() {
       ticketTypes: f.ticketTypes.map((t: any, idx: number) => idx === i ? { ...t, [key]: value } : t)
     }))
   }
+
+  const anyUploading = posterUploading || Object.values(artistUploading).some(Boolean)
 
   return (
     <AdminLayout>
@@ -272,6 +333,69 @@ export default function AdminEventsClient() {
               </div>
             </div>
 
+            {/* Lineup */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <label className="m-0 flex items-center gap-2"><Music2 size={14} /> Lineup</label>
+                <button onClick={addArtist} className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1">
+                  <UserPlus size={12} /> Add Artist
+                </button>
+              </div>
+              {form.lineup.length === 0 && (
+                <p className="text-xs text-gray-600 mb-2">No artists added yet. Add an MC and headline act to show them on the home screen.</p>
+              )}
+              {form.lineup.map((artist: LineupArtist, i: number) => (
+                <div key={i} className="flex gap-3 mb-3 p-3 bg-[#111] rounded-xl border border-[#2a2a2a] items-start">
+                  {/* Artist image upload */}
+                  <div className="shrink-0">
+                    <input
+                      ref={el => { artistInputRefs.current[i] = el }}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0]
+                        if (file) uploadArtistImage(i, file)
+                        e.target.value = ''
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => artistInputRefs.current[i]?.click()}
+                      disabled={artistUploading[i]}
+                      className="w-16 h-16 rounded-xl border-2 border-dashed border-[#3a3a3a] hover:border-purple-500/50 overflow-hidden flex items-center justify-center transition-colors"
+                    >
+                      {artistUploading[i] ? (
+                        <Loader2 size={16} className="animate-spin text-purple-400" />
+                      ) : artist.image ? (
+                        <img src={artist.image} alt="" className="w-full h-full object-cover" onError={() => updateArtist(i, 'image', '')} />
+                      ) : (
+                        <Mic2 size={18} className="text-gray-600" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Artist name + role */}
+                  <div className="flex-1 grid grid-cols-2 gap-2">
+                    <input
+                      placeholder="Artist name"
+                      value={artist.name}
+                      onChange={e => updateArtist(i, 'name', e.target.value)}
+                    />
+                    <select value={artist.role} onChange={e => updateArtist(i, 'role', e.target.value)}>
+                      {Object.entries(ROLE_LABELS).map(([val, label]) => (
+                        <option key={val} value={val}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button type="button" onClick={() => removeArtist(i)} className="text-gray-600 hover:text-red-400 transition-colors mt-1 shrink-0">
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
             {/* Ticket types */}
             {!editing && (
               <div className="mb-4">
@@ -293,7 +417,7 @@ export default function AdminEventsClient() {
             )}
 
             <div className="flex gap-2">
-              <button onClick={save} disabled={saving || posterUploading || !form.name || !form.venue || !form.date} className="btn-primary flex items-center gap-2 text-sm">
+              <button onClick={save} disabled={saving || anyUploading || !form.name || !form.venue || !form.date} className="btn-primary flex items-center gap-2 text-sm">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 {editing ? 'Save' : 'Create Event'}
               </button>
@@ -331,7 +455,6 @@ export default function AdminEventsClient() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* Status quick-change */}
                   <select
                     value={ev.status}
                     onChange={e => updateStatus(ev.id, e.target.value)}

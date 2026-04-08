@@ -6,14 +6,23 @@ import Image from 'next/image'
 import { Calendar, MapPin, ArrowRight, Play } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
+type LineupArtist = {
+  name: string
+  role: 'headline' | 'mc' | 'support_dj' | 'special_guest'
+  image?: string
+}
+
 type Event = {
   id: string
   name: string
   slug: string
   date: string
   venue: string
+  address?: string
+  description?: string
   posterImage?: string
   status: string
+  lineup?: string
   ticketTypes: { name: string; price: number }[]
   _count: { tickets: number }
 }
@@ -212,94 +221,7 @@ export default function HomeClient() {
       </section>
 
       {/* Next Event Spotlight */}
-      <section className="py-20 border-t border-[#1a1a1a] bg-gradient-to-b from-[#0a0a0a] to-[#0a100e]">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-1.5 mb-8">
-            <div className="w-2 h-2 rounded-full bg-green-400 pulse-glow" />
-            <span className="text-purple-300 text-sm font-medium">Next Event — 29 August 2026</span>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-10 items-center">
-            {/* Artists */}
-            <div className="relative">
-              <div className="grid grid-cols-5 gap-3 items-end">
-                {/* Dlala Thukzin — headline */}
-                <div className="col-span-3 relative rounded-2xl overflow-hidden aspect-[3/4]">
-                  <Image
-                    src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/DLALA%20THUKZIN.jpeg"
-                    alt="Dlala Thukzin"
-                    fill
-                    priority
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                  <div className="absolute bottom-4 left-4">
-                    <p className="text-white/60 text-xs uppercase tracking-widest mb-1">Headline Act</p>
-                    <p className="text-white font-black text-xl leading-tight">Dlala Thukzin</p>
-                  </div>
-                </div>
-                {/* Mzoe7 — MC */}
-                <div className="col-span-2 relative rounded-2xl overflow-hidden aspect-[3/4]">
-                  <Image
-                    src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Mzoe7.jpeg"
-                    alt="Mzoe7"
-                    fill
-                    priority
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                  <div className="absolute bottom-4 left-3">
-                    <p className="text-purple-400 text-xs font-medium uppercase tracking-wider mb-1">MC</p>
-                    <p className="text-white font-black text-lg leading-tight">Mzoe7</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Details */}
-            <div className="lg:pl-6 pt-4 lg:pt-0">
-              <h2 className="text-4xl sm:text-5xl font-black text-white leading-none mb-2">
-                NXT STOP
-              </h2>
-              <h3 className="text-2xl sm:text-3xl font-black gradient-text mb-6">
-                Dlala Thukzin Live
-              </h3>
-
-              <div className="space-y-3 mb-8">
-                {[
-                  { icon: '📍', label: 'Venue', value: 'ZITF Pavilion, Bulawayo' },
-                  { icon: '📅', label: 'Date', value: 'Friday, 29 August 2026' },
-                  { icon: '🕗', label: 'Doors', value: '12:00 PM — 10:00 PM' },
-                ].map(d => (
-                  <div key={d.label} className="flex items-center gap-3">
-                    <span className="text-xl">{d.icon}</span>
-                    <div>
-                      <span className="text-gray-500 text-xs uppercase tracking-wider">{d.label}</span>
-                      <p className="text-white font-semibold">{d.value}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex flex-wrap gap-2 mb-8">
-                {['Corason', 'Dlala Thukzin', 'Big Q', 'Yugoe'].map(a => (
-                  <span key={a} className="bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm font-medium px-3 py-1 rounded-full">
-                    {a}
-                  </span>
-                ))}
-              </div>
-
-              <a
-                href="/events/nxt-stop-bulawayo-dlala-thukzin-2026"
-                className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl px-8 py-4 font-bold text-lg transition-all hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5"
-              >
-                Get Tickets
-                <ArrowRight size={20} />
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
+      {featured && <SpotlightSection event={featured} />}
 
       {/* Upcoming Events */}
       <section className="py-20 border-t border-[#1a1a1a]">
@@ -469,6 +391,141 @@ function PastVideosSection() {
               </div>
             </a>
           ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function SpotlightSection({ event }: { event: Event }) {
+  const lineup: LineupArtist[] = (() => {
+    try { return event.lineup ? JSON.parse(event.lineup) : [] } catch { return [] }
+  })()
+
+  const headline = lineup.find(a => a.role === 'headline')
+  const mc = lineup.find(a => a.role === 'mc')
+  const allArtists = lineup.map(a => a.name)
+
+  const [headlineErr, setHeadlineErr] = useState(false)
+  const [mcErr, setMcErr] = useState(false)
+  const [posterErr, setPosterErr] = useState(false)
+
+  return (
+    <section className="py-20 border-t border-[#1a1a1a] bg-gradient-to-b from-[#0a0a0a] to-[#0a100e]">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-1.5 mb-8">
+          <div className="w-2 h-2 rounded-full bg-green-400 pulse-glow" />
+          <span className="text-purple-300 text-sm font-medium">Next Event — {formatDate(event.date, 'MMMM d, yyyy')}</span>
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-10 items-center">
+          {/* Artists / Poster */}
+          <div className="relative">
+            {(headline || mc) ? (
+              <div className="grid grid-cols-5 gap-3 items-end">
+                {/* Headline — large */}
+                {headline ? (
+                  <div className={`${mc ? 'col-span-3' : 'col-span-5'} relative rounded-2xl overflow-hidden aspect-[3/4] bg-[#1a1a1a]`}>
+                    {headline.image && !headlineErr ? (
+                      <Image
+                        src={headline.image}
+                        alt={headline.name}
+                        fill
+                        priority
+                        className="object-cover"
+                        onError={() => setHeadlineErr(true)}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-5xl">🎵</div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                    <div className="absolute bottom-4 left-4">
+                      <p className="text-white/60 text-xs uppercase tracking-widest mb-1">Headline Act</p>
+                      <p className="text-white font-black text-xl leading-tight">{headline.name}</p>
+                    </div>
+                  </div>
+                ) : null}
+                {/* MC — smaller */}
+                {mc ? (
+                  <div className={`${headline ? 'col-span-2' : 'col-span-5'} relative rounded-2xl overflow-hidden aspect-[3/4] bg-[#1a1a1a]`}>
+                    {mc.image && !mcErr ? (
+                      <Image
+                        src={mc.image}
+                        alt={mc.name}
+                        fill
+                        priority
+                        className="object-cover"
+                        onError={() => setMcErr(true)}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-5xl">🎤</div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                    <div className="absolute bottom-4 left-3">
+                      <p className="text-purple-400 text-xs font-medium uppercase tracking-wider mb-1">MC</p>
+                      <p className="text-white font-black text-lg leading-tight">{mc.name}</p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : event.posterImage && !posterErr ? (
+              <div className="relative rounded-2xl overflow-hidden aspect-[3/4] bg-[#1a1a1a]">
+                <Image
+                  src={event.posterImage}
+                  alt={event.name}
+                  fill
+                  priority
+                  className="object-cover"
+                  onError={() => setPosterErr(true)}
+                />
+              </div>
+            ) : (
+              <div className="relative rounded-2xl overflow-hidden aspect-[3/4] bg-[#1a1a1a] flex items-center justify-center text-7xl">
+                🎵
+              </div>
+            )}
+          </div>
+
+          {/* Details */}
+          <div className="lg:pl-6 pt-4 lg:pt-0">
+            <h2 className="text-4xl sm:text-5xl font-black text-white leading-none mb-2">NXT STOP</h2>
+            <h3 className="text-2xl sm:text-3xl font-black gradient-text mb-6">{event.name}</h3>
+
+            <div className="space-y-3 mb-8">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">📍</span>
+                <div>
+                  <span className="text-gray-500 text-xs uppercase tracking-wider">Venue</span>
+                  <p className="text-white font-semibold">{event.venue}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xl">📅</span>
+                <div>
+                  <span className="text-gray-500 text-xs uppercase tracking-wider">Date</span>
+                  <p className="text-white font-semibold">{formatDate(event.date, 'EEEE, d MMMM yyyy')}</p>
+                </div>
+              </div>
+            </div>
+
+            {allArtists.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-8">
+                {allArtists.map(a => (
+                  <span key={a} className="bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm font-medium px-3 py-1 rounded-full">
+                    {a}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <Link
+              href={`/events/${event.slug}`}
+              className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl px-8 py-4 font-bold text-lg transition-all hover:shadow-lg hover:shadow-purple-500/25 hover:-translate-y-0.5"
+            >
+              Get Tickets
+              <ArrowRight size={20} />
+            </Link>
+          </div>
         </div>
       </div>
     </section>
