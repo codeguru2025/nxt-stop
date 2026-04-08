@@ -203,7 +203,12 @@ export default function AdminEventsClient() {
                 />
                 {form.posterImage ? (
                   <div className="relative group w-full aspect-video rounded-lg overflow-hidden border border-[#2a2a2a]">
-                    <img src={form.posterImage} alt="Poster preview" className="w-full h-full object-cover" />
+                    <img
+                      src={form.posterImage}
+                      alt="Poster preview"
+                      className="w-full h-full object-cover"
+                      onError={() => setForm((f: any) => ({ ...f, posterImage: '' }))}
+                    />
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                       <button
                         type="button"
