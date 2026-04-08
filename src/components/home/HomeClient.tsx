@@ -57,6 +57,7 @@ function Countdown({ date }: { date: string }) {
 export default function HomeClient() {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
+  const [featuredImgError, setFeaturedImgError] = useState(false)
 
   useEffect(() => {
     fetch('/api/events?status=published&limit=6')
@@ -145,13 +146,14 @@ export default function HomeClient() {
               <div className="relative">
                 <div className="relative bg-gradient-to-br from-[#1a0a10] to-[#0d1a15] rounded-2xl border border-purple-500/20 overflow-hidden glow-purple">
                   <div className="relative h-48 bg-gradient-to-br from-purple-900/40 to-[#1A6B5A]/20">
-                    {featured.posterImage ? (
+                    {featured.posterImage && !featuredImgError ? (
                       <Image
                         src={featured.posterImage}
                         alt={featured.name}
                         fill
                         priority
                         className="object-cover"
+                        onError={() => setFeaturedImgError(true)}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
@@ -474,6 +476,7 @@ function PastVideosSection() {
 }
 
 function EventCard({ event }: { event: Event }) {
+  const [imgError, setImgError] = useState(false)
   const minPrice = Math.min(...(event.ticketTypes?.map(t => t.price) ?? [0]))
   const isFeatured = event.status === 'live'
 
@@ -481,13 +484,14 @@ function EventCard({ event }: { event: Event }) {
     <Link href={`/events/${event.slug}`} className="group card overflow-hidden hover:border-[#3a3a3a] transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-black/50">
       {/* Image */}
       <div className="relative h-48 bg-gradient-to-br from-[#1a1a2e] to-[#16213e] overflow-hidden">
-        {event.posterImage ? (
+        {event.posterImage && !imgError ? (
           <Image
             src={event.posterImage}
             alt={event.name}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-500"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
