@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Calendar, MapPin, Printer, Download, X, ExternalLink, Ticket } from 'lucide-react'
+import { Calendar, MapPin, Printer, X, ExternalLink, Ticket } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 type TicketData = {
@@ -177,13 +177,6 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
     printWin.document.close()
   }
 
-  const handleDownloadQR = () => {
-    const a = document.createElement('a')
-    a.href = ticket.qrDataUrl
-    a.download = `ticket-${ticket.ticketNumber}.png`
-    a.click()
-  }
-
   const directionsUrl = ticket.event.lat && ticket.event.lng
     ? `https://www.google.com/maps/dir/?api=1&destination=${ticket.event.lat},${ticket.event.lng}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${ticket.event.venue} ${ticket.event.address ?? ''}`)}`
@@ -194,10 +187,7 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
         <div className="flex items-center justify-between mb-3">
           <div className="flex gap-2">
             <button onClick={handlePrint} className="flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg px-3 py-2 transition-colors font-medium">
-              <Printer size={13} /> Print
-            </button>
-            <button onClick={handleDownloadQR} className="flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg px-3 py-2 transition-colors font-medium">
-              <Download size={13} /> Save QR
+              <Printer size={13} /> Print / Save
             </button>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">

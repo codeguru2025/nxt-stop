@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import AdminLayout from './AdminLayout'
-import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, Printer, Download } from 'lucide-react'
+import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, Printer } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 const LOGO_URL = 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo.jpeg'
@@ -248,7 +248,7 @@ export default function AdminTicketsClient() {
     background:linear-gradient(135deg,#7c3aed 0%,#9333ea 55%,#db2777 100%);
     padding:2.5mm 3mm;display:flex;align-items:center;gap:2mm;
   }
-  .t-logo{width:8mm;height:8mm;border-radius:1.5mm;object-fit:cover;flex-shrink:0;background:#fff}
+  .t-logo{width:14mm;height:14mm;border-radius:2mm;object-fit:cover;flex-shrink:0;background:#fff;padding:.5mm}
   .t-head-text{flex:1;min-width:0}
   .t-brand{font-size:5pt;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.1em;line-height:1;margin-bottom:.5mm}
   .t-event{font-size:8.5pt;font-weight:900;color:#fff;line-height:1.15;
@@ -301,18 +301,6 @@ export default function AdminTicketsClient() {
 <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),1200)}</script>
 </body></html>`)
     printWin.document.close()
-  }
-
-  const downloadAllQRs = async () => {
-    if (!hcBatch) return
-    // Download individual QR images as a zip-like approach: download each
-    for (const t of hcBatch.tickets) {
-      const a = document.createElement('a')
-      a.href = t.qrDataUrl
-      a.download = `${t.ticketNumber}.png`
-      a.click()
-      await new Promise(r => setTimeout(r, 100))
-    }
   }
 
   const orderAction = async (orderId: string, action: 'fulfill' | 'check' | 'cancel') => {
@@ -420,9 +408,6 @@ export default function AdminTicketsClient() {
                   <>
                     <button onClick={printBatch} className="flex items-center gap-2 text-sm bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded-lg px-4 py-2">
                       <Printer size={14} /> Print All
-                    </button>
-                    <button onClick={downloadAllQRs} className="flex items-center gap-2 text-sm bg-[#1a1a1a] border border-[#2a2a2a] text-gray-300 hover:text-white rounded-lg px-4 py-2">
-                      <Download size={14} /> Download QRs
                     </button>
                     <a href="/gate/activate" target="_blank" className="flex items-center gap-2 text-sm bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/20 rounded-lg px-4 py-2 transition-colors">
                       <AlertTriangle size={14} /> Activate Page
