@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { QrCode, Check, X, AlertTriangle, Loader2, User, Ticket, RefreshCw, Camera, CameraOff, DollarSign } from 'lucide-react'
 import Link from 'next/link'
+import jsQR from 'jsqr'
 
 type ScanResult = {
   result: 'valid' | 'already_used' | 'invalid'
@@ -36,7 +37,6 @@ export default function GateClient() {
   const [loading, setLoading] = useState(true)
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
-  const [cameraSupported, setCameraSupported] = useState(false)
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
@@ -52,13 +52,6 @@ export default function GateClient() {
     if (authed) inputRef.current?.focus()
   }, [authed])
 
-  // Check camera/BarcodeDetector support
-  useEffect(() => {
-    const hasMedia = !!(navigator.mediaDevices?.getUserMedia)
-    const hasDetector = 'BarcodeDetector' in window
-    setCameraSupported(hasMedia && hasDetector)
-  }, [])
-
   // Auto-scan when QR code pasted (length threshold for UUID)
   useEffect(() => {
     if (qrInput.length >= 36) {
@@ -69,9 +62,7 @@ export default function GateClient() {
 
   // Cleanup camera on unmount
   useEffect(() => {
-    return () => {
-      stopCamera()
-    }
+    return () => { stopCamera() }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -99,50 +90,55 @@ export default function GateClient() {
         invalid: prev.invalid + (data.result !== 'valid' ? 1 : 0),
       }))
 
-      // Auto-clear after 4 seconds, then resume camera scanning
+      // Auto-clear after 4 seconds then resume camera scan loop
       setTimeout(() => {
         setResult(null)
-        if (cameraActive) startScanLoop()
+        if (streamRef.current) startScanLoop()
       }, 4000)
     }
   }
 
   const startScanLoop = useCallback(() => {
-    const detector = (window as any)._barcodeDetector
-    if (!detector || !videoRef.current) return
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    if (!video || !canvas) return
 
-    const loop = async () => {
-      if (!videoRef.current || videoRef.current.readyState < 2) {
+    const loop = () => {
+      if (video.readyState < video.HAVE_ENOUGH_DATA) {
         scanLoopRef.current = requestAnimationFrame(loop)
         return
       }
-      try {
-        const codes = await detector.detect(videoRef.current)
-        if (codes.length > 0 && codes[0].rawValue) {
-          // Pause scanning while processing
-          if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current)
-          handleScan(codes[0].rawValue)
-          return
-        }
-      } catch {
-        // detection error — keep going
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+      if (!ctx) return
+
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert',
+      })
+
+      if (code?.data) {
+        // Found a QR code — stop the loop and submit
+        if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current)
+        handleScan(code.data)
+        return
       }
+
       scanLoopRef.current = requestAnimationFrame(loop)
     }
+
+    if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current)
     scanLoopRef.current = requestAnimationFrame(loop)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraActive])
+  }, [])
 
   const startCamera = async () => {
     setCameraError(null)
     try {
-      if (!('BarcodeDetector' in window)) {
-        setCameraError('Camera QR scanning requires Chrome or Edge browser.')
-        return
-      }
-      const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
-      (window as any)._barcodeDetector = detector
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
       })
@@ -153,11 +149,12 @@ export default function GateClient() {
       }
       setCameraActive(true)
     } catch (err: any) {
-      const msg = err?.name === 'NotAllowedError'
-        ? 'Camera permission denied. Please allow camera access and try again.'
-        : err?.name === 'NotFoundError'
-        ? 'No camera found on this device.'
-        : 'Could not start camera. Please check permissions.'
+      const msg =
+        err?.name === 'NotAllowedError'
+          ? 'Camera permission denied. Please allow camera access and try again.'
+          : err?.name === 'NotFoundError'
+          ? 'No camera found on this device.'
+          : 'Could not start camera. Please check permissions.'
       setCameraError(msg)
     }
   }
@@ -243,7 +240,7 @@ export default function GateClient() {
               />
               {/* Scanning overlay */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-48 h-48 border-2 border-purple-400 rounded-xl opacity-70">
+                <div className="w-48 h-48 border-2 border-purple-400 rounded-xl opacity-70 relative">
                   <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-purple-400 rounded-tl-lg" />
                   <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-purple-400 rounded-tr-lg" />
                   <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-purple-400 rounded-bl-lg" />
@@ -343,18 +340,12 @@ export default function GateClient() {
         {/* Camera toggle */}
         {!cameraActive && (
           <div className="w-full max-w-sm">
-            {cameraSupported ? (
-              <button
-                onClick={startCamera}
-                className="w-full flex items-center justify-center gap-2 text-sm bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 rounded-xl py-3 transition-colors font-medium mb-3"
-              >
-                <Camera size={16} /> Open Camera Scanner
-              </button>
-            ) : (
-              <div className="text-center text-xs text-gray-600 mb-3">
-                Camera scanning requires Chrome or Edge. Use text input below.
-              </div>
-            )}
+            <button
+              onClick={startCamera}
+              className="w-full flex items-center justify-center gap-2 text-sm bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 rounded-xl py-3 transition-colors font-medium mb-3"
+            >
+              <Camera size={16} /> Open Camera Scanner
+            </button>
           </div>
         )}
 
@@ -387,7 +378,7 @@ export default function GateClient() {
           </button>
         </div>
 
-        {/* Hidden canvas for processing */}
+        {/* Hidden canvas used by jsQR to decode frames */}
         <canvas ref={canvasRef} className="hidden" />
 
         <p className="text-xs text-gray-700 text-center max-w-xs">
