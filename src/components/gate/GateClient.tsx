@@ -28,6 +28,7 @@ export default function GateClient() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const scanLoopRef = useRef<number | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const cameraStartingRef = useRef(false)
 
   const [qrInput, setQrInput] = useState('')
   const [scanning, setScanning] = useState(false)
@@ -104,7 +105,8 @@ export default function GateClient() {
     if (!video || !canvas) return
 
     const loop = () => {
-      if (video.readyState < video.HAVE_ENOUGH_DATA) {
+      if (!streamRef.current) return
+      if (video.readyState < video.HAVE_ENOUGH_DATA || video.paused || video.ended) {
         scanLoopRef.current = requestAnimationFrame(loop)
         return
       }
@@ -137,25 +139,59 @@ export default function GateClient() {
   }, [])
 
   const startCamera = async () => {
+    if (cameraStartingRef.current || cameraActive) return
+    cameraStartingRef.current = true
     setCameraError(null)
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera not supported on this browser. Try Chrome or Safari over HTTPS.')
+      cameraStartingRef.current = false
+      return
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      })
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
+      // Try back camera first, fall back to any available camera
+      let stream: MediaStream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        })
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
       }
+
+      streamRef.current = stream
+      const video = videoRef.current
+      if (!video) { stream.getTracks().forEach(t => t.stop()); return }
+
+      video.srcObject = stream
+
+      // Wait for metadata to load before playing — required on iOS/Android
+      await new Promise<void>((resolve) => {
+        const onReady = () => {
+          video.removeEventListener('loadedmetadata', onReady)
+          video.play().catch(() => {}).finally(resolve)
+        }
+        video.addEventListener('loadedmetadata', onReady)
+        // Safety timeout in case loadedmetadata never fires
+        setTimeout(resolve, 3000)
+      })
+
       setCameraActive(true)
+      startScanLoop()
     } catch (err: any) {
       const msg =
         err?.name === 'NotAllowedError'
-          ? 'Camera permission denied. Please allow camera access and try again.'
+          ? 'Camera permission denied. Allow camera access in your browser settings and try again.'
           : err?.name === 'NotFoundError'
           ? 'No camera found on this device.'
-          : 'Could not start camera. Please check permissions.'
+          : err?.name === 'NotSupportedError' || err?.name === 'InsecureOperationError'
+          ? 'Camera requires a secure (HTTPS) connection.'
+          : `Could not start camera: ${err?.message || 'Unknown error'}`
       setCameraError(msg)
+    } finally {
+      cameraStartingRef.current = false
     }
   }
 
@@ -173,13 +209,13 @@ export default function GateClient() {
     setTimeout(() => inputRef.current?.focus(), 100)
   }
 
-  // Start scan loop once camera is active
+  // Stop scan loop when camera is deactivated
   useEffect(() => {
-    if (cameraActive) startScanLoop()
-    else {
-      if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current)
+    if (!cameraActive && scanLoopRef.current) {
+      cancelAnimationFrame(scanLoopRef.current)
+      scanLoopRef.current = null
     }
-  }, [cameraActive, startScanLoop])
+  }, [cameraActive])
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -315,36 +351,39 @@ export default function GateClient() {
             )}
           </div>
         ) : !cameraActive ? (
-          <div className="text-center">
-            <div className={`w-32 h-32 rounded-2xl border-2 border-dashed flex items-center justify-center mx-auto mb-6 ${
-              scanning ? 'border-purple-500 bg-purple-500/10' : 'border-[#3a3a3a]'
+          <button
+            onClick={startCamera}
+            className="text-center group focus:outline-none"
+            aria-label="Open camera scanner"
+          >
+            <div className={`w-40 h-40 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center mx-auto mb-4 transition-all ${
+              scanning
+                ? 'border-purple-500 bg-purple-500/10'
+                : 'border-[#3a3a3a] group-hover:border-purple-500/60 group-hover:bg-purple-500/5 group-active:scale-95'
             }`}>
               {scanning ? (
                 <Loader2 size={40} className="text-purple-400 animate-spin" />
               ) : (
-                <QrCode size={48} className="text-gray-600" />
+                <>
+                  <Camera size={36} className="text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs text-purple-400 font-medium">Tap to scan</span>
+                </>
               )}
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">Ready to Scan</h2>
-            <p className="text-gray-500 text-sm">Use camera or paste a QR code to validate entry</p>
-          </div>
+            <h2 className="text-xl font-bold text-white mb-1">Ready to Scan</h2>
+            <p className="text-gray-500 text-sm">Tap the camera above or paste a ticket ID below</p>
+          </button>
         ) : null}
 
         {/* Camera error */}
         {cameraError && (
           <div className="w-full max-w-sm bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-sm text-red-400 text-center">
             {cameraError}
-          </div>
-        )}
-
-        {/* Camera toggle */}
-        {!cameraActive && (
-          <div className="w-full max-w-sm">
             <button
               onClick={startCamera}
-              className="w-full flex items-center justify-center gap-2 text-sm bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 rounded-xl py-3 transition-colors font-medium mb-3"
+              className="block mt-2 mx-auto text-purple-400 hover:text-purple-300 font-medium text-xs underline"
             >
-              <Camera size={16} /> Open Camera Scanner
+              Try again
             </button>
           </div>
         )}

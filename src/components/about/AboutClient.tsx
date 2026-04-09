@@ -36,8 +36,9 @@ export default function AboutClient() {
             <span className="gradient-text">Live The Culture</span>
           </h1>
           <p className="text-gray-400 text-lg leading-relaxed max-w-2xl mx-auto">
-            NXT STOP was born out of a love for Zimbabwe's nightlife. We exist to bring the best artists, the best nights, and the best energy — and make sure you never miss a moment.
+            Born in Plumtree and built by passionate DJs, NXT STOP exists to create vibrant, inclusive house music experiences that connect people beyond boundaries — elevating local talent from small-town beginnings to national and global stages.
           </p>
+          <p className="text-purple-400 font-bold text-lg mt-4 tracking-wide">NXT STOP : Everywhere</p>
         </div>
       </section>
 
@@ -195,9 +196,9 @@ export default function AboutClient() {
         <div className="max-w-4xl mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { title: 'The Mission', desc: "To bring Zimbabwe's best artists and crowds together — and make every night an experience worth remembering." },
-              { title: 'The Vision', desc: "From Harare to Bulawayo and beyond. NXT STOP is the home of premium nightlife in Southern Africa." },
-              { title: 'The Standard', desc: "Every event we host is held to one standard: does it hit? If not, it doesn't happen." },
+              { title: 'The Mission', desc: "NXT STOP exists to create vibrant, inclusive house music experiences that connect people beyond boundaries — showcasing talent, transforming gatherings, and expanding the house music movement across Zimbabwe and beyond." },
+              { title: 'The Vision', desc: "To become Africa's leading house music movement, uniting communities through sound, culture, and unforgettable experiences while elevating local talent from small-town beginnings to national and global stages." },
+              { title: 'The Standard', desc: "Creating a platform where music, community, and lifestyle converge. Every event we host must move people — if it doesn't hit, it doesn't happen." },
             ].map(s => (
               <div key={s.title} className="stat-card">
                 <h3 className="font-bold text-white mb-2">{s.title}</h3>
