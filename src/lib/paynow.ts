@@ -11,10 +11,11 @@ export type InitiateResult =
 const INITIATE_TIMEOUT_MS = 20_000 // 20s — Paynow API should respond well within this
 const POLL_TIMEOUT_MS = 10_000     // 10s — poll is a simple status check
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withTimeout(promise: Promise<any>, ms: number, label: string): Promise<any> {
   return Promise.race([
     promise,
-    new Promise<T>((_, reject) =>
+    new Promise((_, reject) =>
       setTimeout(() => reject(new Error(`Paynow ${label} timed out after ${ms / 1000}s — please try again`)), ms)
     ),
   ])
