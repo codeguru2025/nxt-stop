@@ -21,7 +21,7 @@ export async function GET() {
       stockAlerts,
       totalVirtualAttendees,
     ] = await Promise.all([
-      prisma.ticket.count(),
+      prisma.ticket.count({ where: { status: { not: 'physical' } } }),
       prisma.order.count({ where: { status: 'paid' } }),
       prisma.order.aggregate({ where: { status: 'paid' }, _sum: { subtotal: true } }),
       prisma.order.aggregate({ where: { status: 'paid' }, _sum: { platformFees: true } }),

@@ -106,14 +106,15 @@ export default function AdminClient() {
                 <div className="space-y-3">
                   {stats?.eventStats.slice(0, 5).map(ev => {
                     const totalCap = ev.ticketTypes.reduce((s: number, t: any) => s + t.capacity, 0)
-                    const pct = totalCap > 0 ? Math.round((ev._count.tickets / totalCap) * 100) : 0
+                    const totalSold = ev.ticketTypes.reduce((s: number, t: any) => s + t.sold, 0)
+                    const pct = totalCap > 0 ? Math.round((totalSold / totalCap) * 100) : 0
 
                     return (
                       <div key={ev.id}>
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="text-sm text-white font-medium truncate flex-1">{ev.name}</span>
                           <div className="flex items-center gap-3 shrink-0 ml-2 text-xs text-gray-500">
-                            <span>{ev._count.tickets} sold</span>
+                            <span>{totalSold} sold</span>
                             <span className="text-purple-400 font-semibold">{pct}%</span>
                           </div>
                         </div>

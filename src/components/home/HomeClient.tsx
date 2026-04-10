@@ -23,7 +23,7 @@ type Event = {
   posterImage?: string
   status: string
   lineup?: string
-  ticketTypes: { name: string; price: number }[]
+  ticketTypes: { name: string; price: number; sold: number }[]
   _count: { tickets: number }
 }
 
@@ -578,7 +578,7 @@ function EventCard({ event }: { event: Event }) {
         </div>
 
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-[#2a2a2a]">
-          <span className="text-xs text-gray-600">{event._count.tickets} sold</span>
+          <span className="text-xs text-gray-600">{event.ticketTypes.reduce((s, t) => s + t.sold, 0)} sold</span>
           <span className="text-sm font-semibold text-purple-400 group-hover:text-purple-300 transition-colors flex items-center gap-1">
             Buy Ticket <ArrowRight size={13} />
           </span>

@@ -288,7 +288,7 @@ export default function EventDetailClient() {
               </div>
               <div className="flex items-center gap-2 text-gray-400">
                 <Ticket size={16} className="text-purple-400" />
-                <span>{event._count.tickets} tickets sold</span>
+                <span>{event.ticketTypes.reduce((s, t) => s + t.sold, 0)} tickets sold</span>
               </div>
             </div>
 

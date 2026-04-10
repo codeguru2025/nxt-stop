@@ -118,9 +118,14 @@ export default function GateClient() {
       canvas.height = video.videoHeight
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
+      if (canvas.width === 0 || canvas.height === 0) {
+        scanLoopRef.current = requestAnimationFrame(loop)
+        return
+      }
+
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
       const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: 'dontInvert',
+        inversionAttempts: 'attemptBoth',
       })
 
       if (code?.data) {
@@ -167,15 +172,22 @@ export default function GateClient() {
 
       video.srcObject = stream
 
-      // Wait for metadata to load before playing — required on iOS/Android
+      // Wait for the video to be ready to play, then start it.
+      // Check readyState first — loadedmetadata may have already fired before
+      // the listener was attached (race condition on fast devices).
       await new Promise<void>((resolve) => {
-        const onReady = () => {
-          video.removeEventListener('loadedmetadata', onReady)
-          video.play().catch(() => {}).finally(resolve)
+        const play = () => { video.play().catch(() => {}).finally(resolve) }
+        if (video.readyState >= video.HAVE_METADATA) {
+          play()
+        } else {
+          const onReady = () => {
+            video.removeEventListener('loadedmetadata', onReady)
+            play()
+          }
+          video.addEventListener('loadedmetadata', onReady)
+          // Safety timeout in case loadedmetadata never fires
+          setTimeout(() => { video.removeEventListener('loadedmetadata', onReady); resolve() }, 4000)
         }
-        video.addEventListener('loadedmetadata', onReady)
-        // Safety timeout in case loadedmetadata never fires
-        setTimeout(resolve, 3000)
       })
 
       setCameraActive(true)
@@ -263,40 +275,38 @@ export default function GateClient() {
       {/* Main scanner */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
 
-        {/* Camera view */}
-        {cameraActive && (
-          <div className="w-full max-w-sm">
-            <div className="relative rounded-2xl overflow-hidden bg-black aspect-square">
-              <video
-                ref={videoRef}
-                playsInline
-                muted
-                autoPlay
-                className="w-full h-full object-cover"
-              />
-              {/* Scanning overlay */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-48 h-48 border-2 border-purple-400 rounded-xl opacity-70 relative">
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-purple-400 rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-purple-400 rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-purple-400 rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-purple-400 rounded-br-lg" />
-                </div>
-              </div>
-              <div className="absolute bottom-3 left-0 right-0 text-center">
-                <span className="text-xs text-purple-300 bg-black/60 px-3 py-1 rounded-full">
-                  {scanning ? 'Validating...' : 'Point camera at QR code'}
-                </span>
+        {/* Camera view — always rendered so videoRef is available when startCamera runs */}
+        <div className={`w-full max-w-sm ${cameraActive ? '' : 'hidden'}`}>
+          <div className="relative rounded-2xl overflow-hidden bg-black aspect-square">
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              autoPlay
+              className="w-full h-full object-cover"
+            />
+            {/* Scanning overlay */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-48 h-48 border-2 border-purple-400 rounded-xl opacity-70 relative">
+                <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-purple-400 rounded-tl-lg" />
+                <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-purple-400 rounded-tr-lg" />
+                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-purple-400 rounded-bl-lg" />
+                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-purple-400 rounded-br-lg" />
               </div>
             </div>
-            <button
-              onClick={stopCamera}
-              className="w-full mt-3 flex items-center justify-center gap-2 text-sm text-red-400 hover:text-red-300 border border-red-500/20 rounded-xl py-2.5 transition-colors"
-            >
-              <CameraOff size={15} /> Stop Camera
-            </button>
+            <div className="absolute bottom-3 left-0 right-0 text-center">
+              <span className="text-xs text-purple-300 bg-black/60 px-3 py-1 rounded-full">
+                {scanning ? 'Validating...' : 'Point camera at QR code'}
+              </span>
+            </div>
           </div>
-        )}
+          <button
+            onClick={stopCamera}
+            className="w-full mt-3 flex items-center justify-center gap-2 text-sm text-red-400 hover:text-red-300 border border-red-500/20 rounded-xl py-2.5 transition-colors"
+          >
+            <CameraOff size={15} /> Stop Camera
+          </button>
+        </div>
 
         {/* Result display */}
         {result ? (

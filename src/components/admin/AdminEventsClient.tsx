@@ -450,7 +450,7 @@ export default function AdminEventsClient() {
                   <div className="flex gap-4 text-xs text-gray-500">
                     <span className="flex items-center gap-1"><Calendar size={11} />{formatDate(ev.date, 'MMM d, yyyy')}</span>
                     <span className="flex items-center gap-1"><MapPin size={11} />{ev.venue}</span>
-                    <span className="flex items-center gap-1"><Ticket size={11} />{ev._count.tickets} sold</span>
+                    <span className="flex items-center gap-1"><Ticket size={11} />{ev.ticketTypes.reduce((s: number, t: any) => s + t.sold, 0)} sold</span>
                   </div>
                 </div>
 

@@ -27,24 +27,39 @@ export async function POST(req: Request) {
     const { limited } = await checkScanLimit(ip)
     if (limited) return error('Rate limit exceeded — slow down', 429)
 
-    const { qrCode, eventId, deviceId } = await req.json()
-    if (!qrCode) return error('QR code is required')
+    const { qrCode: rawCode, eventId, deviceId } = await req.json()
+    if (!rawCode) return error('QR code is required')
 
-    // Distributed lock: prevent double-scan race across multiple gate instances
+    // Trim whitespace (barcode scanners often append \n or trailing spaces)
+    // Normalise to uppercase so ticket numbers typed in lowercase still match
+    const qrCode = String(rawCode).trim().toUpperCase()
+    if (!qrCode || qrCode.length > 200) return error('Invalid QR code')
+
+    // Distributed lock: prevent double-scan race across multiple gate instances.
+    // Lock on the input value — good enough for camera scans (UUID).
+    // Manual entry by ticket number uses a different key than the UUID, but the
+    // atomic updateMany below is the real guard in that case.
     const locked = await acquireScanLock(qrCode)
     if (!locked) {
       return ok({ result: 'invalid', message: 'Scan already in progress — please try again' })
     }
 
-    const ticket = await prisma.ticket.findUnique({
-      where: { qrCode },
-      include: {
-        event: { select: { id: true, name: true, date: true, venue: true, posterImage: true } },
-        ticketType: { select: { name: true, color: true, price: true } },
-        user: { select: { name: true, email: true } },
-        order: { select: { recipientName: true, guestName: true } },
-      },
-    })
+    const ticketInclude = {
+      event: { select: { id: true, name: true, date: true, venue: true, posterImage: true } },
+      ticketType: { select: { name: true, color: true, price: true } },
+      user: { select: { name: true, email: true } },
+      order: { select: { recipientName: true, guestName: true } },
+    }
+
+    // UUIDs are stored lowercase; normalise back for qrCode lookup only
+    const qrCodeLower = qrCode.toLowerCase()
+
+    // Try qrCode first (UUID from QR image), then fall back to ticket number for manual entry
+    let ticket = await prisma.ticket.findUnique({ where: { qrCode: qrCodeLower }, include: ticketInclude })
+    if (!ticket) {
+      // ticketNumber is stored uppercase (NXT-...) — already uppercased above
+      ticket = await prisma.ticket.findUnique({ where: { ticketNumber: qrCode }, include: ticketInclude }) ?? null
+    }
 
     if (!ticket) {
       await logScan(null, eventId ?? '', session.id, 'invalid', deviceId)
@@ -62,7 +77,7 @@ export async function POST(req: Request) {
 
     if (ticket.status === 'used') {
       await logScan(ticket.id, ticket.eventId, session.id, 'already_used', deviceId)
-      const usedHolder = (ticket.order as any)?.recipientName || (ticket.order as any)?.guestName || ticket.user.name
+      const usedHolder = (ticket.order as any)?.recipientName || (ticket.order as any)?.guestName || ticket.user?.name || 'Unknown'
       const payload = {
         result: 'already_used',
         message: 'Ticket has already been used',
@@ -90,7 +105,11 @@ export async function POST(req: Request) {
 
     if (ticket.status !== 'valid') {
       await logScan(ticket.id, ticket.eventId, session.id, 'invalid', deviceId)
-      const payload = { result: 'invalid', message: `Ticket status: ${ticket.status}` }
+      const statusMessages: Record<string, string> = {
+        cancelled: 'This ticket has been cancelled',
+        refunded:  'This ticket has been refunded',
+      }
+      const payload = { result: 'invalid', message: statusMessages[ticket.status] ?? `Ticket cannot be used (status: ${ticket.status})` }
       emitScanEvent(ticket.eventId, payload)
       return ok(payload)
     }
@@ -103,13 +122,15 @@ export async function POST(req: Request) {
     })
 
     if (count === 0) {
-      // Another scanner beat us — treat as already_used
+      // Another scanner beat us to this ticket — re-fetch the actual usedAt
+      // so we show the correct time rather than this scanner's local clock.
+      const fresh = await prisma.ticket.findUnique({ where: { id: ticket.id }, select: { usedAt: true } })
       await logScan(ticket.id, ticket.eventId, session.id, 'already_used', deviceId)
-      const holderName = (ticket.order as any)?.recipientName || (ticket.order as any)?.guestName || ticket.user.name
+      const holderName = (ticket.order as any)?.recipientName || (ticket.order as any)?.guestName || ticket.user?.name || 'Unknown'
       const payload = {
         result: 'already_used',
         message: 'Ticket has already been used',
-        usedAt,
+        usedAt: fresh?.usedAt ?? usedAt,
         ticket: {
           number: ticket.ticketNumber,
           holder: holderName,
@@ -126,14 +147,14 @@ export async function POST(req: Request) {
 
     await logScan(ticket.id, ticket.eventId, session.id, 'valid', deviceId)
 
-    const holderName = (ticket.order as any)?.recipientName || (ticket.order as any)?.guestName || ticket.user.name
+    const holderName = (ticket.order as any)?.recipientName || (ticket.order as any)?.guestName || ticket.user?.name || 'Unknown'
     const payload = {
       result: 'valid',
       message: 'Entry granted',
       ticket: {
         number: ticket.ticketNumber,
         holder: holderName,
-        email: ticket.user.email,
+        email: ticket.user?.email,
         type: ticket.ticketType.name,
         color: (ticket.ticketType as any).color,
         price: (ticket.ticketType as any).price,
