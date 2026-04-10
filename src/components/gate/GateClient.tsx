@@ -12,7 +12,7 @@ type ScanResult = {
   ticket?: {
     number: string
     holder: string
-    email?: string
+    phone?: string
     type: string
     event: string
   }
@@ -172,9 +172,6 @@ export default function GateClient() {
 
       video.srcObject = stream
 
-      // Wait for the video to be ready to play, then start it.
-      // Check readyState first — loadedmetadata may have already fired before
-      // the listener was attached (race condition on fast devices).
       await new Promise<void>((resolve) => {
         const play = () => { video.play().catch(() => {}).finally(resolve) }
         if (video.readyState >= video.HAVE_METADATA) {
@@ -185,7 +182,6 @@ export default function GateClient() {
             play()
           }
           video.addEventListener('loadedmetadata', onReady)
-          // Safety timeout in case loadedmetadata never fires
           setTimeout(() => { video.removeEventListener('loadedmetadata', onReady); resolve() }, 4000)
         }
       })
@@ -221,7 +217,6 @@ export default function GateClient() {
     setTimeout(() => inputRef.current?.focus(), 100)
   }
 
-  // Stop scan loop when camera is deactivated
   useEffect(() => {
     if (!cameraActive && scanLoopRef.current) {
       cancelAnimationFrame(scanLoopRef.current)
@@ -238,44 +233,49 @@ export default function GateClient() {
   if (!authed) return null
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
+
       {/* Header */}
-      <div className="bg-[#111] border-b border-[#2a2a2a] px-4 py-3 flex items-center justify-between">
+      <div className="bg-[#111] border-b border-[#2a2a2a] px-4 h-14 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center">
-            <span className="text-white font-black text-sm">N</span>
-          </div>
+          <img
+            src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
+            alt="NXT STOP"
+            className="h-7 w-auto object-contain invert"
+          />
+          <div className="h-4 w-px bg-[#2a2a2a]" />
           <div>
-            <div className="font-bold text-white text-sm">NXT STOP Gate</div>
-            <div className="text-xs text-gray-500">Entry Validation System</div>
+            <div className="font-bold text-white text-sm leading-none">Gate Scanner</div>
+            <div className="text-xs text-gray-500 leading-none mt-0.5">Entry Validation</div>
           </div>
         </div>
         <Link
           href="/gate/activate"
-          className="flex items-center gap-1.5 text-xs bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/20 rounded-lg px-3 py-1.5 transition-colors font-medium"
+          className="flex items-center gap-1.5 text-sm btn-primary px-3 py-2"
         >
-          <DollarSign size={12} /> Sell Ticket
+          <DollarSign size={14} />
+          Sell Ticket
         </Link>
-        <div className="flex items-center gap-4 text-sm">
-          <div className="text-center">
-            <div className="font-black text-white">{stats.scanned}</div>
-            <div className="text-xs text-gray-500">Scanned</div>
-          </div>
-          <div className="text-center">
-            <div className="font-black text-green-400">{stats.valid}</div>
-            <div className="text-xs text-gray-500">Valid</div>
-          </div>
-          <div className="text-center">
-            <div className="font-black text-red-400">{stats.invalid}</div>
-            <div className="text-xs text-gray-500">Rejected</div>
-          </div>
-        </div>
       </div>
 
-      {/* Main scanner */}
+      {/* Stats bar */}
+      <div className="bg-[#111] border-b border-[#2a2a2a] px-4 py-3 grid grid-cols-3 gap-3 shrink-0">
+        {[
+          { label: 'Scanned', value: stats.scanned, color: 'text-white' },
+          { label: 'Valid',   value: stats.valid,   color: 'text-green-400' },
+          { label: 'Rejected', value: stats.invalid, color: 'text-red-400' },
+        ].map(s => (
+          <div key={s.label} className="text-center">
+            <div className={`text-2xl font-black ${s.color}`}>{s.value}</div>
+            <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
 
-        {/* Camera view — always rendered so videoRef is available when startCamera runs */}
+        {/* Camera view — always rendered so videoRef is available */}
         <div className={`w-full max-w-sm ${cameraActive ? '' : 'hidden'}`}>
           <div className="relative rounded-2xl overflow-hidden bg-black aspect-square">
             <video
@@ -285,7 +285,6 @@ export default function GateClient() {
               autoPlay
               className="w-full h-full object-cover"
             />
-            {/* Scanning overlay */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-48 h-48 border-2 border-purple-400 rounded-xl opacity-70 relative">
                 <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-purple-400 rounded-tl-lg" />
@@ -308,15 +307,15 @@ export default function GateClient() {
           </button>
         </div>
 
-        {/* Result display */}
+        {/* Scan result */}
         {result ? (
           <div className={`w-full max-w-sm border rounded-2xl p-6 text-center transition-all ${
-            result.result === 'valid' ? 'scan-valid bg-green-500/5' :
-            result.result === 'already_used' ? 'scan-used bg-yellow-500/5' :
+            result.result === 'valid'       ? 'scan-valid bg-green-500/5' :
+            result.result === 'already_used'? 'scan-used bg-yellow-500/5' :
             'scan-invalid bg-red-500/5'
           } card`}>
             <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
-              result.result === 'valid' ? 'bg-green-500/20' :
+              result.result === 'valid'        ? 'bg-green-500/20' :
               result.result === 'already_used' ? 'bg-yellow-500/20' :
               'bg-red-500/20'
             }`}>
@@ -330,11 +329,11 @@ export default function GateClient() {
             </div>
 
             <h2 className={`text-2xl font-black mb-1 ${
-              result.result === 'valid' ? 'text-green-400' :
+              result.result === 'valid'        ? 'text-green-400' :
               result.result === 'already_used' ? 'text-yellow-400' :
               'text-red-400'
             }`}>
-              {result.result === 'valid' ? 'ENTRY GRANTED' :
+              {result.result === 'valid'        ? 'ENTRY GRANTED' :
                result.result === 'already_used' ? 'ALREADY USED' :
                'INVALID TICKET'}
             </h2>

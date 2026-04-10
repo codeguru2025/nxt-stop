@@ -11,10 +11,10 @@ export async function POST(req: Request) {
     const { limited, retryAfter } = await checkAuthLimit(ip)
     if (limited) return error(`Too many attempts. Try again in ${retryAfter}s`, 429)
 
-    const { email, password } = await req.json()
-    if (!email || !password) return error('Email and password required')
+    const { phone, password } = await req.json()
+    if (!phone || !password) return error('Phone number and password required')
 
-    const user = await prisma.user.findUnique({ where: { email } })
+    const user = await prisma.user.findUnique({ where: { phone: phone.trim() } })
     if (!user) return error('Invalid credentials', 401)
 
     const valid = await bcrypt.compare(password, user.passwordHash)
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 
     const token = await signToken({
       id: user.id,
-      email: user.email,
+      phone: user.phone,
       name: user.name,
       role: user.role,
       referralCode: user.referralCode,
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       user: {
         id: user.id,
         name: user.name,
-        email: user.email,
+        phone: user.phone,
         role: user.role,
         referralCode: user.referralCode,
         points: user.points,

@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     const ticketInclude = {
       event: { select: { id: true, name: true, date: true, venue: true, posterImage: true } },
       ticketType: { select: { name: true, color: true, price: true } },
-      user: { select: { name: true, email: true } },
+      user: { select: { name: true, phone: true } },
       order: { select: { recipientName: true, guestName: true } },
     }
 
@@ -154,7 +154,7 @@ export async function POST(req: Request) {
       ticket: {
         number: ticket.ticketNumber,
         holder: holderName,
-        email: ticket.user?.email,
+        phone: ticket.user?.phone,
         type: ticket.ticketType.name,
         color: (ticket.ticketType as any).color,
         price: (ticket.ticketType as any).price,

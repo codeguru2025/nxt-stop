@@ -27,20 +27,19 @@ export async function POST(req: Request) {
   if (!match) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@nxtstop.com'
+    const adminPhone = process.env.ADMIN_PHONE ?? '+2630000000001'
     const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin123'
-    const gateEmail = process.env.GATE_EMAIL ?? 'gate@nxtstop.com'
+    const gatePhone = process.env.GATE_PHONE ?? '+2630000000002'
     const gatePassword = process.env.GATE_PASSWORD ?? 'gate123'
 
     const hash = await bcrypt.hash(adminPassword, 12)
 
-    // Admin user
     const admin = await prisma.user.upsert({
-      where: { email: adminEmail },
+      where: { phone: adminPhone },
       update: {},
       create: {
         name: 'NXT STOP Admin',
-        email: adminEmail,
+        phone: adminPhone,
         passwordHash: hash,
         role: 'admin',
       },
@@ -48,11 +47,11 @@ export async function POST(req: Request) {
 
     // Gate staff
     await prisma.user.upsert({
-      where: { email: gateEmail },
+      where: { phone: gatePhone },
       update: {},
       create: {
         name: 'Gate Staff',
-        email: gateEmail,
+        phone: gatePhone,
         passwordHash: await bcrypt.hash(gatePassword, 12),
         role: 'gate_staff',
       },
@@ -135,11 +134,11 @@ export async function POST(req: Request) {
     // Partner (DJ)
     const partnerReferralCode = 'DJFIRE2025'
     const partnerUser = await prisma.user.upsert({
-      where: { email: 'dj.fire@nxtstop.com' },
+      where: { phone: '+2630000000003' },
       update: {},
       create: {
         name: 'DJ Fire',
-        email: 'dj.fire@nxtstop.com',
+        phone: '+2630000000003',
         passwordHash: await bcrypt.hash('dj123', 12),
         role: 'partner',
       },
@@ -156,15 +155,8 @@ export async function POST(req: Request) {
       },
     })
 
-    return ok({
-      message: 'Seed complete',
-      credentials: {
-        admin: { email: adminEmail, password: adminPassword },
-        gate: { email: gateEmail, password: gatePassword },
-        partner: { email: 'dj.fire@nxtstop.com', password: 'dj123' },
-      },
-    })
+    return ok({ message: 'Seed complete' })
   } catch (e: any) {
-    return Response.json({ success: false, error: e?.message ?? String(e), stack: e?.stack }, { status: 500 })
+    return Response.json({ success: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

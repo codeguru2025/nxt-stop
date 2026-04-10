@@ -64,7 +64,7 @@ export default function EventDetailClient() {
 
   // Guest / "for someone else" fields
   const [guestName, setGuestName]           = useState('')
-  const [guestEmail, setGuestEmail]         = useState('')
+  const [guestPhone, setGuestPhone]         = useState('')
   const [forSomeoneElse, setForSomeoneElse] = useState(false)
   const [recipientName, setRecipientName]   = useState('')
 
@@ -148,7 +148,7 @@ export default function EventDetailClient() {
 
     // Validate guest fields if not logged in
     if (!user) {
-      if (!guestEmail.trim()) return
+      if (!guestPhone.trim()) return
       if (!guestName.trim()) return
     }
 
@@ -167,7 +167,7 @@ export default function EventDetailClient() {
         recipientName: forSomeoneElse && recipientName ? recipientName : undefined,
       }
       if (!user) {
-        orderBody.guestEmail = guestEmail
+        orderBody.guestPhone = guestPhone
         orderBody.guestName = guestName
       }
 
@@ -504,13 +504,13 @@ export default function EventDetailClient() {
                             className="w-full"
                           />
                           <input
-                            type="email"
-                            placeholder="Email address *"
-                            value={guestEmail}
-                            onChange={e => setGuestEmail(e.target.value)}
+                            type="tel"
+                            placeholder="Phone number *"
+                            value={guestPhone}
+                            onChange={e => setGuestPhone(e.target.value)}
                             className="w-full"
                           />
-                          <p className="text-xs text-gray-600">We'll send your ticket here. <a href="/register" className="text-purple-400 hover:text-purple-300">Create an account</a> to manage tickets easier.</p>
+                          <p className="text-xs text-gray-600"><a href="/register" className="text-purple-400 hover:text-purple-300">Create an account</a> to manage your tickets and earn rewards.</p>
                         </div>
                       )}
 
@@ -553,7 +553,7 @@ export default function EventDetailClient() {
                         !selectedType ||
                         available <= 0 ||
                         (isMobile && !phone.trim()) ||
-                        (!user && (!guestEmail.trim() || !guestName.trim()))
+                        (!user && (!guestPhone.trim() || !guestName.trim()))
                       }
                       className="w-full btn-primary flex items-center justify-center gap-2 text-base"
                     >

@@ -13,7 +13,7 @@ export async function GET() {
     const partners = await prisma.partner.findMany({
       orderBy: { totalSales: 'desc' },
       include: {
-        user: { select: { name: true, email: true, phone: true } },
+        user: { select: { name: true, phone: true } },
         commissions: { select: { amount: true, status: true } },
         _count: { select: { tickets: true } },
       },
@@ -31,21 +31,21 @@ export async function POST(req: Request) {
     if (!session) return forbidden()
 
     const {
-      name, email, phone, type, businessName, commissionRate, commissionPerTicket, password,
+      name, phone, type, businessName, commissionRate, commissionPerTicket, password,
     } = await req.json()
 
-    if (!name || !email || !type || !password) {
-      return error('name, email, type, and password are required')
+    if (!name || !phone || !type || !password) {
+      return error('name, phone, type, and password are required')
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } })
-    if (existing) return error('Email already registered')
+    const existing = await prisma.user.findUnique({ where: { phone: phone.trim() } })
+    if (existing) return error('Phone number already registered')
 
     const passwordHash = await bcrypt.hash(password, 12)
     const referralCode = crypto.randomBytes(6).toString('hex').toUpperCase()
 
     const user = await prisma.user.create({
-      data: { name, email, phone, passwordHash, role: 'partner' },
+      data: { name, phone: phone.trim(), passwordHash, role: 'partner' },
     })
 
     const qrPayload = `${process.env.NEXT_PUBLIC_APP_URL}/r/${referralCode}`
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
         commissionRate: commissionRate ?? 10,
         commissionPerTicket: commissionPerTicket ?? 0,
       },
-      include: { user: { select: { name: true, email: true } } },
+      include: { user: { select: { name: true, phone: true } } },
     })
 
     return ok(partner, 201)
@@ -85,7 +85,7 @@ export async function PATCH(req: Request) {
         ...(commissionPerTicket !== undefined && { commissionPerTicket }),
         ...(active !== undefined && { active }),
       },
-      include: { user: { select: { name: true, email: true } } },
+      include: { user: { select: { name: true, phone: true } } },
     })
 
     return ok(partner)

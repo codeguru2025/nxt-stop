@@ -10,7 +10,7 @@ type Partner = {
   id: string; type: string; businessName?: string; referralCode: string
   commissionRate: number; commissionPerTicket: number
   totalSales: number; totalEarned: number; active: boolean
-  user: { name: string; email: string; phone?: string }
+  user: { name: string; phone: string }
   _count: { tickets: number }
   commissions: { amount: number; status: string }[]
 }
@@ -26,7 +26,7 @@ export default function AdminPartnersClient() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ commissionRate: 0, commissionPerTicket: 0 })
   const [form, setForm] = useState({
-    name: '', email: '', phone: '', password: '',
+    name: '', phone: '', password: '',
     type: 'dj', businessName: '', commissionRate: 10, commissionPerTicket: 0
   })
 
@@ -93,8 +93,7 @@ export default function AdminPartnersClient() {
             <h3 className="font-bold text-white mb-4">Add New Partner</h3>
             <div className="grid sm:grid-cols-2 gap-4">
               <div><label>Full Name *</label><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="DJ Fire" /></div>
-              <div><label>Email *</label><input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="dj@example.com" /></div>
-              <div><label>Phone</label><input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+263 77..." /></div>
+              <div><label>Phone *</label><input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+263 77 123 4567" /></div>
               <div><label>Password *</label><input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min 8 characters" /></div>
               <div>
                 <label>Partner Type *</label>
@@ -115,7 +114,7 @@ export default function AdminPartnersClient() {
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={save} disabled={saving || !form.name || !form.email || !form.password} className="btn-primary flex items-center gap-2 text-sm">
+              <button onClick={save} disabled={saving || !form.name || !form.phone || !form.password} className="btn-primary flex items-center gap-2 text-sm">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 Create Partner
               </button>
@@ -165,7 +164,7 @@ export default function AdminPartnersClient() {
                     <tr key={p.id} className="hover:bg-white/2">
                       <td className="p-4">
                         <div className="font-medium text-white">{p.user.name}</div>
-                        <div className="text-xs text-gray-500">{p.user.email}</div>
+                        <div className="text-xs text-gray-500">{p.user.phone}</div>
                       </td>
                       <td className="p-4">
                         <span className="capitalize text-gray-300 bg-[#2a2a2a] rounded-md px-2 py-0.5 text-xs">{p.type}</span>

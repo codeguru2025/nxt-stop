@@ -19,7 +19,7 @@ export async function GET(
         products: true,
         partners: {
           include: {
-            partner: { include: { user: { select: { name: true, email: true } } } },
+            partner: { include: { user: { select: { name: true, phone: true } } } },
           },
         },
         _count: { select: { tickets: true, scanLogs: true, socialPosts: true } },

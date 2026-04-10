@@ -10,7 +10,7 @@ export default function RegisterClient() {
   const params = useSearchParams()
   const ref = params.get('ref') ?? ''
 
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', referralCode: ref })
+  const [form, setForm] = useState({ name: '', phone: '', password: '', referralCode: ref })
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -39,9 +39,11 @@ export default function RegisterClient() {
   return (
     <div className="w-full max-w-md">
       <div className="text-center mb-8">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center mx-auto mb-4">
-          <span className="text-white font-black text-2xl">N</span>
-        </div>
+        <img
+          src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
+          alt="NXT STOP"
+          className="h-10 w-auto object-contain invert mx-auto mb-4"
+        />
         <h1 className="text-2xl font-black text-white">Create Account</h1>
         <p className="text-gray-500 text-sm mt-1">Join NXT STOP and start earning rewards</p>
       </div>
@@ -60,12 +62,15 @@ export default function RegisterClient() {
             <input placeholder="Your Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
           </div>
           <div>
-            <label>Email</label>
-            <input type="email" placeholder="you@example.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
-          </div>
-          <div>
-            <label>Phone (optional)</label>
-            <input placeholder="+263 77..." value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+            <label>Phone Number</label>
+            <input
+              type="tel"
+              placeholder="+263 77 123 4567"
+              value={form.phone}
+              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+              required
+              autoComplete="tel"
+            />
           </div>
           <div>
             <label>Password</label>

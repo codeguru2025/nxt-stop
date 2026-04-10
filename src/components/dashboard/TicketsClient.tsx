@@ -20,7 +20,7 @@ type TicketData = {
   order?: { total: number; subtotal: number; recipientName?: string }
 }
 
-const LOGO_URL = 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo.jpeg'
+const LOGO_URL = 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
 
 async function fetchAsDataURL(url: string): Promise<string> {
   try {
@@ -80,7 +80,7 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
   /* Body */
   .body{padding:22px 24px}
   .header-row{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px}
-  .logo{width:48px;height:48px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#f3f4f6}
+  .logo{height:48px;width:auto;border-radius:0;object-fit:contain;flex-shrink:0}
   .header-text{flex:1;min-width:0}
   .brand-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#9ca3af;margin-bottom:3px}
   .event-name{font-size:20px;font-weight:900;color:#111;line-height:1.2}
@@ -115,7 +115,7 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
     display:flex;align-items:center;justify-content:space-between;
   }
   .f-logo{display:flex;align-items:center;gap:8px}
-  .f-logo-img{width:28px;height:28px;border-radius:6px;object-fit:cover;background:#fff;padding:1px}
+  .f-logo-img{height:28px;width:auto;object-fit:contain;filter:brightness(0) invert(1)}
   .f-brand{font-size:11px;font-weight:900;color:#fff;letter-spacing:.03em}
   .f-tagline{font-size:9px;color:rgba(255,255,255,.65);margin-top:1px}
   .f-instructions{font-size:9px;color:rgba(255,255,255,.8);text-align:right;line-height:1.5}
@@ -206,7 +206,7 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
 
             <div className="body p-6">
               <div className="flex items-start gap-3 mb-4">
-                <img src={LOGO_URL} alt="NXT STOP" className="logo w-11 h-11 rounded-lg object-contain shrink-0 mix-blend-multiply" />
+                <img src={LOGO_URL} alt="NXT STOP" className="h-10 w-auto object-contain shrink-0" />
                 <div>
                   <p className="lbl text-xs text-gray-400 uppercase tracking-widest font-semibold">NXT STOP</p>
                   <h2 className="text-xl font-black text-gray-900 leading-tight">{ticket.event.name}</h2>

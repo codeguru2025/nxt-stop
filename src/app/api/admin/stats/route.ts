@@ -37,14 +37,14 @@ export async function GET() {
       prisma.partner.findMany({
         orderBy: { totalSales: 'desc' },
         take: 5,
-        include: { user: { select: { name: true, email: true } } },
+        include: { user: { select: { name: true, phone: true } } },
       }),
       prisma.order.findMany({
         where: { status: 'paid' },
         orderBy: { createdAt: 'desc' },
         take: 10,
         include: {
-          user: { select: { name: true, email: true } },
+          user: { select: { name: true, phone: true } },
           items: true,
         },
       }),

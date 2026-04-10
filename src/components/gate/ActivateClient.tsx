@@ -117,20 +117,23 @@ export default function ActivateClient() {
   if (!authed) return null
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-[#0a0a0a]">
+
       {/* Header */}
-      <div className="bg-[#111] border-b border-[#2a2a2a] px-4 py-3 flex items-center gap-4">
-        <Link href="/gate" className="text-gray-500 hover:text-white transition-colors">
+      <div className="bg-[#111] border-b border-[#2a2a2a] px-4 h-14 flex items-center gap-4 shrink-0">
+        <Link href="/gate" className="text-gray-500 hover:text-white transition-colors shrink-0">
           <ArrowLeft size={18} />
         </Link>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-600 to-emerald-500 flex items-center justify-center">
-            <DollarSign size={14} className="text-white" />
-          </div>
-          <div>
-            <div className="font-bold text-white text-sm">Ticket Activation</div>
-            <div className="text-xs text-gray-500">Cash sale — physical ticket</div>
-          </div>
+        <div className="h-4 w-px bg-[#2a2a2a]" />
+        <img
+          src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
+          alt="NXT STOP"
+          className="h-7 w-auto object-contain invert"
+        />
+        <div className="h-4 w-px bg-[#2a2a2a]" />
+        <div>
+          <div className="font-bold text-white text-sm leading-none">Sell Ticket</div>
+          <div className="text-xs text-gray-500 leading-none mt-0.5">Cash sale — physical ticket</div>
         </div>
       </div>
 
@@ -155,13 +158,13 @@ export default function ActivateClient() {
                 <div className="text-xs text-gray-600">Order {result.orderNumber}</div>
               </div>
               <button onClick={reset} className="w-full btn-primary flex items-center justify-center gap-2">
-                <Ticket size={16} /> Activate Another
+                <DollarSign size={16} /> Sell Another
               </button>
             </div>
           </div>
         ) : (
           <>
-            {/* Icon */}
+            {/* Idle state */}
             {!preview && !previewError && (
               <div className="text-center">
                 <div className="w-32 h-32 rounded-2xl border-2 border-dashed border-[#3a3a3a] flex items-center justify-center mx-auto mb-4">

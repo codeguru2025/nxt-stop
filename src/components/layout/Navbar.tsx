@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { Menu, X, Ticket, User, LogOut, LayoutDashboard, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-type NavUser = { name: string; role: string; email: string } | null
+type NavUser = { name: string; role: string; phone: string } | null
 
 export default function Navbar() {
   const pathname = usePathname()

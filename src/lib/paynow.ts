@@ -13,8 +13,10 @@ function createClient() {
     process.env.PAYNOW_INTEGRATION_ID!,
     process.env.PAYNOW_INTEGRATION_KEY!
   )
-  client.resultUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/paynow/webhook`
-  client.returnUrl = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/tickets`
+  // Strip any trailing slash so we never produce double-slash URLs (e.g. https://app.com//api/...)
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+  client.resultUrl = `${appUrl}/api/paynow/webhook`
+  client.returnUrl = `${appUrl}/dashboard/tickets`
   return client
 }
 
@@ -36,20 +38,22 @@ export async function initiatePaynowPayment(opts: {
 
   if (opts.method === 'standard') {
     const response = await client.send(payment)
+    // The paynow library swallows axios errors and returns undefined — treat as network failure
+    if (!response) throw new Error('No response from Paynow — possible network error. Please try again.')
     if (!response.success) throw new Error(response.error ?? 'Paynow initiation failed')
     return { type: 'redirect', redirectUrl: response.redirectUrl, pollUrl: response.pollUrl }
   }
 
   if (!opts.phone) throw new Error('Phone number is required for mobile payments')
   const response = await client.sendMobile(payment, opts.phone, opts.method)
+  // The paynow library swallows axios errors and returns undefined — treat as network failure
+  if (!response) throw new Error('No response from Paynow — possible network error. Please try again.')
   if (!response.success) throw new Error(response.error ?? 'Paynow mobile initiation failed')
 
   if (opts.method === 'innbucks') {
-    return {
-      type: 'innbucks',
-      innbucksCode: response.data?.innbucksCode ?? response.instructions ?? '',
-      pollUrl: response.pollUrl,
-    }
+    // Innbucks code is stored in innbucks_info[0].authorizationcode by the library
+    const innbucksCode = response.innbucks_info?.[0]?.authorizationcode ?? response.instructions ?? ''
+    return { type: 'innbucks', innbucksCode, pollUrl: response.pollUrl }
   }
 
   return {

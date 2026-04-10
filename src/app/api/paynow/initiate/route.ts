@@ -19,7 +19,7 @@ export async function POST(req: Request) {
 
     const body = await req.json()
     const parsed = InitiateSchema.safeParse(body)
-    if (!parsed.success) return error(parsed.error.issues.map(i => i.message).join('; '))
+    if (!parsed.success) return error(parsed.error.issues.map((i: { message: string }) => i.message).join('; '))
 
     const { orderId, method, phone, guestToken } = parsed.data
 
@@ -52,16 +52,22 @@ export async function POST(req: Request) {
     if (isMobile && !phone) return error('Phone number is required for mobile payments')
 
     const description = order.items.map(i => i.name).join(', ')
-    const buyerEmail = order.guestEmail ?? session?.email ?? MERCHANT_EMAIL
+    const buyerEmail = MERCHANT_EMAIL
 
-    const result = await initiatePaynowPayment({
-      orderNumber: order.orderNumber,
-      email: buyerEmail,
-      description,
-      amount: order.total,
-      method,
-      phone,
-    })
+    let result
+    try {
+      result = await initiatePaynowPayment({
+        orderNumber: order.orderNumber,
+        email: buyerEmail,
+        description,
+        amount: Number(order.total), // Prisma returns Decimal — convert to plain number
+        method,
+        phone,
+      })
+    } catch (e: any) {
+      // Paynow API errors (bad credentials, invalid phone, etc.) are user-facing — return 400
+      return error(e?.message ?? 'Payment initiation failed. Please try again.')
+    }
 
     await prisma.order.update({
       where: { id: orderId },

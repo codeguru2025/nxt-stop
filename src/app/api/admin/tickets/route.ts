@@ -26,7 +26,7 @@ export async function GET(req: Request) {
       where.OR = [
         { ticketNumber: { contains: search, mode: 'insensitive' } },
         { user: { name: { contains: search, mode: 'insensitive' } } },
-        { user: { email: { contains: search, mode: 'insensitive' } } },
+        { user: { phone: { contains: search, mode: 'insensitive' } } },
         { order: { recipientName: { contains: search, mode: 'insensitive' } } },
       ]
     }
@@ -76,7 +76,7 @@ export async function GET(req: Request) {
         include: {
           event: { select: { name: true, date: true, venue: true } },
           ticketType: { select: { name: true, color: true, price: true } },
-          user: { select: { name: true, email: true } },
+          user: { select: { name: true, phone: true } },
           order: { select: { orderNumber: true, paymentMethod: true, total: true, status: true, recipientName: true, guestName: true } },
         },
       }),

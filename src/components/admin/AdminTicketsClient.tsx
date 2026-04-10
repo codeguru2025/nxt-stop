@@ -5,7 +5,7 @@ import AdminLayout from './AdminLayout'
 import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, Printer } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
-const LOGO_URL = 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo.jpeg'
+const LOGO_URL = 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
 
 async function fetchAsDataURL(url: string): Promise<string> {
   try {
@@ -28,7 +28,7 @@ type TicketRow = {
   createdAt: string
   event: { name: string; date: string; venue: string }
   ticketType: { name: string; color: string; price: number }
-  user: { name: string; email: string }
+  user: { name: string; phone: string }
   order: { orderNumber: string; paymentMethod: string | null; total: number; status: string; recipientName?: string; guestName?: string }
 }
 
@@ -39,10 +39,10 @@ type OrderRow = {
   total: number
   paymentMethod: string | null
   createdAt: string
-  user: { name: string; email: string }
+  user: { name: string; phone: string }
   items: { name: string; quantity: number; price: number }[]
   tickets: { id: string; ticketNumber: string; status: string }[]
-  guestEmail?: string
+  guestPhone?: string
   guestName?: string
 }
 
@@ -248,7 +248,7 @@ export default function AdminTicketsClient() {
     background:linear-gradient(135deg,#7c3aed 0%,#9333ea 55%,#db2777 100%);
     padding:2.5mm 3mm;display:flex;align-items:center;gap:2mm;
   }
-  .t-logo{width:14mm;height:14mm;border-radius:2mm;object-fit:cover;flex-shrink:0;background:#fff;padding:.5mm}
+  .t-logo{height:10mm;width:auto;object-fit:contain;flex-shrink:0;filter:brightness(0) invert(1)}
   .t-head-text{flex:1;min-width:0}
   .t-brand{font-size:5pt;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.1em;line-height:1;margin-bottom:.5mm}
   .t-event{font-size:8.5pt;font-weight:900;color:#fff;line-height:1.15;
@@ -457,7 +457,7 @@ export default function AdminTicketsClient() {
                 <input
                   value={search}
                   onChange={e => { setSearch(e.target.value); setPage(1) }}
-                  placeholder={tab === 'tickets' ? 'Search name, email, ticket #...' : 'Search name, email, order #...'}
+                  placeholder={tab === 'tickets' ? 'Search name, phone, ticket #...' : 'Search name, phone, order #...'}
                   className="pl-8 py-2 text-sm"
                 />
               </div>
@@ -482,7 +482,7 @@ export default function AdminTicketsClient() {
                       <div className="flex-1 min-w-0 grid grid-cols-4 gap-4 text-sm">
                         <div>
                           <p className="text-white font-semibold truncate">{t.order?.recipientName || t.order?.guestName || t.user.name}</p>
-                          <p className="text-gray-500 text-xs truncate">{t.user.email}</p>
+                          <p className="text-gray-500 text-xs truncate">{t.user.phone}</p>
                         </div>
                         <div>
                           <p className="text-white font-mono text-xs">{t.ticketNumber}</p>
@@ -510,7 +510,7 @@ export default function AdminTicketsClient() {
                         <div className="flex-1 min-w-0 grid grid-cols-4 gap-4 text-sm">
                           <div>
                             <p className="text-white font-semibold truncate">{o.guestName || o.user.name}</p>
-                            <p className="text-gray-500 text-xs truncate">{o.guestEmail || o.user.email}</p>
+                            <p className="text-gray-500 text-xs truncate">{o.guestPhone || o.user.phone}</p>
                           </div>
                           <div>
                             <p className="text-white font-mono text-xs">{o.orderNumber}</p>

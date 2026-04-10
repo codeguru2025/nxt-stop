@@ -7,7 +7,7 @@ import { Ticket, Star, Share2, Copy, Check, QrCode, ArrowRight, Gift } from 'luc
 import { buildReferralUrl, formatCurrency } from '@/lib/utils'
 
 type User = {
-  id: string; name: string; email: string; role: string
+  id: string; name: string; phone: string; role: string
   referralCode: string; points: number; totalEarned: number
   _count: { tickets: number; referralsMade: number; redemptions: number }
 }

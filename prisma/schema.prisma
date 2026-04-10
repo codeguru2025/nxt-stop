@@ -11,8 +11,7 @@ datasource db {
 
 model User {
   id            String   @id @default(cuid())
-  email         String   @unique
-  phone         String?
+  phone         String   @unique
   name          String
   passwordHash  String
   role          String   @default("customer") // customer | partner | gate_staff | admin
@@ -208,7 +207,7 @@ model Order {
   partnerId     String?
   referralCode  String?
   guestToken    String?   @unique
-  guestEmail    String?
+  guestPhone    String?
   guestName     String?
   recipientName String?
   createdAt     DateTime  @default(now())

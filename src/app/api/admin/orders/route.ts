@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const search = searchParams.get('search') ?? ''
     const status = searchParams.get('status') ?? ''
-    const page = parseInt(searchParams.get('page') ?? '1')
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1') || 1)
     const limit = 50
 
     const where: any = {}
@@ -22,8 +22,9 @@ export async function GET(req: Request) {
       where.OR = [
         { orderNumber: { contains: search, mode: 'insensitive' } },
         { user: { name: { contains: search, mode: 'insensitive' } } },
-        { user: { email: { contains: search, mode: 'insensitive' } } },
-        { guestEmail: { contains: search, mode: 'insensitive' } },
+        { user: { phone: { contains: search, mode: 'insensitive' } } },
+        { guestName: { contains: search, mode: 'insensitive' } },
+        { guestPhone: { contains: search, mode: 'insensitive' } },
       ]
     }
 
@@ -34,7 +35,7 @@ export async function GET(req: Request) {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          user: { select: { name: true, email: true } },
+          user: { select: { name: true, phone: true } },
           items: true,
           tickets: { select: { id: true, ticketNumber: true, status: true } },
         },

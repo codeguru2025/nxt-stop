@@ -17,10 +17,11 @@ const NAV = [
   { href: '/admin/store',     icon: Package,         label: 'Store' },
   { href: '/admin/rewards',   icon: Gift,            label: 'Rewards' },
   { href: '/admin/founders',  icon: UserCircle2,     label: 'Founders' },
-  { href: '/admin/tickets',   icon: Ticket,          label: 'Tickets & Orders' },
-  { href: '/admin/gallery',   icon: ImageIcon,       label: 'Gallery' },
-  { href: '/admin/videos',    icon: Video,           label: 'Past Videos' },
-  { href: '/gate',            icon: QrCode,          label: 'Gate Scanner' },
+  { href: '/admin/tickets',    icon: Ticket,          label: 'Tickets & Orders' },
+  { href: '/admin/gallery',    icon: ImageIcon,       label: 'Gallery' },
+  { href: '/admin/videos',     icon: Video,           label: 'Past Videos' },
+  { href: '/admin/gate-staff', icon: Users,           label: 'Gate Staff' },
+  { href: '/gate',             icon: QrCode,          label: 'Gate Scanner' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

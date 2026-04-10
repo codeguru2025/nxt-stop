@@ -17,7 +17,7 @@ const CreateOrderSchema = z.object({
   quantity:     z.number().int().min(1).max(20).default(1),
   referralCode: z.string().optional(),
   partnerId:    z.string().optional(),
-  guestEmail:   z.string().email().optional(),
+  guestPhone:   z.string().min(7).max(20).optional(),
   guestName:    z.string().min(1).max(100).optional(),
   recipientName: z.string().max(100).optional(),
 })
@@ -34,9 +34,9 @@ export async function POST(req: Request) {
     const body = await req.json()
     const parsed = CreateOrderSchema.safeParse(body)
     if (!parsed.success) {
-      return error(parsed.error.issues.map(i => i.message).join('; '))
+      return error(parsed.error.issues.map((i: { message: string }) => i.message).join('; '))
     }
-    const { eventId, ticketTypeId, quantity, referralCode, partnerId, guestEmail, guestName, recipientName } = parsed.data
+    const { eventId, ticketTypeId, quantity, referralCode, partnerId, guestPhone, guestName, recipientName } = parsed.data
 
     // Resolve user — either from session or guest checkout
     let userId: string
@@ -46,16 +46,16 @@ export async function POST(req: Request) {
     if (session) {
       userId = session.id
     } else {
-      if (!guestEmail) return error('Email is required to purchase tickets')
+      if (!guestPhone) return error('Phone number is required to purchase tickets')
       if (!guestName)  return error('Name is required to purchase tickets')
 
-      // Upsert to prevent TOCTOU race between two concurrent guest checkouts with same email
+      // Upsert to prevent TOCTOU race between two concurrent guest checkouts with same phone
       const fakeHash = await bcrypt.hash(crypto.randomUUID(), 6)
       const guestUser = await prisma.user.upsert({
-        where:  { email: guestEmail },
+        where:  { phone: guestPhone.trim() },
         update: {},
         create: {
-          email: guestEmail,
+          phone: guestPhone.trim(),
           name: guestName,
           passwordHash: fakeHash,
           role: 'customer',
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
 
       autoSessionToken = await signToken({
         id: guestUser.id,
-        email: guestUser.email,
+        phone: guestUser.phone,
         name: guestUser.name,
         role: guestUser.role,
         referralCode: guestUser.referralCode,
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
           partnerId: resolvedPartnerId ?? null,
           referralCode: referralCode ?? null,
           guestToken: guestToken ?? null,
-          guestEmail: guestEmail ?? null,
+          guestPhone: guestPhone ?? null,
           guestName: guestName ?? null,
           recipientName: recipientName ?? null,
           items: {

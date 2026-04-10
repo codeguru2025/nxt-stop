@@ -10,7 +10,7 @@ export default function LoginClient() {
   const params = useSearchParams()
   const redirect = params.get('redirect') ?? '/dashboard'
 
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [form, setForm] = useState({ phone: '', password: '' })
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -29,7 +29,10 @@ export default function LoginClient() {
     setLoading(false)
 
     if (res.success) {
-      router.push(redirect)
+      // Gate staff go straight to the scanner; everyone else follows the redirect param
+      const role = res.data?.user?.role
+      const dest = role === 'gate_staff' ? '/gate' : redirect
+      router.push(dest)
       router.refresh()
     } else {
       setError(res.error ?? 'Login failed')
@@ -38,11 +41,12 @@ export default function LoginClient() {
 
   return (
     <div className="w-full max-w-md">
-      {/* Logo */}
       <div className="text-center mb-8">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center mx-auto mb-4">
-          <span className="text-white font-black text-2xl">N</span>
-        </div>
+        <img
+          src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
+          alt="NXT STOP"
+          className="h-10 w-auto object-contain invert mx-auto mb-4"
+        />
         <h1 className="text-2xl font-black text-white">Welcome Back</h1>
         <p className="text-gray-500 text-sm mt-1">Sign in to your NXT STOP account</p>
       </div>
@@ -50,13 +54,14 @@ export default function LoginClient() {
       <div className="card p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label>Email</label>
+            <label>Phone Number</label>
             <input
-              type="email"
-              placeholder="you@example.com"
-              value={form.email}
-              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+              type="tel"
+              placeholder="+263 77 123 4567"
+              value={form.phone}
+              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
               required
+              autoComplete="tel"
             />
           </div>
 

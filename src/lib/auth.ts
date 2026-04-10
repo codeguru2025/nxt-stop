@@ -9,7 +9,7 @@ function getJwtSecret(): Uint8Array {
 
 export type SessionUser = {
   id: string
-  email: string
+  phone: string
   name: string
   role: string
   referralCode: string
