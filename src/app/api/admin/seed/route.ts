@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     const gatePhone = process.env.GATE_PHONE ?? '+2630000000002'
     const gatePassword = process.env.GATE_PASSWORD ?? 'gate123'
 
-    const hash = await bcrypt.hash(adminPassword, 12)
+    const hash = await bcrypt.hash(adminPassword, 10)
 
     const admin = await prisma.user.upsert({
       where: { phone: adminPhone },
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       create: {
         name: 'Gate Staff',
         phone: gatePhone,
-        passwordHash: await bcrypt.hash(gatePassword, 12),
+        passwordHash: await bcrypt.hash(gatePassword, 10),
         role: 'gate_staff',
       },
     })
@@ -139,7 +139,7 @@ export async function POST(req: Request) {
       create: {
         name: 'DJ Fire',
         phone: '+2630000000003',
-        passwordHash: await bcrypt.hash('dj123', 12),
+        passwordHash: await bcrypt.hash('dj123', 10),
         role: 'partner',
       },
     })

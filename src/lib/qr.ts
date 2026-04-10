@@ -1,7 +1,20 @@
 import QRCode from 'qrcode'
+import { redis } from './redis'
+
+const QR_TTL = 60 * 60 * 24 * 30 // 30 days — QR codes are immutable once created
 
 export async function generateQRDataURL(data: string): Promise<string> {
-  return QRCode.toDataURL(data, {
+  // Check Redis cache first — QR data URLs are deterministic and never change
+  if (redis) {
+    try {
+      const cached = await redis.get(`qr:${data}`)
+      if (cached) return cached
+    } catch {
+      // Redis unavailable — fall through to generation
+    }
+  }
+
+  const dataUrl = await QRCode.toDataURL(data, {
     width: 300,
     margin: 2,
     color: {
@@ -10,6 +23,13 @@ export async function generateQRDataURL(data: string): Promise<string> {
     },
     errorCorrectionLevel: 'H',
   })
+
+  // Cache asynchronously — don't block the response
+  if (redis) {
+    redis.set(`qr:${data}`, dataUrl, 'EX', QR_TTL).catch(() => {})
+  }
+
+  return dataUrl
 }
 
 export async function generateQRSVG(data: string): Promise<string> {

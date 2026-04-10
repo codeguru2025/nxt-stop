@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     const existing = await prisma.user.findUnique({ where: { phone: phone.trim() } })
     if (existing) return error('Phone number already registered')
 
-    const passwordHash = await bcrypt.hash(password, 12)
+    const passwordHash = await bcrypt.hash(password, 10)
 
     const user = await prisma.user.create({
       data: { name, phone: phone.trim(), passwordHash, role: 'gate_staff' },

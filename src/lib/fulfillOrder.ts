@@ -34,23 +34,19 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
       }
       if (!ticketType) throw new Error(`Ticket type not found for order item ${item.id} — fulfillment aborted`)
 
-      for (let i = 0; i < item.quantity; i++) {
-        const ticketNumber = generateTicketNumber()
-        const qrPayload = crypto.randomUUID()
+      // Build all ticket rows upfront, then insert in a single round-trip
+      const ticketRows = Array.from({ length: item.quantity }, () => ({
+        ticketNumber: generateTicketNumber(),
+        qrCode: crypto.randomUUID(),
+        userId: order.userId,
+        eventId: ticketType!.eventId,
+        ticketTypeId: ticketType!.id,
+        orderId: order.id,
+        partnerId: order.partnerId ?? null,
+        referralCode: order.referralCode ?? null,
+      }))
 
-        await tx.ticket.create({
-          data: {
-            ticketNumber,
-            qrCode: qrPayload,
-            userId: order.userId,
-            eventId: ticketType.eventId,
-            ticketTypeId: ticketType.id,
-            orderId: order.id,
-            partnerId: order.partnerId ?? null,
-            referralCode: order.referralCode ?? null,
-          },
-        })
-      }
+      await tx.ticket.createMany({ data: ticketRows })
 
       await tx.ticketType.update({
         where: { id: ticketType.id },

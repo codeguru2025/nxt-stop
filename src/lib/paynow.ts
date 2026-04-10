@@ -8,6 +8,18 @@ export type InitiateResult =
   | { type: 'mobile'; instructions: string; pollUrl: string }
   | { type: 'innbucks'; innbucksCode: string; pollUrl: string }
 
+const INITIATE_TIMEOUT_MS = 20_000 // 20s — Paynow API should respond well within this
+const POLL_TIMEOUT_MS = 10_000     // 10s — poll is a simple status check
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Paynow ${label} timed out after ${ms / 1000}s — please try again`)), ms)
+    ),
+  ])
+}
+
 function createClient() {
   const client = new Paynow(
     process.env.PAYNOW_INTEGRATION_ID!,
@@ -37,7 +49,7 @@ export async function initiatePaynowPayment(opts: {
   payment.add(opts.description, opts.amount)
 
   if (opts.method === 'standard') {
-    const response = await client.send(payment)
+    const response = await withTimeout(client.send(payment), INITIATE_TIMEOUT_MS, 'initiation')
     // The paynow library swallows axios errors and returns undefined — treat as network failure
     if (!response) throw new Error('No response from Paynow — possible network error. Please try again.')
     if (!response.success) throw new Error(response.error ?? 'Paynow initiation failed')
@@ -45,7 +57,11 @@ export async function initiatePaynowPayment(opts: {
   }
 
   if (!opts.phone) throw new Error('Phone number is required for mobile payments')
-  const response = await client.sendMobile(payment, opts.phone, opts.method)
+  const response = await withTimeout(
+    client.sendMobile(payment, opts.phone, opts.method),
+    INITIATE_TIMEOUT_MS,
+    'mobile initiation'
+  )
   // The paynow library swallows axios errors and returns undefined — treat as network failure
   if (!response) throw new Error('No response from Paynow — possible network error. Please try again.')
   if (!response.success) throw new Error(response.error ?? 'Paynow mobile initiation failed')
@@ -71,7 +87,7 @@ export type PollStatus = 'paid' | 'failed' | 'cancelled' | 'pending'
  */
 export async function pollPaynowTransaction(pollUrl: string): Promise<PollStatus> {
   const client = createClient()
-  const res = await client.pollTransaction(pollUrl)
+  const res = await withTimeout(client.pollTransaction(pollUrl), POLL_TIMEOUT_MS, 'poll')
   // pollTransaction returns an InitResponse — check .status directly (no .paid() method exists)
   const s: string = (res?.status ?? '').toLowerCase()
   if (s === 'paid') return 'paid'
