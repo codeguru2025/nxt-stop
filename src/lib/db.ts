@@ -20,11 +20,7 @@ function create(): PrismaClient {
 
   const pool = new Pool({
     connectionString,
-    ssl: process.env.NODE_ENV === 'production'
-      ? process.env.DO_CA_CERT
-        ? { rejectUnauthorized: true, ca: Buffer.from(process.env.DO_CA_CERT, 'base64').toString() }
-        : { rejectUnauthorized: false }
-      : { rejectUnauthorized: false },
+    ssl: { rejectUnauthorized: false },
     max: 25,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
