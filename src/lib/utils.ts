@@ -6,12 +6,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency = 'USD'): string {
+export function formatCurrency(amount: number | string, currency = 'USD'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
-  }).format(amount)
+  }).format(Number(amount))
 }
 
 export function formatDate(date: Date | string, pattern = 'PPP'): string {

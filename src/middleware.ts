@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
-import crypto from 'crypto'
 
 const PROTECTED_PATHS = ['/dashboard', '/admin', '/gate']
 const ADMIN_PATHS = ['/admin']
@@ -9,11 +8,16 @@ const CSRF_COOKIE = 'csrf-token'
 const CSRF_HEADER = 'x-csrf-token'
 const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS']
 
-// Webhook endpoints that receive external callbacks (no CSRF)
 const CSRF_EXEMPT = ['/api/paynow/webhook', '/api/health']
 
 function getJwtSecret(): Uint8Array {
   return new TextEncoder().encode(process.env.JWT_SECRET)
+}
+
+function generateToken(): string {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 export async function middleware(req: NextRequest) {
@@ -22,8 +26,7 @@ export async function middleware(req: NextRequest) {
 
   // ── CSRF: issue token cookie on every response if missing ──
   if (!req.cookies.get(CSRF_COOKIE)?.value) {
-    const token = crypto.randomBytes(32).toString('hex')
-    response.cookies.set(CSRF_COOKIE, token, {
+    response.cookies.set(CSRF_COOKIE, generateToken(), {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
