@@ -3,10 +3,6 @@ import { requireGateOrAdmin } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { acquireScanLock, checkScanLimit } from '@/lib/rateLimit'
 
-function getIp(req: Request): string {
-  return req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
-}
-
 function emitScanEvent(eventId: string, payload: object) {
   try {
     const io = (global as any).__io
@@ -23,8 +19,8 @@ export async function POST(req: Request) {
     const session = await requireGateOrAdmin().catch(() => null)
     if (!session) return unauthorized()
 
-    const ip = getIp(req)
-    const { limited } = await checkScanLimit(ip)
+    // Rate limit per-user so that multiple gate staff sharing an IP don't trip each other's limits
+    const { limited } = await checkScanLimit(`user:${session.id}`)
     if (limited) return error('Rate limit exceeded — slow down', 429)
 
     const { qrCode: rawCode, eventId, deviceId } = await req.json()

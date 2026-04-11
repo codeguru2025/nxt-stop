@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     // Handle referral
     if (referredBy) {
       const referrer = await prisma.user.findUnique({ where: { referralCode: referredBy } })
-      if (referrer) {
+      if (referrer && referrer.id !== user.id) {
         await prisma.referral.create({
           data: { sourceUserId: referrer.id, targetUserId: user.id },
         })

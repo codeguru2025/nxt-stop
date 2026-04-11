@@ -50,6 +50,15 @@ export async function PATCH(
       lat, lng,
     } = body
 
+    if (lat !== undefined && lat !== null) {
+      const v = parseFloat(lat)
+      if (isNaN(v) || v < -90 || v > 90) return error('Latitude must be between -90 and 90')
+    }
+    if (lng !== undefined && lng !== null) {
+      const v = parseFloat(lng)
+      if (isNaN(v) || v < -180 || v > 180) return error('Longitude must be between -180 and 180')
+    }
+
     const event = await prisma.event.update({
       where: { id },
       data: {

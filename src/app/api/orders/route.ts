@@ -76,6 +76,12 @@ export async function POST(req: Request) {
 
     // Capacity check + order creation inside a transaction to prevent overselling
     const result = await prisma.$transaction(async (tx) => {
+      // Lock the TicketType row for the duration of this transaction.
+      // This serialises concurrent checkouts for the same ticket type so that
+      // the aggregate-then-insert below is atomic — no two requests can both
+      // read reserved=0 and both proceed past the capacity check.
+      await tx.$executeRaw`SELECT id FROM "TicketType" WHERE id = ${ticketTypeId} FOR UPDATE`
+
       const ticketType = await tx.ticketType.findFirst({
         where: { id: ticketTypeId, eventId, active: true },
         include: { event: true },

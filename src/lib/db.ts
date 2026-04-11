@@ -9,7 +9,9 @@ declare global {
 function create(): PrismaClient {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    ssl: process.env.NODE_ENV === 'production'
+      ? { rejectUnauthorized: true }
+      : { rejectUnauthorized: false },
     max: 25,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,

@@ -15,6 +15,7 @@ function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 let authLimiter: RateLimiterRedis | null = null
 let scanLimiter: RateLimiterRedis | null = null
 let orderLimiter: RateLimiterRedis | RateLimiterMemory | null = null
+let pollLimiter: RateLimiterRedis | RateLimiterMemory | null = null
 
 function getAuthLimiter(): RateLimiterRedis | null {
   if (!redis) return null
@@ -90,6 +91,31 @@ function getOrderLimiter(): RateLimiterRedis | RateLimiterMemory {
       : new RateLimiterMemory(opts)
   }
   return orderLimiter
+}
+
+function getPollLimiter(): RateLimiterRedis | RateLimiterMemory {
+  if (!pollLimiter) {
+    const opts = { keyPrefix: 'rl:poll', points: 30, duration: 60 } // 30 polls/min per key
+    pollLimiter = redis
+      ? new RateLimiterRedis({ storeClient: redis, ...opts })
+      : new RateLimiterMemory(opts)
+  }
+  return pollLimiter
+}
+
+export async function checkPollLimit(key: string): Promise<{ limited: boolean }> {
+  return withTimeout(
+    (async () => {
+      try {
+        await getPollLimiter().consume(key)
+        return { limited: false }
+      } catch (e: any) {
+        if (isRateLimited(e)) return { limited: true }
+        return { limited: false }
+      }
+    })(),
+    { limited: false }
+  )
 }
 
 export async function checkOrderLimit(key: string): Promise<{ limited: boolean }> {

@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     if (!activationCode?.trim()) return error('Activation code is required')
 
     const clean = activationCode.trim().toUpperCase()
+    if (clean.length > 20) return error('Invalid activation code')
 
     // Look up ticket details first (read-only, outside transaction)
     const ticket = await prisma.ticket.findUnique({

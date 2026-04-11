@@ -39,6 +39,15 @@ export async function POST(req: Request) {
 
     if (!name || !venue || !date) return error('name, venue, and date are required')
 
+    const parsedLat = lat != null ? parseFloat(lat) : null
+    const parsedLng = lng != null ? parseFloat(lng) : null
+    if (parsedLat != null && (isNaN(parsedLat) || parsedLat < -90 || parsedLat > 90)) {
+      return error('Latitude must be between -90 and 90')
+    }
+    if (parsedLng != null && (isNaN(parsedLng) || parsedLng < -180 || parsedLng > 180)) {
+      return error('Longitude must be between -180 and 180')
+    }
+
     const slug = slugify(name) + '-' + crypto.randomBytes(4).toString('hex')
 
     const event = await prisma.event.create({
@@ -59,8 +68,8 @@ export async function POST(req: Request) {
         virtualStreamUrl,
         platformFee: platformFee ?? 0.10,
         status: status ?? 'draft',
-        lat: lat ? parseFloat(lat) : null,
-        lng: lng ? parseFloat(lng) : null,
+        lat: parsedLat,
+        lng: parsedLng,
         ticketTypes: ticketTypes
           ? {
               create: ticketTypes.map((t: any) => ({

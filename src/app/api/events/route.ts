@@ -5,7 +5,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
     const status = url.searchParams.get('status') ?? 'published'
-    const limit = parseInt(url.searchParams.get('limit') ?? '20')
+    const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '20') || 20, 100)
 
     // 'published' means visible to users — include both published and live events
     const where =

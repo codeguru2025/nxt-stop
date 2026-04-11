@@ -12,7 +12,9 @@ export async function GET(req: Request) {
     if (!session) return forbidden()
 
     const { searchParams } = new URL(req.url)
-    const search = searchParams.get('search') ?? ''
+    const rawSearch = searchParams.get('search') ?? ''
+    if (rawSearch.length > 100) return error('Search query too long')
+    const search = rawSearch
     const eventId = searchParams.get('eventId') ?? ''
     const status = searchParams.get('status') ?? ''
     const page = parseInt(searchParams.get('page') ?? '1')

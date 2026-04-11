@@ -27,10 +27,13 @@ export async function POST(req: Request) {
   if (!match) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    const adminPhone = process.env.ADMIN_PHONE ?? '+2630000000001'
-    const adminPassword = process.env.ADMIN_PASSWORD ?? 'admin123'
-    const gatePhone = process.env.GATE_PHONE ?? '+2630000000002'
-    const gatePassword = process.env.GATE_PASSWORD ?? 'gate123'
+    const adminPhone = process.env.ADMIN_PHONE
+    const adminPassword = process.env.ADMIN_PASSWORD
+    const gatePhone = process.env.GATE_PHONE
+    const gatePassword = process.env.GATE_PASSWORD
+    if (!adminPhone || !adminPassword || !gatePhone || !gatePassword) {
+      return Response.json({ error: 'ADMIN_PHONE, ADMIN_PASSWORD, GATE_PHONE, and GATE_PASSWORD must all be set' }, { status: 500 })
+    }
 
     const hash = await bcrypt.hash(adminPassword, 10)
 

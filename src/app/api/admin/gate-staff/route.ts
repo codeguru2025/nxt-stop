@@ -32,8 +32,8 @@ export async function POST(req: Request) {
     if (!name || !phone || !password) {
       return error('Name, phone number, and password are required')
     }
-    if (password.length < 6) {
-      return error('Password must be at least 6 characters')
+    if (password.length < 8) {
+      return error('Password must be at least 8 characters')
     }
 
     const existing = await prisma.user.findUnique({ where: { phone: phone.trim() } })

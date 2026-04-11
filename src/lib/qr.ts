@@ -26,7 +26,9 @@ export async function generateQRDataURL(data: string): Promise<string> {
 
   // Cache asynchronously — don't block the response
   if (redis) {
-    redis.set(`qr:${data}`, dataUrl, 'EX', QR_TTL).catch(() => {})
+    redis.set(`qr:${data}`, dataUrl, 'EX', QR_TTL).catch((err: Error) => {
+      console.warn('[qr] Redis cache write failed:', err.message)
+    })
   }
 
   return dataUrl
