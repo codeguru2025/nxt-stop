@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Calendar, MapPin, Printer, X, ExternalLink, Ticket } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
@@ -284,20 +284,43 @@ export default function TicketsClient() {
   const [tickets, setTickets] = useState<TicketData[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<TicketData | null>(null)
+  const retryRef = useRef(0)
+  const MAX_RETRIES = 6
 
   useEffect(() => {
     const guestToken = searchParams.get('guestToken')
+    const isNewPurchase = searchParams.get('new') === '1'
     const url = guestToken ? `/api/tickets?guestToken=${guestToken}` : '/api/tickets'
 
     if (!guestToken) {
       fetch('/api/auth/me').then(r => r.json()).then(d => {
         if (!d.success) router.push('/login')
+      }).catch(() => {})
+    }
+
+    const loadTickets = () => {
+      fetch(url).then(r => r.json()).then(d => {
+        if (d.success && d.data.length > 0) {
+          setTickets(d.data)
+          setLoading(false)
+        } else if (isNewPurchase && retryRef.current < MAX_RETRIES) {
+          retryRef.current += 1
+          setTimeout(loadTickets, 2000)
+        } else {
+          if (d.success) setTickets(d.data)
+          setLoading(false)
+        }
+      }).catch(() => {
+        if (isNewPurchase && retryRef.current < MAX_RETRIES) {
+          retryRef.current += 1
+          setTimeout(loadTickets, 2000)
+        } else {
+          setLoading(false)
+        }
       })
     }
 
-    fetch(url).then(r => r.json()).then(d => {
-      if (d.success) setTickets(d.data)
-    }).finally(() => setLoading(false))
+    loadTickets()
   }, [router, searchParams])
 
   if (loading) return (

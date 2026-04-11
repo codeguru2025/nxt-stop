@@ -29,7 +29,7 @@ function createClient() {
   // Strip any trailing slash so we never produce double-slash URLs (e.g. https://app.com//api/...)
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
   client.resultUrl = `${appUrl}/api/paynow/webhook`
-  client.returnUrl = `${appUrl}/dashboard/tickets`
+  client.returnUrl = `${appUrl}/dashboard/tickets?new=1`
   return client
 }
 
@@ -91,7 +91,7 @@ export async function pollPaynowTransaction(pollUrl: string): Promise<PollStatus
   const res = await withTimeout(client.pollTransaction(pollUrl), POLL_TIMEOUT_MS, 'poll')
   // pollTransaction returns an InitResponse — check .status directly (no .paid() method exists)
   const s: string = (res?.status ?? '').toLowerCase()
-  if (s === 'paid') return 'paid'
+  if (['paid', 'awaiting delivery', 'delivered'].includes(s)) return 'paid'
   if (['failed', 'voided', 'error', 'disputed', 'cancelled'].includes(s)) return 'failed'
   return 'pending'
 }

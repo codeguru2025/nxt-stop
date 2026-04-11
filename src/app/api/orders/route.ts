@@ -3,6 +3,7 @@ import { requireAuth, signToken } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { generateOrderNumber } from '@/lib/qr'
 import { checkOrderLimit } from '@/lib/rateLimit'
+import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { z } from 'zod'
@@ -151,6 +152,17 @@ export async function POST(req: Request) {
 
       return { order, ticketType, event: ticketType.event }
     })
+
+    if (autoSessionToken) {
+      const cookieStore = await cookies()
+      cookieStore.set('nxt-session', autoSessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+        path: '/',
+      })
+    }
 
     return ok({
       order: result.order,

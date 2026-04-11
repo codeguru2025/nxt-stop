@@ -122,7 +122,11 @@ export default function EventDetailClient() {
           clearInterval(pollRef.current!)
           setStage({ name: 'paid', guestToken })
           setTimeout(() => {
-            router.push(guestToken ? `/dashboard/tickets?guestToken=${guestToken}` : '/dashboard/tickets')
+            const base = '/dashboard/tickets'
+            const params = new URLSearchParams()
+            if (guestToken) params.set('guestToken', guestToken)
+            params.set('new', '1')
+            router.push(`${base}?${params.toString()}`)
           }, 2000)
           return
         }
