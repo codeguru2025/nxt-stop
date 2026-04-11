@@ -29,7 +29,7 @@ export default function LoginClient() {
 
       if (res.success) {
         const role = res.data?.user?.role
-        const dest = role === 'gate_staff' ? '/gate' : redirect
+        const dest = role === 'admin' ? '/admin' : role === 'gate_staff' ? '/gate' : redirect
         router.push(dest)
         router.refresh()
       } else {

@@ -126,16 +126,27 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile right — profile icon only (bottom nav handles everything else) */}
-        <div className="flex md:hidden items-center">
+        {/* Mobile right */}
+        <div className="flex md:hidden items-center gap-2">
           {user ? (
-            <Link
-              href="/dashboard"
-              className="w-9 h-9 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400"
-              aria-label="Dashboard"
-            >
-              <User size={17} />
-            </Link>
+            <>
+              {user.role === 'admin' && (
+                <Link
+                  href="/admin"
+                  className="w-9 h-9 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400"
+                  aria-label="Admin"
+                >
+                  <ShieldCheck size={17} />
+                </Link>
+              )}
+              <Link
+                href="/dashboard"
+                className="w-9 h-9 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400"
+                aria-label="Dashboard"
+              >
+                <User size={17} />
+              </Link>
+            </>
           ) : (
             <Link
               href="/login"
