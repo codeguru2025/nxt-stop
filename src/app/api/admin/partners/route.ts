@@ -43,25 +43,25 @@ export async function POST(req: Request) {
 
     const passwordHash = await bcrypt.hash(password, 10)
     const referralCode = crypto.randomBytes(6).toString('hex').toUpperCase()
-
-    const user = await prisma.user.create({
-      data: { name, phone: phone.trim(), passwordHash, role: 'partner' },
-    })
-
     const qrPayload = `${process.env.NEXT_PUBLIC_APP_URL}/r/${referralCode}`
     const qrDataUrl = await generateQRDataURL(qrPayload)
 
-    const partner = await prisma.partner.create({
-      data: {
-        userId: user.id,
-        type,
-        businessName,
-        referralCode,
-        qrCode: qrDataUrl,
-        commissionRate: commissionRate ?? 10,
-        commissionPerTicket: commissionPerTicket ?? 0,
-      },
-      include: { user: { select: { name: true, phone: true } } },
+    const partner = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: { name, phone: phone.trim(), passwordHash, role: 'partner' },
+      })
+      return tx.partner.create({
+        data: {
+          userId: user.id,
+          type,
+          businessName,
+          referralCode,
+          qrCode: qrDataUrl,
+          commissionRate: commissionRate ?? 10,
+          commissionPerTicket: commissionPerTicket ?? 0,
+        },
+        include: { user: { select: { name: true, phone: true } } },
+      })
     })
 
     return ok(partner, 201)

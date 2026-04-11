@@ -1,4 +1,5 @@
 import QRCode from 'qrcode'
+import crypto from 'crypto'
 import { redis } from './redis'
 
 const QR_TTL = 60 * 60 * 24 * 30 // 30 days — QR codes are immutable once created
@@ -45,12 +46,12 @@ export async function generateQRSVG(data: string): Promise<string> {
 
 export function generateTicketNumber(): string {
   const timestamp = Date.now().toString(36).toUpperCase()
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase()
+  const random = crypto.randomBytes(4).toString('hex').toUpperCase()
   return `NXT-${timestamp}-${random}`
 }
 
 export function generateOrderNumber(): string {
   const timestamp = Date.now().toString(36).toUpperCase()
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase()
+  const random = crypto.randomBytes(4).toString('hex').toUpperCase()
   return `ORD-${timestamp}-${random}`
 }

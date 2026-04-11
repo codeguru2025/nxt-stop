@@ -23,23 +23,26 @@ export async function POST(req: Request) {
 
     const passwordHash = await bcrypt.hash(password, 10)
 
-    const user = await prisma.user.create({
-      data: {
-        name: name.trim(),
-        phone: phone.trim(),
-        passwordHash,
-      },
-    })
+    const user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name: name.trim(),
+          phone: phone.trim(),
+          passwordHash,
+        },
+      })
 
-    // Handle referral
-    if (referredBy) {
-      const referrer = await prisma.user.findUnique({ where: { referralCode: referredBy } })
-      if (referrer && referrer.id !== user.id) {
-        await prisma.referral.create({
-          data: { sourceUserId: referrer.id, targetUserId: user.id },
-        })
+      if (referredBy) {
+        const referrer = await tx.user.findUnique({ where: { referralCode: referredBy } })
+        if (referrer && referrer.id !== newUser.id) {
+          await tx.referral.create({
+            data: { sourceUserId: referrer.id, targetUserId: newUser.id },
+          })
+        }
       }
-    }
+
+      return newUser
+    })
 
     const token = await signToken({
       id: user.id,

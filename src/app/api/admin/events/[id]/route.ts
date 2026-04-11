@@ -115,6 +115,13 @@ export async function DELETE(
     if (!session) return forbidden()
     const { id } = await ctx.params
 
+    const soldTickets = await prisma.ticket.count({
+      where: { eventId: id, status: { in: ['valid', 'used'] } },
+    })
+    if (soldTickets > 0) {
+      return error(`Cannot delete event with ${soldTickets} sold ticket(s). Cancel or refund them first.`)
+    }
+
     await prisma.event.delete({ where: { id } })
     return ok({ deleted: true })
   } catch (e) {

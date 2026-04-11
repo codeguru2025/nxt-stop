@@ -4,7 +4,7 @@ import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { initiatePaynowPayment, type PaynowMethod } from '@/lib/paynow'
 import { z } from 'zod'
 
-const MERCHANT_EMAIL = process.env.PAYNOW_EMAIL ?? 'gustozw@gmail.com'
+import { env } from '@/lib/env'
 
 const InitiateSchema = z.object({
   orderId:    z.string().min(1),
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     if (isMobile && !phone) return error('Phone number is required for mobile payments')
 
     const description = order.items.map(i => i.name).join(', ')
-    const buyerEmail = MERCHANT_EMAIL
+    const buyerEmail = env.PAYNOW_EMAIL
 
     let result
     try {

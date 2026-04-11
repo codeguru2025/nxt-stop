@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/db'
 import { fulfillOrder } from '@/lib/fulfillOrder'
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { sha512 } = require('js-sha512')
+import { createHash } from 'crypto'
 
 // POST /api/paynow/webhook
 // Paynow posts status updates here (resultUrl).
@@ -34,7 +33,7 @@ export async function POST(req: Request) {
       params.get('pollurl') ?? '',
     ].join('') + integrationKey.toLowerCase()
 
-    const computedHash = sha512(hashInput).toUpperCase()
+    const computedHash = createHash('sha512').update(hashInput).digest('hex').toUpperCase()
 
     if (computedHash !== receivedHash.toUpperCase()) {
       console.warn('Paynow webhook hash mismatch — possible spoofing attempt')

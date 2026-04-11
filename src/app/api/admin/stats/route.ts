@@ -1,11 +1,23 @@
 import { prisma } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
 import { ok, forbidden, serverError } from '@/lib/api'
+import { redis } from '@/lib/redis'
+
+const CACHE_KEY = 'admin:stats'
+const CACHE_TTL = 30 // 30 seconds
 
 export async function GET() {
   try {
     const session = await requireAdmin().catch(() => null)
     if (!session) return forbidden()
+
+    // Try Redis cache first
+    if (redis) {
+      try {
+        const cached = await redis.get(CACHE_KEY)
+        if (cached) return ok(JSON.parse(cached))
+      } catch { /* fall through to DB */ }
+    }
 
     const [
       totalTickets,
@@ -19,7 +31,6 @@ export async function GET() {
       topPartners,
       recentOrders,
       stockAlerts,
-      totalVirtualAttendees,
     ] = await Promise.all([
       prisma.ticket.count({ where: { status: { not: 'physical' } } }),
       prisma.order.count({ where: { status: 'paid' } }),
@@ -48,16 +59,11 @@ export async function GET() {
           items: true,
         },
       }),
-      prisma.product.findMany({
-        where: { active: true },
-      }).catch(() => []),
-      prisma.ticket.count({ where: { event: { hasVirtual: true } } }),
+      prisma.product.findMany({ where: { active: true } }).catch(() => []),
     ])
 
-    // Low stock alerts — reuse the result already fetched above (stockAlerts)
     const lowStock = (stockAlerts as any[]).filter((p: any) => p.stock <= p.lowStockAt)
 
-    // Tickets sold per event
     const eventStats = await prisma.event.findMany({
       where: { status: { in: ['published', 'live', 'ended'] } },
       include: {
@@ -66,12 +72,12 @@ export async function GET() {
       },
     })
 
-    return ok({
+    const data = {
       totals: {
         tickets: totalTickets,
         orders: totalOrders,
-        revenue: totalRevenue._sum.subtotal ?? 0,
-        platformFees: totalPlatformFees._sum.platformFees ?? 0,
+        revenue: Number(totalRevenue._sum.subtotal ?? 0),
+        platformFees: Number(totalPlatformFees._sum.platformFees ?? 0),
         users: totalUsers,
         activeEvents,
         liveEvents,
@@ -81,7 +87,14 @@ export async function GET() {
       recentOrders,
       lowStockAlerts: lowStock,
       eventStats,
-    })
+    }
+
+    // Cache result asynchronously
+    if (redis) {
+      redis.set(CACHE_KEY, JSON.stringify(data), 'EX', CACHE_TTL).catch(() => {})
+    }
+
+    return ok(data)
   } catch (e) {
     return serverError(e)
   }

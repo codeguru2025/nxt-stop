@@ -110,30 +110,27 @@ export async function POST(req: Request) {
     ])
     if (!ticketType || !event) return error('Event or ticket type not found')
 
-    // Generate tickets as inventory (no order, no sold increment, status=physical)
-    const generated: { ticketNumber: string; qrCode: string; qrDataUrl: string; activationCode: string }[] = []
-    for (let i = 0; i < quantity; i++) {
+    // Build all ticket rows upfront, then batch-insert inside a transaction
+    const ticketRows = Array.from({ length: quantity }, () => {
       const ticketNumber = generateTicketNumber()
       const qrCode = crypto.randomUUID()
-      const qrDataUrl = await generateQRDataURL(qrCode)
-      // Short 6-char activation code — easy to type, hard to guess
       const activationCode = crypto.randomBytes(3).toString('hex').toUpperCase()
+      return { ticketNumber, qrCode, activationCode, userId: session.id, eventId, ticketTypeId, status: 'physical' as const }
+    })
 
-      await prisma.ticket.create({
-        data: {
-          ticketNumber,
-          qrCode,
-          activationCode,
-          userId: session.id,
-          eventId,
-          ticketTypeId,
-          status: 'physical', // inventory — not yet sold
-          // orderId intentionally omitted — set on activation
-        },
-      })
+    await prisma.$transaction(async (tx) => {
+      await tx.ticket.createMany({ data: ticketRows })
+    })
 
-      generated.push({ ticketNumber, qrCode, qrDataUrl, activationCode })
-    }
+    // Generate QR data URLs after the transaction (CPU-bound, non-critical)
+    const generated = await Promise.all(
+      ticketRows.map(async (t) => ({
+        ticketNumber: t.ticketNumber,
+        qrCode: t.qrCode,
+        activationCode: t.activationCode,
+        qrDataUrl: await generateQRDataURL(t.qrCode),
+      }))
+    )
 
     return ok({
       event: { name: event.name, date: event.date, venue: event.venue },

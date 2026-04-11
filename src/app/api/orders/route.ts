@@ -49,12 +49,15 @@ export async function POST(req: Request) {
       if (!guestPhone) return error('Phone number is required to purchase tickets')
       if (!guestName)  return error('Name is required to purchase tickets')
 
-      // Upsert to prevent TOCTOU race between two concurrent guest checkouts with same phone
+      // Check if a user with a real password already exists — require them to log in
+      const existingUser = await prisma.user.findUnique({ where: { phone: guestPhone.trim() } })
+      if (existingUser) {
+        return error('This phone number is already registered. Please log in to purchase tickets.', 401)
+      }
+
       const fakeHash = await bcrypt.hash(crypto.randomUUID(), 6)
-      const guestUser = await prisma.user.upsert({
-        where:  { phone: guestPhone.trim() },
-        update: {},
-        create: {
+      const guestUser = await prisma.user.create({
+        data: {
           phone: guestPhone.trim(),
           name: guestName,
           passwordHash: fakeHash,
@@ -73,6 +76,14 @@ export async function POST(req: Request) {
         referralCode: guestUser.referralCode,
       })
     }
+
+    // Expire stale pending orders (older than 30 min) before checking capacity.
+    // This is best-effort cleanup so abandoned carts don't permanently block inventory.
+    const PENDING_TTL_MS = 30 * 60 * 1000
+    await prisma.order.updateMany({
+      where: { status: 'pending', createdAt: { lt: new Date(Date.now() - PENDING_TTL_MS) } },
+      data: { status: 'failed' },
+    }).catch(() => {})
 
     // Capacity check + order creation inside a transaction to prevent overselling
     const result = await prisma.$transaction(async (tx) => {
@@ -102,8 +113,8 @@ export async function POST(req: Request) {
         throw Object.assign(new Error('Not enough tickets available'), { status: 409 })
       }
 
-      const platformFee = ticketType.event.platformFee * quantity
-      const subtotal = ticketType.price * quantity
+      const platformFee = Number(ticketType.event.platformFee) * quantity
+      const subtotal = Number(ticketType.price) * quantity
       const total = subtotal + platformFee
 
       let resolvedPartnerId = partnerId

@@ -27,8 +27,8 @@ export const viewport = {
   themeColor: '#8B5CF6',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  viewportFit: 'cover', // allows content behind iOS home indicator
+  maximumScale: 5,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

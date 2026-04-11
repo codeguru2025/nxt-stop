@@ -85,16 +85,17 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
       const partner = await tx.partner.findUnique({ where: { id: order.partnerId } })
       if (partner) {
         const totalQty = ticketItems.reduce((s, i) => s + i.quantity, 0)
-        const commissionAmount = partner.commissionPerTicket > 0
-          ? partner.commissionPerTicket * totalQty
-          : order.subtotal * (partner.commissionRate / 100)
+        const perTicket = Number(partner.commissionPerTicket)
+        const commissionAmount = perTicket > 0
+          ? perTicket * totalQty
+          : Number(order.subtotal) * (Number(partner.commissionRate) / 100)
         await tx.commission.create({
           data: { partnerId: order.partnerId, orderId: order.id, amount: commissionAmount },
         })
         await tx.partner.update({
           where: { id: order.partnerId },
           data: {
-            totalSales: { increment: ticketItems.reduce((s, i) => s + i.quantity, 0) },
+            totalSales: { increment: totalQty },
             totalEarned: { increment: commissionAmount },
           },
         })

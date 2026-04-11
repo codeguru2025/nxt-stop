@@ -16,7 +16,7 @@ export const env = {
   get PAYNOW_INTEGRATION_ID() { return required('PAYNOW_INTEGRATION_ID') },
   get PAYNOW_INTEGRATION_KEY(){ return required('PAYNOW_INTEGRATION_KEY') },
 
-  get PAYNOW_EMAIL()    { return process.env.PAYNOW_EMAIL ?? 'gustozw@gmail.com' },
+  get PAYNOW_EMAIL()    { return required('PAYNOW_EMAIL') },
   get REDIS_URL()       { return process.env.REDIS_URL },
   get APP_URL()         { return process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000' },
   get SEED_SECRET()     { return process.env.SEED_SECRET },

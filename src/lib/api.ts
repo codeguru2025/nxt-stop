@@ -25,15 +25,25 @@ export function serverError(err?: unknown): Response {
   return error('Internal server error', 500)
 }
 
-// Client-side API helper
+function getCsrfToken(): string {
+  if (typeof document === 'undefined') return ''
+  const match = document.cookie.match(/(?:^|;\s*)csrf-token=([^;]+)/)
+  return match?.[1] ?? ''
+}
+
+// Client-side API helper — automatically includes CSRF token on mutations
 export async function apiFetch<T>(
   path: string,
   options?: RequestInit
 ): Promise<{ success: true; data: T } | { success: false; error: string }> {
+  const method = options?.method?.toUpperCase() ?? 'GET'
+  const isMutation = !['GET', 'HEAD', 'OPTIONS'].includes(method)
+
   const res = await fetch(path, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(isMutation ? { 'x-csrf-token': getCsrfToken() } : {}),
       ...options?.headers,
     },
   })

@@ -1,5 +1,7 @@
 import type { NextConfig } from 'next'
 
+const isProd = process.env.NODE_ENV === 'production'
+
 const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control',   value: 'on' },
   { key: 'X-Frame-Options',          value: 'SAMEORIGIN' },
@@ -14,17 +16,13 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      // Next.js inline scripts + Turbopack HMR
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      // Styles: inline (Next.js injects them) + unpkg for Leaflet
+      isProd
+        ? "script-src 'self' 'unsafe-inline'"
+        : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline' https://unpkg.com",
-      // Images: self + any HTTPS (event posters from external CDNs) + data URIs (QR codes)
       "img-src 'self' https: data: blob:",
-      // Fonts
       "font-src 'self'",
-      // Connects: self + Paynow + OpenStreetMap tiles
-      "connect-src 'self' https://www.paynow.co.zw https://*.tile.openstreetmap.org",
-      // Leaflet marker icons from unpkg
+      "connect-src 'self' https://www.paynow.co.zw https://*.tile.openstreetmap.org wss:",
       "worker-src blob:",
       "frame-ancestors 'none'",
     ].join('; '),
@@ -34,7 +32,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: '**' },
+      { protocol: 'https', hostname: '*.digitaloceanspaces.com' },
+      { protocol: 'https', hostname: '*.cdn.digitaloceanspaces.com' },
     ],
   },
   async headers() {
