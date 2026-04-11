@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ShoppingBag, Filter, ChevronLeft } from 'lucide-react'
+import { ShoppingBag, Filter } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
 type MerchItem = {
@@ -49,20 +49,6 @@ export default function MerchClient() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
-      {/* Nav */}
-      <div className="border-b border-[#1a1a1a] px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm">
-          <ChevronLeft size={16} /> Back
-        </Link>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center">
-            <span className="text-white font-black text-xs">N</span>
-          </div>
-          <span className="font-black text-white text-sm">NXT STOP</span>
-        </div>
-        <div className="w-16" />
-      </div>
-
       <div className="max-w-5xl mx-auto px-4 py-10">
         {/* Header */}
         <div className="text-center mb-10">

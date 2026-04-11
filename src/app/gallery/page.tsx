@@ -1,11 +1,15 @@
-import GalleryClient from '@/components/gallery/GalleryClient'
 import Navbar from '@/components/layout/Navbar'
+import Footer from '@/components/layout/Footer'
+import GalleryClient from '@/components/gallery/GalleryClient'
 
 export default function GalleryPage() {
   return (
     <>
       <Navbar />
-      <GalleryClient />
+      <main className="flex-1">
+        <GalleryClient />
+      </main>
+      <Footer />
     </>
   )
 }

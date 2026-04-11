@@ -8,7 +8,7 @@ export default function EventsPage() {
   return (
     <>
       <Navbar />
-      <main className="flex-1 pt-20">
+      <main className="flex-1 pt-16">
         <EventsClient />
       </main>
       <Footer />

@@ -1,3 +1,5 @@
+import Navbar from '@/components/layout/Navbar'
+import Footer from '@/components/layout/Footer'
 import MerchClient from '@/components/merch/MerchClient'
 
 export const metadata = {
@@ -6,5 +8,13 @@ export const metadata = {
 }
 
 export default function MerchPage() {
-  return <MerchClient />
+  return (
+    <>
+      <Navbar />
+      <main className="flex-1 pt-16">
+        <MerchClient />
+      </main>
+      <Footer />
+    </>
+  )
 }

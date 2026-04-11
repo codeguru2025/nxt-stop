@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import PWAInstallPrompt from '@/components/PWAInstallPrompt'
+import BottomNav from '@/components/layout/BottomNav'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
@@ -24,13 +25,21 @@ export const metadata: Metadata = {
 
 export const viewport = {
   themeColor: '#8B5CF6',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover', // allows content behind iOS home indicator
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="min-h-screen flex flex-col antialiased">
-        {children}
+      <body className="min-h-screen min-h-dvh flex flex-col antialiased">
+        {/* Bottom padding on mobile to clear the fixed bottom nav */}
+        <div className="flex flex-col flex-1 pb-safe md:pb-0">
+          {children}
+        </div>
+        <BottomNav />
         <PWAInstallPrompt />
       </body>
     </html>

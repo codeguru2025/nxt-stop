@@ -8,7 +8,7 @@ export default function AboutPage() {
   return (
     <>
       <Navbar />
-      <main className="flex-1 pt-20">
+      <main className="flex-1 pt-16">
         <AboutClient />
       </main>
       <Footer />

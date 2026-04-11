@@ -7,7 +7,7 @@ export default function ReferralsPage() {
   return (
     <>
       <Navbar />
-      <main className="flex-1 pt-20 min-h-screen">
+      <main className="flex-1 pt-16 min-h-screen">
         <ReferralsClient />
       </main>
     </>

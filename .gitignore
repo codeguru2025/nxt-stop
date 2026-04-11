@@ -50,3 +50,6 @@ server.js
 # SQLite dev databases
 *.db
 *.db-journal
+
+# Claude Code local settings (may contain secrets)
+.claude/settings.local.json

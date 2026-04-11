@@ -16,7 +16,7 @@ export default function GalleryClient() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] pt-24 pb-16 px-4">
+    <div className="min-h-screen bg-[#0a0a0a] pt-20 pb-16 px-4">
       <div className="max-w-7xl mx-auto">
         <div className="mb-10">
           <h1 className="text-4xl font-black text-white mb-2">Gallery</h1>
