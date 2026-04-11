@@ -27,12 +27,10 @@ export async function POST(req: Request) {
   if (!match) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
-    const adminPhone = process.env.ADMIN_PHONE
+    const adminPhone = process.env.ADMIN_PHONE_NUMBER ?? process.env.ADMIN_PHONE
     const adminPassword = process.env.ADMIN_PASSWORD
-    const gatePhone = process.env.GATE_PHONE
-    const gatePassword = process.env.GATE_PASSWORD
-    if (!adminPhone || !adminPassword || !gatePhone || !gatePassword) {
-      return Response.json({ error: 'ADMIN_PHONE, ADMIN_PASSWORD, GATE_PHONE, and GATE_PASSWORD must all be set' }, { status: 500 })
+    if (!adminPhone || !adminPassword) {
+      return Response.json({ error: 'ADMIN_PHONE_NUMBER and ADMIN_PASSWORD must be set' }, { status: 500 })
     }
 
     const hash = await bcrypt.hash(adminPassword, 10)
@@ -48,17 +46,21 @@ export async function POST(req: Request) {
       },
     })
 
-    // Gate staff
-    await prisma.user.upsert({
-      where: { phone: gatePhone },
-      update: {},
-      create: {
-        name: 'Gate Staff',
-        phone: gatePhone,
-        passwordHash: await bcrypt.hash(gatePassword, 10),
-        role: 'gate_staff',
-      },
-    })
+    // Gate staff are managed through the admin panel — seed one only if both env vars are provided
+    const gatePhone = process.env.GATE_PHONE
+    const gatePassword = process.env.GATE_PASSWORD
+    if (gatePhone && gatePassword) {
+      await prisma.user.upsert({
+        where: { phone: gatePhone },
+        update: {},
+        create: {
+          name: 'Gate Staff',
+          phone: gatePhone,
+          passwordHash: await bcrypt.hash(gatePassword, 10),
+          role: 'gate_staff',
+        },
+      })
+    }
 
     // Founders
     const founders = [
