@@ -29,19 +29,24 @@ export default function AdminClient() {
   const [refreshing, setRefreshing] = useState(false)
 
   const load = async () => {
-    const [authRes, statsRes] = await Promise.all([
-      fetch('/api/auth/me').then(r => r.json()),
-      fetch('/api/admin/stats').then(r => r.json()),
-    ])
+    try {
+      const [authRes, statsRes] = await Promise.all([
+        fetch('/api/auth/me').then(r => r.json()),
+        fetch('/api/admin/stats').then(r => r.json()),
+      ])
 
-    if (!authRes.success || authRes.data.role !== 'admin') {
-      router.push('/login')
-      return
+      if (!authRes.success || authRes.data.role !== 'admin') {
+        router.push('/login')
+        return
+      }
+
+      if (statsRes.success) setStats(statsRes.data)
+    } catch {
+      // Network error — still clear loading state
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
     }
-
-    if (statsRes.success) setStats(statsRes.data)
-    setLoading(false)
-    setRefreshing(false)
   }
 
   useEffect(() => { load() }, [])

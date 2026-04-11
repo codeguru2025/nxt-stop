@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import PWAInstallPrompt from '@/components/PWAInstallPrompt'
 import BottomNav from '@/components/layout/BottomNav'
+import CsrfProvider from '@/components/CsrfProvider'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="flex flex-col flex-1 pb-safe md:pb-0">
           {children}
         </div>
+        <CsrfProvider />
         <BottomNav />
         <PWAInstallPrompt />
       </body>

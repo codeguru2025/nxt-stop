@@ -23,12 +23,20 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
     const ticketItems = order.items.filter(i => !i.productId)
 
     for (const item of ticketItems) {
-      // Use stored ticketTypeId relation if available, fall back to name-matching
       let ticketType: { id: string; eventId: string; [key: string]: any } | null = item.ticketType ?? null
+      if (!ticketType && item.ticketTypeId) {
+        ticketType = await tx.ticketType.findUnique({
+          where: { id: item.ticketTypeId },
+          include: { event: true },
+        })
+      }
       if (!ticketType && item.name) {
-        const [typeName] = item.name.split(' - ')
+        const [typeName, eventName] = item.name.split(' - ')
         ticketType = await tx.ticketType.findFirst({
-          where: { name: typeName },
+          where: {
+            name: typeName,
+            ...(eventName ? { event: { name: { contains: eventName, mode: 'insensitive' as const } } } : {}),
+          },
           include: { event: true },
         })
       }

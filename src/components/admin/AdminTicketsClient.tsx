@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import AdminLayout from './AdminLayout'
-import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, Printer } from 'lucide-react'
+import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 const LOGO_URL = 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
@@ -60,6 +60,15 @@ type GeneratedBatch = {
   tickets: { ticketNumber: string; qrCode: string; qrDataUrl: string; activationCode: string }[]
 }
 
+type BatchSummary = {
+  eventId: string
+  ticketTypeId: string
+  event: { id: string; name: string; date: string; venue: string } | null
+  ticketType: { id: string; name: string; color: string; price: number } | null
+  unsold: number
+  activated: number
+}
+
 const STATUS_COLOR_EXTRA: Record<string, string> = {
   physical: 'bg-orange-500/20 text-orange-400',
 }
@@ -96,6 +105,13 @@ export default function AdminTicketsClient() {
   const [hcLoadingExisting, setHcLoadingExisting] = useState(false)
   const [hcExistingCount, setHcExistingCount] = useState<number | null>(null)
 
+  // Batch overview state
+  const [batches, setBatches] = useState<BatchSummary[]>([])
+  const [batchesLoading, setBatchesLoading] = useState(false)
+  const [expandedBatch, setExpandedBatch] = useState<string | null>(null)
+  const [expandedTickets, setExpandedTickets] = useState<any[]>([])
+  const [expandedLoading, setExpandedLoading] = useState(false)
+
   const load = useCallback(async () => {
     if (tab === 'hardcopy') return
     setLoading(true)
@@ -118,17 +134,36 @@ export default function AdminTicketsClient() {
 
   useEffect(() => { load() }, [load])
 
-  // Load events for hard copy tab
   useEffect(() => {
-    if (tab === 'hardcopy' && events.length === 0) {
-      fetch('/api/admin/events').then(r => r.json()).then(d => {
-        if (d.success) setEvents(d.data)
-      })
+    if (tab === 'hardcopy') {
+      if (events.length === 0) {
+        fetch('/api/admin/events').then(r => r.json()).then(d => {
+          if (d.success) setEvents(d.data)
+        })
+      }
+      loadBatches()
     }
-  }, [tab, events.length])
+  }, [tab])
 
   const selectedEvent = events.find(e => e.id === hcEventId)
   const selectedTicketType = selectedEvent?.ticketTypes.find(t => t.id === hcTicketTypeId)
+
+  const loadBatches = async () => {
+    setBatchesLoading(true)
+    const res = await fetch('/api/admin/tickets?groupBy=batch').then(r => r.json()).catch(() => null)
+    if (res?.success) setBatches(res.data)
+    setBatchesLoading(false)
+  }
+
+  const expandBatch = async (eventId: string, ticketTypeId: string) => {
+    const key = `${eventId}:${ticketTypeId}`
+    if (expandedBatch === key) { setExpandedBatch(null); return }
+    setExpandedBatch(key)
+    setExpandedLoading(true)
+    const res = await fetch(`/api/admin/tickets?status=physical&eventId=${eventId}&ticketTypeId=${ticketTypeId}&includeQR=true`).then(r => r.json()).catch(() => null)
+    if (res?.success) setExpandedTickets(res.data.tickets ?? [])
+    setExpandedLoading(false)
+  }
 
   // Check how many unsold physical tickets already exist for the selected event
   const checkExisting = async (eventId: string, ticketTypeId: string) => {
@@ -162,7 +197,7 @@ export default function AdminTicketsClient() {
       body: JSON.stringify({ eventId: hcEventId, ticketTypeId: hcTicketTypeId, quantity: hcQty }),
     }).then(r => r.json())
     setHcGenerating(false)
-    if (res.success) setHcBatch(res.data)
+    if (res.success) { setHcBatch(res.data); loadBatches() }
   }
 
   const printBatch = async () => {
@@ -444,6 +479,101 @@ export default function AdminTicketsClient() {
                 </div>
               </div>
             )}
+
+            {/* ── Existing Physical Ticket Batches ── */}
+            <div className="card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-white">Physical Ticket Inventory</h3>
+                  <p className="text-gray-500 text-sm">All generated batches by event & ticket type</p>
+                </div>
+                <button onClick={loadBatches} disabled={batchesLoading} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors">
+                  <RefreshCw size={12} className={batchesLoading ? 'animate-spin' : ''} /> Refresh
+                </button>
+              </div>
+
+              {batchesLoading && batches.length === 0 ? (
+                <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="skeleton h-16 rounded-xl" />)}</div>
+              ) : batches.length === 0 ? (
+                <p className="text-gray-600 text-sm text-center py-8">No physical tickets generated yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {batches.map(b => {
+                    const key = `${b.eventId}:${b.ticketTypeId}`
+                    const isExpanded = expandedBatch === key
+                    return (
+                      <div key={key}>
+                        <button
+                          onClick={() => expandBatch(b.eventId, b.ticketTypeId)}
+                          className={`w-full card p-4 flex items-center gap-4 text-left transition-all ${isExpanded ? 'border-purple-500/40 bg-purple-500/5' : ''}`}
+                        >
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ background: b.ticketType?.color ?? '#8B5CF6' }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-semibold text-sm truncate">{b.event?.name ?? 'Unknown Event'}</p>
+                            <p className="text-gray-500 text-xs">{b.ticketType?.name ?? '—'} · {b.event ? formatDate(b.event.date, 'MMM d, yyyy') : '—'}</p>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs shrink-0">
+                            <div className="text-center">
+                              <p className="text-orange-400 font-bold text-base">{b.unsold}</p>
+                              <p className="text-gray-600">unsold</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-green-400 font-bold text-base">{b.activated}</p>
+                              <p className="text-gray-600">activated</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-white font-bold text-base">{b.unsold + b.activated}</p>
+                              <p className="text-gray-600">total</p>
+                            </div>
+                          </div>
+                          {isExpanded ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
+                        </button>
+
+                        {isExpanded && (
+                          <div className="mt-2 ml-4 border-l-2 border-purple-500/20 pl-4 pb-2">
+                            {expandedLoading ? (
+                              <div className="flex items-center gap-2 py-6 justify-center text-gray-500 text-sm">
+                                <Loader2 size={16} className="animate-spin" /> Loading tickets…
+                              </div>
+                            ) : expandedTickets.length === 0 ? (
+                              <p className="text-gray-600 text-sm py-4">No unsold physical tickets.</p>
+                            ) : (
+                              <>
+                                <div className="flex items-center justify-between mb-3">
+                                  <p className="text-xs text-gray-500">{expandedTickets.length} unsold ticket{expandedTickets.length !== 1 ? 's' : ''}</p>
+                                  <button
+                                    onClick={() => {
+                                      if (!b.event || !b.ticketType) return
+                                      setHcBatch({
+                                        event: { name: b.event.name, date: b.event.date, venue: b.event.venue },
+                                        ticketType: { name: b.ticketType.name, color: b.ticketType.color, price: b.ticketType.price },
+                                        tickets: expandedTickets,
+                                      })
+                                    }}
+                                    className="flex items-center gap-1.5 text-xs bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded-lg px-3 py-1.5 transition-colors"
+                                  >
+                                    <Printer size={12} /> Print These
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                                  {expandedTickets.map((t: any) => (
+                                    <div key={t.ticketNumber} className="bg-[#111] border border-[#2a2a2a] rounded-xl p-2.5 flex flex-col items-center gap-1.5">
+                                      <img src={t.qrDataUrl} alt={t.ticketNumber} className="w-16 h-16 rounded-lg bg-white p-0.5" />
+                                      <span className="text-[10px] font-mono text-gray-500 text-center break-all">{t.ticketNumber}</span>
+                                      <span className="text-xs font-black font-mono text-orange-400 tracking-wider">{t.activationCode}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

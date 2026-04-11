@@ -21,8 +21,48 @@ export async function GET(req: Request) {
     const includeQR = searchParams.get('includeQR') === 'true'
     const limit = 50
 
+    const groupBy = searchParams.get('groupBy')
+
+    // Return physical ticket batch summaries grouped by event + ticket type
+    if (groupBy === 'batch') {
+      const batches = await prisma.ticket.groupBy({
+        by: ['eventId', 'ticketTypeId', 'status'],
+        where: { status: 'physical' },
+        _count: true,
+      })
+      const eventIds = [...new Set(batches.map(b => b.eventId))]
+      const ticketTypeIds = [...new Set(batches.map(b => b.ticketTypeId).filter(Boolean))] as string[]
+
+      const [events, ticketTypes, activatedCounts] = await Promise.all([
+        prisma.event.findMany({ where: { id: { in: eventIds } }, select: { id: true, name: true, date: true, venue: true } }),
+        prisma.ticketType.findMany({ where: { id: { in: ticketTypeIds } }, select: { id: true, name: true, color: true, price: true } }),
+        prisma.ticket.groupBy({
+          by: ['eventId', 'ticketTypeId'],
+          where: { activationCode: { not: null }, status: { in: ['valid', 'used'] } },
+          _count: true,
+        }),
+      ])
+
+      const evMap = Object.fromEntries(events.map(e => [e.id, e]))
+      const ttMap = Object.fromEntries(ticketTypes.map(t => [t.id, t]))
+
+      const summary = batches.map(b => ({
+        eventId: b.eventId,
+        ticketTypeId: b.ticketTypeId,
+        event: evMap[b.eventId] ?? null,
+        ticketType: b.ticketTypeId ? ttMap[b.ticketTypeId] ?? null : null,
+        unsold: b._count,
+        activated: activatedCounts.find(a => a.eventId === b.eventId && a.ticketTypeId === b.ticketTypeId)?._count ?? 0,
+      }))
+
+      return ok(summary)
+    }
+
+    const ticketTypeId = searchParams.get('ticketTypeId') ?? ''
+
     const where: any = {}
     if (eventId) where.eventId = eventId
+    if (ticketTypeId) where.ticketTypeId = ticketTypeId
     if (status) where.status = status
     if (search) {
       where.OR = [
@@ -109,12 +149,21 @@ export async function POST(req: Request) {
       prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, date: true, venue: true } }),
     ])
     if (!ticketType || !event) return error('Event or ticket type not found')
+    if (ticketType.eventId !== eventId) return error('Ticket type does not belong to this event')
 
-    // Build all ticket rows upfront, then batch-insert inside a transaction
+    const existingPhysical = await prisma.ticket.count({
+      where: { eventId, ticketTypeId, status: 'physical' },
+    })
+    const totalAllocated = ticketType.sold + existingPhysical + quantity
+    if (totalAllocated > ticketType.capacity) {
+      const available = ticketType.capacity - ticketType.sold - existingPhysical
+      return error(`Exceeds capacity. ${available > 0 ? `Only ${available} can be generated.` : 'No capacity remaining.'}`)
+    }
+
     const ticketRows = Array.from({ length: quantity }, () => {
       const ticketNumber = generateTicketNumber()
       const qrCode = crypto.randomUUID()
-      const activationCode = crypto.randomBytes(3).toString('hex').toUpperCase()
+      const activationCode = crypto.randomBytes(4).toString('hex').toUpperCase()
       return { ticketNumber, qrCode, activationCode, userId: session.id, eventId, ticketTypeId, status: 'physical' as const }
     })
 

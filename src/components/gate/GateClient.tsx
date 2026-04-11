@@ -72,30 +72,35 @@ export default function GateClient() {
     setScanning(true)
     setResult(null)
 
-    const res = await fetch('/api/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ qrCode: code.trim() }),
-    }).then(r => r.json())
+    try {
+      const res = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrCode: code.trim() }),
+      }).then(r => r.json())
 
-    setScanning(false)
-    setQrInput('')
-    if (!cameraActive) inputRef.current?.focus()
+      if (res.success) {
+        const data = res.data as ScanResult
+        setResult(data)
+        setStats(prev => ({
+          scanned: prev.scanned + 1,
+          valid: prev.valid + (data.result === 'valid' ? 1 : 0),
+          invalid: prev.invalid + (data.result !== 'valid' ? 1 : 0),
+        }))
 
-    if (res.success) {
-      const data = res.data as ScanResult
-      setResult(data)
-      setStats(prev => ({
-        scanned: prev.scanned + 1,
-        valid: prev.valid + (data.result === 'valid' ? 1 : 0),
-        invalid: prev.invalid + (data.result !== 'valid' ? 1 : 0),
-      }))
-
-      // Auto-clear after 4 seconds then resume camera scan loop
-      setTimeout(() => {
-        setResult(null)
-        if (streamRef.current) startScanLoop()
-      }, 4000)
+        setTimeout(() => {
+          setResult(null)
+          if (streamRef.current) startScanLoop()
+        }, 4000)
+      } else {
+        setResult({ result: 'error', message: res.error ?? 'Scan failed' } as any)
+      }
+    } catch {
+      setResult({ result: 'error', message: 'Network error — check connection' } as any)
+    } finally {
+      setScanning(false)
+      setQrInput('')
+      if (!cameraActive) inputRef.current?.focus()
     }
   }
 

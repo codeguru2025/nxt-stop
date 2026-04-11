@@ -197,7 +197,7 @@ export default function HomeClient() {
                       <div>
                         <div className="text-xs text-gray-500">From</div>
                         <div className="text-2xl font-black text-white">
-                          {formatCurrency(Math.min(...featured.ticketTypes.map(t => t.price)))}
+                          {formatCurrency(featured.ticketTypes.length > 0 ? Math.min(...featured.ticketTypes.map(t => t.price)) : 0)}
                         </div>
                       </div>
                       <Link
@@ -534,7 +534,8 @@ function SpotlightSection({ event }: { event: Event }) {
 
 function EventCard({ event }: { event: Event }) {
   const [imgError, setImgError] = useState(false)
-  const minPrice = Math.min(...(event.ticketTypes?.map(t => t.price) ?? [0]))
+  const prices = event.ticketTypes?.map(t => t.price) ?? []
+  const minPrice = prices.length > 0 ? Math.min(...prices) : 0
   const isFeatured = event.status === 'live'
 
   return (

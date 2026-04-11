@@ -12,10 +12,11 @@ type Event = {
   _count: { tickets: number }
 }
 
-function EventCard({ event }: { event: Event }) {
+function EventCard({ event, referral }: { event: Event; referral?: string }) {
   const [imgError, setImgError] = useState(false)
+  const eventUrl = referral ? `/events/${event.slug}?ref=${referral}` : `/events/${event.slug}`
 
-  const minPrice = Math.min(...event.ticketTypes.map(t => t.price))
+  const minPrice = event.ticketTypes.length > 0 ? Math.min(...event.ticketTypes.map(t => t.price)) : 0
   const totalCap = event.ticketTypes.reduce((s, t) => s + t.capacity, 0)
   const totalSold = event.ticketTypes.reduce((s, t) => s + t.sold, 0)
   const pct = totalCap > 0 ? (totalSold / totalCap) * 100 : 0
@@ -23,7 +24,7 @@ function EventCard({ event }: { event: Event }) {
 
   return (
     <Link
-      href={`/events/${event.slug}`}
+      href={eventUrl}
       className="group card overflow-hidden hover:border-[#3a3a3a] transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-black/50"
     >
       <div className="relative h-52 bg-gradient-to-br from-[#1a1a2e] to-[#16213e] overflow-hidden">
@@ -108,10 +109,14 @@ export default function EventsClient() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+  const ref = searchParams?.get('ref') ?? ''
+
   useEffect(() => {
     fetch('/api/events?status=published&limit=50')
       .then(r => r.json())
       .then(d => { if (d.success) setEvents(d.data) })
+      .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
@@ -165,7 +170,7 @@ export default function EventsClient() {
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map(event => <EventCard key={event.id} event={event} />)}
+          {filtered.map(event => <EventCard key={event.id} event={event} referral={ref || undefined} />)}
         </div>
       )}
     </div>

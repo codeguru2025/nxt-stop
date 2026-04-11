@@ -67,8 +67,9 @@ export async function DELETE(
     const session = await requireAdmin().catch(() => null)
     if (!session) return forbidden()
 
+    const { id: eventId } = await ctx.params
     const { mediaId } = await req.json()
-    const media = await prisma.eventMedia.findUnique({ where: { id: mediaId } })
+    const media = await prisma.eventMedia.findFirst({ where: { id: mediaId, eventId } })
     if (!media) return Response.json({ error: 'Not found' }, { status: 404 })
 
     // Extract S3 key from the CDN URL (pathname without leading slash)

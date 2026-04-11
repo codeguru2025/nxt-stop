@@ -9,17 +9,16 @@ export async function GET() {
   try {
     await prisma.$executeRaw`SELECT 1`
     checks.database = 'ok'
-  } catch (e: any) {
-    checks.database = `error: ${e.message?.slice(0, 100)}`
+  } catch {
+    checks.database = 'error'
   }
 
-  // Redis (optional)
   if (redis) {
     try {
       await redis.ping()
       checks.redis = 'ok'
-    } catch (e: any) {
-      checks.redis = `error: ${e.message?.slice(0, 100)}`
+    } catch {
+      checks.redis = 'error'
     }
   } else {
     checks.redis = 'not_configured'

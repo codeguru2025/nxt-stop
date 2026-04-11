@@ -3,6 +3,8 @@ import { Server as SocketServer } from 'socket.io'
 import { createAdapter } from '@socket.io/redis-adapter'
 import Redis from 'ioredis'
 import next from 'next'
+import { jwtVerify } from 'jose'
+import { parse as parseCookie } from 'cookie'
 
 const port = parseInt(process.env.PORT ?? '3000', 10)
 const dev = process.env.NODE_ENV !== 'production'
@@ -10,13 +12,18 @@ const dev = process.env.NODE_ENV !== 'production'
 const app = next({ dev })
 const handle = app.getRequestHandler()
 
+function getJwtSecret(): Uint8Array {
+  return new TextEncoder().encode(process.env.JWT_SECRET)
+}
+
 app.prepare().then(() => {
   const httpServer = createServer((req, res) => handle(req, res))
 
-  // Socket.io — attach to the same HTTP server
+  const allowedOrigin = process.env.NEXT_PUBLIC_APP_URL || (dev ? 'http://localhost:3000' : undefined)
+
   const io = new SocketServer(httpServer, {
     cors: {
-      origin: process.env.NEXT_PUBLIC_APP_URL ?? '*',
+      origin: allowedOrigin || false,
       credentials: true,
     },
   })
@@ -41,24 +48,43 @@ app.prepare().then(() => {
     console.warn('[socket.io] REDIS_URL not set — running without Redis adapter (single-instance only)')
   }
 
-  // Gate room: gate staff join event-specific rooms to receive live scan events
+  // Authenticate Socket.IO connections via session cookie
+  io.use(async (socket, next) => {
+    try {
+      const cookies = parseCookie(socket.handshake.headers.cookie ?? '')
+      const token = cookies['nxt-session']
+      if (!token) return next(new Error('Authentication required'))
+
+      const { payload } = await jwtVerify(token, getJwtSecret())
+      ;(socket as any).user = { id: payload.sub, role: payload.role }
+      next()
+    } catch {
+      next(new Error('Authentication required'))
+    }
+  })
+
   io.on('connection', (socket) => {
+    const user = (socket as any).user as { id: string; role: string } | undefined
+
     socket.on('gate:join', (eventId: string) => {
+      if (!user || !['admin', 'gate_staff'].includes(user.role)) return
       socket.join(`gate:${eventId}`)
     })
     socket.on('gate:leave', (eventId: string) => {
       socket.leave(`gate:${eventId}`)
     })
-    // Admin joins to receive all scans
     socket.on('admin:join', () => {
+      if (!user || user.role !== 'admin') return
       socket.join('admin:scans')
     })
   })
 
-  // Expose io globally so API routes can emit events
   ;(global as any).__io = io
 
   httpServer.listen(port, () => {
     console.log(`> NXT STOP ready on http://localhost:${port} [${dev ? 'dev' : 'production'}]`)
   })
+}).catch((err) => {
+  console.error('Failed to start server:', err)
+  process.exit(1)
 })

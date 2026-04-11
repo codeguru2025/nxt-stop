@@ -20,22 +20,26 @@ function generateToken(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl
-  const response = NextResponse.next()
-
-  // ── CSRF: issue token cookie on every response if missing ──
+function setCsrfCookie(req: NextRequest, res: NextResponse): void {
   if (!req.cookies.get(CSRF_COOKIE)?.value) {
-    response.cookies.set(CSRF_COOKIE, generateToken(), {
+    res.cookies.set(CSRF_COOKIE, generateToken(), {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24,
     })
   }
+}
 
-  // ── CSRF: verify on state-changing API requests ──
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl
+  const response = NextResponse.next()
+
+  // Issue CSRF cookie on every response (pages + API)
+  setCsrfCookie(req, response)
+
+  // CSRF: verify on state-changing API requests
   if (
     pathname.startsWith('/api/') &&
     !SAFE_METHODS.includes(req.method) &&
@@ -48,13 +52,15 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // ── Auth: protect pages ──
+  // Auth: only enforce on protected page routes
   const isProtected = PROTECTED_PATHS.some((p) => pathname.startsWith(p))
   if (!isProtected) return response
 
   const token = req.cookies.get('nxt-session')?.value
   if (!token) {
-    return NextResponse.redirect(new URL(`/login?from=${encodeURIComponent(pathname)}`, req.url))
+    const redirect = NextResponse.redirect(new URL(`/login?from=${encodeURIComponent(pathname)}`, req.url))
+    setCsrfCookie(req, redirect)
+    return redirect
   }
 
   try {
@@ -62,21 +68,28 @@ export async function middleware(req: NextRequest) {
     const role = payload.role as string
 
     if (ADMIN_PATHS.some((p) => pathname.startsWith(p)) && role !== 'admin') {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
+      const redirect = NextResponse.redirect(new URL('/dashboard', req.url))
+      setCsrfCookie(req, redirect)
+      return redirect
     }
 
     if (GATE_PATHS.some((p) => pathname.startsWith(p)) && !['admin', 'gate_staff'].includes(role)) {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
+      const redirect = NextResponse.redirect(new URL('/dashboard', req.url))
+      setCsrfCookie(req, redirect)
+      return redirect
     }
 
     return response
   } catch {
     const redirect = NextResponse.redirect(new URL(`/login?from=${encodeURIComponent(pathname)}`, req.url))
     redirect.cookies.delete('nxt-session')
+    setCsrfCookie(req, redirect)
     return redirect
   }
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*', '/gate/:path*', '/api/:path*'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.json|icons/).*)',
+  ],
 }

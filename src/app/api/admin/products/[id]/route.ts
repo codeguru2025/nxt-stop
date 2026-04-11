@@ -12,7 +12,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
     const { id } = await params
     const body = await req.json()
 
-    const allowed = ['name','description','price','stock','sold','category','image',
+    const allowed = ['name','description','price','stock','category','image',
                      'lowStockAt','active','merchType','size','color']
     const data: Record<string, any> = {}
     for (const key of allowed) {

@@ -131,18 +131,19 @@ export async function POST(req: Request) {
       include: { ticketTypes: true },
     })
 
-    // Partner (DJ)
     const partnerReferralCode = 'DJFIRE2025'
+    const partnerPassword = crypto.randomBytes(12).toString('base64url')
     const partnerUser = await prisma.user.upsert({
       where: { phone: '+2630000000003' },
       update: {},
       create: {
         name: 'DJ Fire',
         phone: '+2630000000003',
-        passwordHash: await bcrypt.hash('dj123', 10),
+        passwordHash: await bcrypt.hash(partnerPassword, 10),
         role: 'partner',
       },
     })
+    console.log(`[seed] Partner "DJ Fire" password: ${partnerPassword} — change immediately`)
     await prisma.partner.upsert({
       where: { userId: partnerUser.id },
       update: {},

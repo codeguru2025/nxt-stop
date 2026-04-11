@@ -20,22 +20,25 @@ export default function LoginClient() {
     setLoading(true)
     setError('')
 
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    }).then(r => r.json())
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      }).then(r => r.json())
 
-    setLoading(false)
-
-    if (res.success) {
-      // Gate staff go straight to the scanner; everyone else follows the redirect param
-      const role = res.data?.user?.role
-      const dest = role === 'gate_staff' ? '/gate' : redirect
-      router.push(dest)
-      router.refresh()
-    } else {
-      setError(res.error ?? 'Login failed')
+      if (res.success) {
+        const role = res.data?.user?.role
+        const dest = role === 'gate_staff' ? '/gate' : redirect
+        router.push(dest)
+        router.refresh()
+      } else {
+        setError(res.error ?? 'Login failed')
+      }
+    } catch {
+      setError('Network error — please try again')
+    } finally {
+      setLoading(false)
     }
   }
 

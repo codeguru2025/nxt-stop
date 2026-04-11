@@ -20,19 +20,23 @@ export default function RegisterClient() {
     setLoading(true)
     setError('')
 
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    }).then(r => r.json())
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      }).then(r => r.json())
 
-    setLoading(false)
-
-    if (res.success) {
-      router.push('/dashboard')
-      router.refresh()
-    } else {
-      setError(res.error ?? 'Registration failed')
+      if (res.success) {
+        router.push('/dashboard')
+        router.refresh()
+      } else {
+        setError(res.error ?? 'Registration failed')
+      }
+    } catch {
+      setError('Network error — please try again')
+    } finally {
+      setLoading(false)
     }
   }
 

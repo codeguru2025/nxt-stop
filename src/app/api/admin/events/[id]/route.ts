@@ -83,24 +83,40 @@ export async function PATCH(
       },
     })
 
-    // Update ticket type prices/capacity if provided
     if (body.ticketTypes?.length) {
       for (const tt of body.ticketTypes) {
-        if (!tt.id) continue
-        await prisma.ticketType.update({
-          where: { id: tt.id },
-          data: {
-            ...(tt.name !== undefined && { name: tt.name }),
-            ...(tt.price !== undefined && { price: parseFloat(String(tt.price)) }),
-            ...(tt.capacity !== undefined && { capacity: parseInt(String(tt.capacity)) }),
-            ...(tt.color !== undefined && { color: tt.color }),
-            ...(tt.description !== undefined && { description: tt.description }),
-          },
-        })
+        if (tt.id) {
+          await prisma.ticketType.updateMany({
+            where: { id: tt.id, eventId: id },
+            data: {
+              ...(tt.name !== undefined && { name: tt.name }),
+              ...(tt.price !== undefined && { price: parseFloat(String(tt.price)) }),
+              ...(tt.capacity !== undefined && { capacity: parseInt(String(tt.capacity)) }),
+              ...(tt.color !== undefined && { color: tt.color }),
+              ...(tt.description !== undefined && { description: tt.description }),
+            },
+          })
+        } else if (tt.name && tt.capacity) {
+          await prisma.ticketType.create({
+            data: {
+              eventId: id,
+              name: tt.name,
+              price: parseFloat(String(tt.price ?? 0)),
+              capacity: parseInt(String(tt.capacity)),
+              color: tt.color ?? '#8B5CF6',
+              description: tt.description ?? null,
+            },
+          })
+        }
       }
     }
 
-    return ok(event)
+    const updated = await prisma.event.findUnique({
+      where: { id },
+      include: { ticketTypes: true },
+    })
+
+    return ok(updated)
   } catch (e) {
     return serverError(e)
   }

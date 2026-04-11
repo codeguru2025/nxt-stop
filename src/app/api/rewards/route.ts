@@ -33,21 +33,26 @@ export async function POST(req: Request) {
           throw Object.assign(new Error('Reward is out of stock'), { status: 409 })
         }
 
-        const user = await tx.user.findUnique({ where: { id: session.id } })
-        if (!user) throw Object.assign(new Error('User not found'), { status: 401 })
-        if (user.points < reward.pointsCost) {
-          throw Object.assign(
-            new Error(`Insufficient points. You need ${reward.pointsCost} but have ${user.points}`),
-            { status: 400 }
-          )
+        // Atomic point deduction — only succeeds if user has enough points
+        const deducted = await tx.user.updateMany({
+          where: { id: session.id, points: { gte: reward.pointsCost } },
+          data: { points: { decrement: reward.pointsCost } },
+        })
+        if (deducted.count === 0) {
+          throw Object.assign(new Error('Insufficient points'), { status: 400 })
         }
 
-        await tx.user.update({ where: { id: session.id }, data: { points: { decrement: reward.pointsCost } } })
         await tx.redemption.create({
           data: { userId: session.id, rewardId, points: reward.pointsCost, status: 'pending' },
         })
         if (reward.stock !== null) {
-          await tx.reward.update({ where: { id: rewardId }, data: { stock: { decrement: 1 } } })
+          const stockResult = await tx.reward.updateMany({
+            where: { id: rewardId, stock: { gt: 0 } },
+            data: { stock: { decrement: 1 } },
+          })
+          if (stockResult.count === 0) {
+            throw Object.assign(new Error('Reward just went out of stock'), { status: 409 })
+          }
         }
       })
     } catch (e: any) {

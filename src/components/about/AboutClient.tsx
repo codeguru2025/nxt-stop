@@ -13,9 +13,10 @@ export default function AboutClient() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/admin/founders')
+    fetch('/api/founders')
       .then(r => r.json())
       .then(d => { if (d.success) setFounders(d.data) })
+      .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 

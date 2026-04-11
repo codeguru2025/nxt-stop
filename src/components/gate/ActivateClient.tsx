@@ -66,12 +66,17 @@ export default function ActivateClient() {
     setPreview(null)
     setPreviewError(null)
     setError(null)
-    const res = await fetch(`/api/activate?code=${encodeURIComponent(clean)}`).then(r => r.json())
-    setPreviewing(false)
-    if (res.success) {
-      setPreview(res.data)
-    } else {
-      setPreviewError(res.error ?? 'Code not found')
+    try {
+      const res = await fetch(`/api/activate?code=${encodeURIComponent(clean)}`).then(r => r.json())
+      if (res.success) {
+        setPreview(res.data)
+      } else {
+        setPreviewError(res.error ?? 'Code not found')
+      }
+    } catch {
+      setPreviewError('Network error — check connection')
+    } finally {
+      setPreviewing(false)
     }
   }
 
@@ -85,18 +90,23 @@ export default function ActivateClient() {
     if (!preview || preview.alreadyActivated) return
     setActivating(true)
     setError(null)
-    const res = await fetch('/api/activate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ activationCode: code.trim().toUpperCase() }),
-    }).then(r => r.json())
-    setActivating(false)
-    if (res.success) {
-      setResult(res.data)
-      setPreview(null)
-      setCode('')
-    } else {
-      setError(res.error ?? 'Activation failed')
+    try {
+      const res = await fetch('/api/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activationCode: code.trim().toUpperCase() }),
+      }).then(r => r.json())
+      if (res.success) {
+        setResult(res.data)
+        setPreview(null)
+        setCode('')
+      } else {
+        setError(res.error ?? 'Activation failed')
+      }
+    } catch {
+      setError('Network error — check connection')
+    } finally {
+      setActivating(false)
     }
   }
 

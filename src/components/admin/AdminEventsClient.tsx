@@ -74,27 +74,38 @@ export default function AdminEventsClient() {
     })
   }, [router])
 
+  const [saveError, setSaveError] = useState('')
+
   const save = async () => {
     setSaving(true)
+    setSaveError('')
     const url = editing ? `/api/admin/events/${editing}` : '/api/admin/events'
     const method = editing ? 'PATCH' : 'POST'
 
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    }).then(r => r.json())
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      }).then(r => r.json())
 
-    setSaving(false)
-    if (res.success) { load(); setShowForm(false); setEditing(null); setForm(BLANK_FORM) }
+      if (res.success) { load(); setShowForm(false); setEditing(null); setForm(BLANK_FORM) }
+      else setSaveError(res.error ?? 'Failed to save event')
+    } catch {
+      setSaveError('Network error — please try again')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const updateStatus = async (id: string, status: string) => {
-    await fetch(`/api/admin/events/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    })
+    try {
+      await fetch(`/api/admin/events/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+    } catch { /* handled silently — load() will show current state */ }
     load()
   }
 
@@ -128,7 +139,10 @@ export default function AdminEventsClient() {
 
   const deleteEvent = async (id: string) => {
     if (!confirm('Delete this event? This cannot be undone.')) return
-    await fetch(`/api/admin/events/${id}`, { method: 'DELETE' })
+    try {
+      const res = await fetch(`/api/admin/events/${id}`, { method: 'DELETE' }).then(r => r.json())
+      if (!res.success) alert(res.error ?? 'Failed to delete event')
+    } catch { alert('Network error') }
     load()
   }
 
@@ -397,23 +411,41 @@ export default function AdminEventsClient() {
             </div>
 
             {/* Ticket types */}
-            {!editing && (
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="m-0">Ticket Types</label>
-                  <button onClick={addTicketType} className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1">
-                    <Plus size={12} /> Add Type
-                  </button>
-                </div>
-                {form.ticketTypes.map((t: any, i: number) => (
-                  <div key={i} className="grid grid-cols-4 gap-2 mb-2">
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <label className="m-0">Ticket Types</label>
+                <button onClick={addTicketType} className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1">
+                  <Plus size={12} /> Add Type
+                </button>
+              </div>
+              {form.ticketTypes.map((t: any, i: number) => (
+                <div key={t.id ?? `new-${i}`} className="mb-2">
+                  <div className="grid grid-cols-4 gap-2">
                     <input placeholder="Name (e.g. VIP)" value={t.name} onChange={e => updateTicketType(i, 'name', e.target.value)} />
                     <input type="number" placeholder="Price" value={t.price} onChange={e => updateTicketType(i, 'price', parseFloat(e.target.value))} />
                     <input type="number" placeholder="Capacity" value={t.capacity} onChange={e => updateTicketType(i, 'capacity', parseInt(e.target.value))} />
-                    <input type="color" value={t.color} onChange={e => updateTicketType(i, 'color', e.target.value)} className="h-10 cursor-pointer p-1" />
+                    <div className="flex items-center gap-1.5">
+                      <input type="color" value={t.color} onChange={e => updateTicketType(i, 'color', e.target.value)} className="h-10 cursor-pointer p-1 flex-1" />
+                      {!t.id && (
+                        <button
+                          type="button"
+                          onClick={() => setForm((f: any) => ({ ...f, ticketTypes: f.ticketTypes.filter((_: any, idx: number) => idx !== i) }))}
+                          className="text-gray-600 hover:text-red-400 transition-colors shrink-0"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
+                  {editing && t.id && typeof t.sold === 'number' && (
+                    <p className="text-xs text-gray-600 mt-0.5 ml-0.5">{t.sold} sold of {t.capacity}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {saveError && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-red-400 text-sm mb-4">{saveError}</div>
             )}
 
             <div className="flex gap-2">

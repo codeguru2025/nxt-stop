@@ -45,7 +45,12 @@ export async function POST(req: Request) {
         where: { orderNumber: reference },
       })
       if (order && order.status !== 'paid') {
-        await fulfillOrder(order.id, order.paymentMethod ?? 'paynow', paynowRef ?? undefined)
+        try {
+          await fulfillOrder(order.id, order.paymentMethod ?? 'paynow', paynowRef ?? undefined)
+        } catch (fulfillErr) {
+          console.error(`Webhook: fulfillOrder failed for order ${order.id}`, fulfillErr)
+          return new Response('Fulfillment Error', { status: 500 })
+        }
       }
     } else if (status === 'cancelled' || status === 'failed') {
       await prisma.order.updateMany({
