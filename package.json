@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "prisma generate && next build && tsc server.ts --outDir . --module commonjs --esModuleInterop --skipLibCheck",
+    "build": "prisma generate && next build && tsc -p tsconfig.server.json",
     "start": "node server.js",
     "lint": "eslint"
   },
