@@ -11,7 +11,7 @@ export default function GalleryClient() {
 
   useEffect(() => {
     fetch('/api/gallery').then(r => r.json()).then(d => {
-      if (d.success) setPhotos(d.data)
+      if (d.success) setPhotos(d.data.photos ?? [])
     }).finally(() => setLoading(false))
   }, [])
 
