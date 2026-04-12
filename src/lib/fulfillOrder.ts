@@ -4,17 +4,45 @@ import crypto from 'crypto'
 
 export async function fulfillOrder(orderId: string, paymentMethod: string, paymentRef?: string) {
   await prisma.$transaction(async (tx) => {
-    // Idempotent replay (e.g. Paynow webhook retries): tickets already minted.
+    // Serialize fulfillment for this order (pending payment vs paid-without-tickets repair).
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE
+    `
+    if (!locked.length) return
+
     if ((await tx.ticket.count({ where: { orderId } })) > 0) {
       return
     }
 
-    // Only transition pending → paid when we are about to issue tickets.
-    const { count } = await tx.order.updateMany({
-      where: { id: orderId, status: 'pending' },
-      data: { status: 'paid', paymentMethod, paymentRef: paymentRef ?? null, paidAt: new Date() },
+    const orderRow = await tx.order.findUnique({
+      where: { id: orderId },
+      select: { status: true },
     })
-    if (count === 0) return // already fulfilled, cancelled, or another worker won the race
+    if (!orderRow) return
+    if (orderRow.status !== 'pending' && orderRow.status !== 'paid') {
+      return
+    }
+
+    if (orderRow.status === 'pending') {
+      const { count } = await tx.order.updateMany({
+        where: { id: orderId, status: 'pending' },
+        data: {
+          status: 'paid',
+          paymentMethod,
+          paymentRef: paymentRef ?? null,
+          paidAt: new Date(),
+        },
+      })
+      if (count === 0) return
+    } else {
+      // Repair: order is paid but has no tickets (failed mint, manual fix, etc.)
+      const patch: { paymentMethod?: string; paymentRef?: string | null } = {}
+      if (paymentMethod) patch.paymentMethod = paymentMethod
+      if (paymentRef !== undefined) patch.paymentRef = paymentRef ?? null
+      if (Object.keys(patch).length > 0) {
+        await tx.order.update({ where: { id: orderId }, data: patch })
+      }
+    }
 
     const order = await tx.order.findUnique({
       where: { id: orderId },
@@ -22,12 +50,14 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
         items: { include: { ticketType: { include: { event: true } } } },
       },
     })
-    if (!order) return
+    if (!order || order.status !== 'paid') return
 
     const ticketItems = order.items.filter(i => !i.productId)
+    if (ticketItems.length === 0) return
 
     for (const item of ticketItems) {
-      let ticketType: { id: string; eventId: string; [key: string]: any } | null = item.ticketType ?? null
+      let ticketType: { id: string; eventId: string; capacity: number; sold: number; [key: string]: any } | null =
+        item.ticketType ?? null
       if (!ticketType && item.ticketTypeId) {
         ticketType = await tx.ticketType.findUnique({
           where: { id: item.ticketTypeId },
@@ -46,7 +76,18 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
       }
       if (!ticketType) throw new Error(`Ticket type not found for order item ${item.id} — fulfillment aborted`)
 
-      // Build all ticket rows upfront, then insert in a single round-trip
+      await tx.$executeRaw`SELECT id FROM "TicketType" WHERE id = ${ticketType.id} FOR UPDATE`
+      const freshType = await tx.ticketType.findUnique({
+        where: { id: ticketType.id },
+        select: { id: true, sold: true, capacity: true },
+      })
+      if (!freshType) throw new Error(`Ticket type ${ticketType.id} missing — fulfillment aborted`)
+      if (freshType.sold + item.quantity > freshType.capacity) {
+        throw new Error(
+          `Cannot fulfill order ${orderId}: only ${freshType.capacity - freshType.sold} seat(s) left for this ticket type (need ${item.quantity})`
+        )
+      }
+
       const ticketRows = Array.from({ length: item.quantity }, () => ({
         ticketNumber: generateTicketNumber(),
         qrCode: crypto.randomUUID(),
@@ -66,7 +107,6 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
       })
     }
 
-    // Award referral points (skip if this order was already recorded — extra safety)
     if (order.referralCode) {
       const existingRef = await tx.referral.findFirst({ where: { orderId: order.id } })
       if (!existingRef) {
@@ -95,7 +135,6 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
       }
     }
 
-    // Partner commission (skip duplicate row for same order + partner)
     if (order.partnerId) {
       const existingComm = await tx.commission.findFirst({
         where: { orderId: order.id, partnerId: order.partnerId },
@@ -122,6 +161,6 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
       }
     }
   }, {
-    timeout: 15000, // 15s — generous for ticket batch creation
+    timeout: 15000,
   })
 }
