@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import PWAInstallPrompt from '@/components/PWAInstallPrompt'
-import BottomNav from '@/components/layout/BottomNav'
 import CsrfProvider from '@/components/CsrfProvider'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -36,12 +35,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="min-h-screen min-h-dvh flex flex-col antialiased">
-        {/* Bottom padding on mobile to clear the fixed bottom nav */}
-        <div className="flex flex-col flex-1 pb-safe md:pb-0">
+        <div className="flex flex-col flex-1 min-h-0 max-md:pb-[env(safe-area-inset-bottom)]">
           {children}
         </div>
         <CsrfProvider />
-        <BottomNav />
         <PWAInstallPrompt />
       </body>
     </html>

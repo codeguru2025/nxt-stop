@@ -77,21 +77,6 @@ button, [role="button"], nav, .no-select {
   overflow-y: auto;
 }
 
-/* ─── Safe area spacing ───────────────────────────────────── */
-/* Bottom nav height: 64px + safe area (iPhone notch) */
-.pb-safe {
-  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
-}
-
-.mb-safe {
-  margin-bottom: calc(4rem + env(safe-area-inset-bottom));
-}
-
-/* Bottom nav bar itself */
-.bottom-nav-safe {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
 /* ─── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #111; }
@@ -269,53 +254,6 @@ label {
 @media (max-width: 767px) {
   .admin-sidebar-hidden { transform: translateX(-100%); }
   .admin-sidebar-visible { transform: translateX(0); }
-}
-
-/* ─── Bottom nav active indicator ────────────────────────── */
-.bottom-nav-tab {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  flex: 1;
-  padding: 8px 4px;
-  color: #555;
-  transition: color 0.15s;
-  cursor: pointer;
-  min-height: 44px;
-}
-
-.bottom-nav-tab.active {
-  color: #E8174A;
-}
-
-.bottom-nav-tab.active::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 32px;
-  height: 2px;
-  border-radius: 0 0 2px 2px;
-  background: #E8174A;
-}
-
-/* Horizontal scroll row for many bottom tabs (mobile) */
-.bottom-nav-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-.bottom-nav-scroll::-webkit-scrollbar {
-  display: none;
-}
-.bottom-nav-scroll .bottom-nav-tab--scroll {
-  flex: 0 0 auto;
-  min-width: 3.35rem;
-  max-width: 4.25rem;
 }
 
 /* ─── Divider ─────────────────────────────────────────────── */
