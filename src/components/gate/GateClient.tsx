@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { QrCode, Check, X, AlertTriangle, Loader2, User, Ticket, RefreshCw, Camera, CameraOff, DollarSign } from 'lucide-react'
 import Link from 'next/link'
 import jsQR from 'jsqr'
+import { playGateScanTone, unlockGateAudio } from '@/lib/gateSounds'
 
 type ScanResult = {
   result: 'valid' | 'already_used' | 'invalid'
@@ -14,7 +15,7 @@ type ScanResult = {
     holder: string
     phone?: string
     type: string
-    event: string
+    event?: string
   }
   usedAt?: string
 }
@@ -69,6 +70,7 @@ export default function GateClient() {
 
   const handleScan = async (code: string) => {
     if (!code.trim() || scanning) return
+    unlockGateAudio()
     setScanning(true)
     setResult(null)
 
@@ -81,26 +83,36 @@ export default function GateClient() {
 
       if (res.success) {
         const data = res.data as ScanResult
+        if (data.result === 'valid') playGateScanTone('valid')
+        else if (data.result === 'already_used') playGateScanTone('already_used')
+        else playGateScanTone('invalid')
         setResult(data)
         setStats(prev => ({
           scanned: prev.scanned + 1,
           valid: prev.valid + (data.result === 'valid' ? 1 : 0),
           invalid: prev.invalid + (data.result !== 'valid' ? 1 : 0),
         }))
-
-        setTimeout(() => {
-          setResult(null)
-          if (streamRef.current) startScanLoop()
-        }, 4000)
       } else {
+        playGateScanTone('error')
         setResult({ result: 'error', message: res.error ?? 'Scan failed' } as any)
       }
     } catch {
+      playGateScanTone('error')
       setResult({ result: 'error', message: 'Network error — check connection' } as any)
     } finally {
       setScanning(false)
       setQrInput('')
       if (!cameraActive) inputRef.current?.focus()
+    }
+  }
+
+  const scanAnotherTicket = () => {
+    setResult(null)
+    setQrInput('')
+    if (cameraActive && streamRef.current) {
+      startScanLoop()
+    } else {
+      setTimeout(() => inputRef.current?.focus(), 50)
     }
   }
 
@@ -152,6 +164,7 @@ export default function GateClient() {
     if (cameraStartingRef.current || cameraActive) return
     cameraStartingRef.current = true
     setCameraError(null)
+    unlockGateAudio()
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError('Camera not supported on this browser. Try Chrome or Safari over HTTPS.')
@@ -192,6 +205,7 @@ export default function GateClient() {
       })
 
       setCameraActive(true)
+      unlockGateAudio()
       startScanLoop()
     } catch (err: any) {
       const msg =
@@ -351,10 +365,17 @@ export default function GateClient() {
                   <User size={14} className="text-gray-500" />
                   <span className="text-white font-medium">{result.ticket.holder}</span>
                 </div>
+                {result.ticket.phone && (
+                  <div className="text-sm text-gray-300">
+                    <span className="text-gray-500">Phone: </span>
+                    {result.ticket.phone}
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-sm">
                   <Ticket size={14} className="text-gray-500" />
                   <span className="text-gray-300">{result.ticket.type}</span>
                 </div>
+                <div className="text-xs text-gray-500">{result.ticket.event}</div>
                 <div className="text-xs text-gray-600 font-mono">{result.ticket.number}</div>
                 {result.usedAt && (
                   <div className="text-xs text-yellow-500">
@@ -363,6 +384,15 @@ export default function GateClient() {
                 )}
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={scanAnotherTicket}
+              className="w-full mt-5 btn-primary flex items-center justify-center gap-2 py-3 font-bold"
+            >
+              <QrCode size={18} />
+              Scan another ticket
+            </button>
           </div>
         ) : !cameraActive ? (
           <button

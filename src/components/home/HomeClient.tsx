@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Calendar, MapPin, ArrowRight, Play } from 'lucide-react'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate, formatCurrency, getEventTimePhase } from '@/lib/utils'
 
 type LineupArtist = {
   name: string
@@ -17,6 +17,7 @@ type Event = {
   name: string
   slug: string
   date: string
+  endDate?: string
   venue: string
   address?: string
   description?: string
@@ -29,11 +30,16 @@ type Event = {
 
 function Countdown({ date }: { date: string }) {
   const [time, setTime] = useState({ d: 0, h: 0, m: 0, s: 0 })
+  const [started, setStarted] = useState(false)
 
   useEffect(() => {
     const tick = () => {
       const diff = new Date(date).getTime() - Date.now()
-      if (diff <= 0) return
+      if (diff <= 0) {
+        setStarted(true)
+        return
+      }
+      setStarted(false)
       setTime({
         d: Math.floor(diff / 86400000),
         h: Math.floor((diff % 86400000) / 3600000),
@@ -45,6 +51,10 @@ function Countdown({ date }: { date: string }) {
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
   }, [date])
+
+  if (started) {
+    return <p className="text-sm text-gray-500">This event has started or passed.</p>
+  }
 
   return (
     <div className="flex gap-3">
@@ -69,14 +79,25 @@ export default function HomeClient() {
   const [featuredImgError, setFeaturedImgError] = useState(false)
 
   useEffect(() => {
-    fetch('/api/events?status=published&limit=6')
+    fetch('/api/events?status=published&limit=12')
       .then(r => r.json())
       .then(d => { if (d.success) setEvents(d.data) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  const featured = events[0]
+  const sortedEvents = useMemo(() => {
+    const rank = { upcoming: 0, live: 1, ended: 2 } as const
+    return [...events].sort((a, b) => {
+      const pa = getEventTimePhase(a.date, a.endDate)
+      const pb = getEventTimePhase(b.date, b.endDate)
+      if (rank[pa] !== rank[pb]) return rank[pa] - rank[pb]
+      return new Date(a.date).getTime() - new Date(b.date).getTime()
+    })
+  }, [events])
+
+  const featured = sortedEvents.find(e => getEventTimePhase(e.date, e.endDate) !== 'ended') ?? sortedEvents[0]
+  const gridEvents = sortedEvents
 
   return (
     <>
@@ -176,8 +197,31 @@ export default function HomeClient() {
 
                   <div className="p-6">
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-green-400 pulse-glow" />
-                      <span className="text-green-400 text-xs font-medium uppercase tracking-wider">On Sale Now</span>
+                      {(() => {
+                        const ph = getEventTimePhase(featured.date, featured.endDate)
+                        if (ph === 'live') {
+                          return (
+                            <>
+                              <div className="w-2 h-2 rounded-full bg-red-400 pulse-glow" />
+                              <span className="text-red-400 text-xs font-medium uppercase tracking-wider">Live now</span>
+                            </>
+                          )
+                        }
+                        if (ph === 'upcoming') {
+                          return (
+                            <>
+                              <div className="w-2 h-2 rounded-full bg-sky-400 pulse-glow" />
+                              <span className="text-sky-400 text-xs font-medium uppercase tracking-wider">Coming soon</span>
+                            </>
+                          )
+                        }
+                        return (
+                          <>
+                            <div className="w-2 h-2 rounded-full bg-zinc-500" />
+                            <span className="text-zinc-400 text-xs font-medium uppercase tracking-wider">Ended</span>
+                          </>
+                        )
+                      })()}
                     </div>
 
                     <h3 className="text-xl font-bold text-white mb-2">{featured.name}</h3>
@@ -202,9 +246,13 @@ export default function HomeClient() {
                       </div>
                       <Link
                         href={`/events/${featured.slug}`}
-                        className="bg-purple-600 hover:bg-purple-500 text-white rounded-xl px-6 py-3 font-bold transition-all hover:shadow-lg hover:shadow-purple-500/25"
+                        className={`rounded-xl px-6 py-3 font-bold transition-all ${
+                          getEventTimePhase(featured.date, featured.endDate) === 'ended'
+                            ? 'bg-zinc-700 text-white hover:bg-zinc-600'
+                            : 'bg-purple-600 hover:bg-purple-500 text-white hover:shadow-lg hover:shadow-purple-500/25'
+                        }`}
                       >
-                        Buy Ticket
+                        {getEventTimePhase(featured.date, featured.endDate) === 'ended' ? 'View event' : 'Buy Ticket'}
                       </Link>
                     </div>
                   </div>
@@ -256,7 +304,7 @@ export default function HomeClient() {
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {events.map(event => (
+              {gridEvents.map(event => (
                 <EventCard key={event.id} event={event} />
               ))}
             </div>
@@ -410,12 +458,17 @@ function SpotlightSection({ event }: { event: Event }) {
   const [mcErr, setMcErr] = useState(false)
   const [posterErr, setPosterErr] = useState(false)
 
+  const spotPhase = getEventTimePhase(event.date, event.endDate)
+
   return (
     <section className="py-20 border-t border-[#1a1a1a] bg-gradient-to-b from-[#0a0a0a] to-[#0a100e]">
       <div className="max-w-7xl mx-auto px-4">
         <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-1.5 mb-8">
-          <div className="w-2 h-2 rounded-full bg-green-400 pulse-glow" />
-          <span className="text-purple-300 text-sm font-medium">Next Event — {formatDate(event.date, 'MMMM d, yyyy')}</span>
+          <div className={`w-2 h-2 rounded-full shrink-0 ${spotPhase === 'live' ? 'bg-red-400 pulse-glow' : spotPhase === 'upcoming' ? 'bg-sky-400 pulse-glow' : 'bg-zinc-500'}`} />
+          <span className="text-purple-300 text-sm font-medium">
+            {spotPhase === 'live' ? 'Live — ' : spotPhase === 'ended' ? 'Past event — ' : 'Next up — '}
+            {formatDate(event.date, 'MMMM d, yyyy')}
+          </span>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-10 items-center">
@@ -536,10 +589,13 @@ function EventCard({ event }: { event: Event }) {
   const [imgError, setImgError] = useState(false)
   const prices = event.ticketTypes?.map(t => t.price) ?? []
   const minPrice = prices.length > 0 ? Math.min(...prices) : 0
-  const isFeatured = event.status === 'live'
+  const phase = getEventTimePhase(event.date, event.endDate)
 
   return (
-    <Link href={`/events/${event.slug}`} className="group card overflow-hidden hover:border-[#3a3a3a] transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-black/50">
+    <Link
+      href={`/events/${event.slug}`}
+      className={`group card overflow-hidden hover:border-[#3a3a3a] transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-black/50 ${phase === 'ended' ? 'opacity-75' : ''}`}
+    >
       {/* Image */}
       <div className="relative h-48 bg-gradient-to-br from-[#1a1a2e] to-[#16213e] overflow-hidden">
         {event.posterImage && !imgError ? (
@@ -556,9 +612,19 @@ function EventCard({ event }: { event: Event }) {
             <div className="text-5xl">🎵</div>
           </div>
         )}
-        {isFeatured && (
+        {phase === 'live' && (
           <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wide pulse-glow">
-            LIVE NOW
+            Live now
+          </div>
+        )}
+        {phase === 'upcoming' && (
+          <div className="absolute top-3 left-3 bg-sky-600 text-white text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wide">
+            Coming soon
+          </div>
+        )}
+        {phase === 'ended' && (
+          <div className="absolute top-3 left-3 bg-zinc-600 text-white text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wide">
+            Ended
           </div>
         )}
         <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-md">
@@ -581,7 +647,7 @@ function EventCard({ event }: { event: Event }) {
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-[#2a2a2a]">
           <span className="text-xs text-gray-600">{event.ticketTypes.reduce((s, t) => s + t.sold, 0)} sold</span>
           <span className="text-sm font-semibold text-purple-400 group-hover:text-purple-300 transition-colors flex items-center gap-1">
-            Buy Ticket <ArrowRight size={13} />
+            {phase === 'ended' ? 'View' : 'Buy Ticket'} <ArrowRight size={13} />
           </span>
         </div>
       </div>

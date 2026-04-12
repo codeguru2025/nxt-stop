@@ -2,10 +2,20 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import AdminLayout from './AdminLayout'
-import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer } from 'lucide-react'
+import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer, Calendar, MapPin, QrCode } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 const LOGO_URL = 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
+
+function money(v: unknown): number {
+  if (v == null) return 0
+  if (typeof v === 'number') return v
+  if (typeof v === 'string') return parseFloat(v) || 0
+  if (typeof v === 'object' && v !== null && 'toNumber' in v && typeof (v as { toNumber: () => number }).toNumber === 'function') {
+    return (v as { toNumber: () => number }).toNumber()
+  }
+  return Number(v) || 0
+}
 
 async function fetchAsDataURL(url: string): Promise<string> {
   try {
@@ -111,6 +121,44 @@ export default function AdminTicketsClient() {
   const [expandedBatch, setExpandedBatch] = useState<string | null>(null)
   const [expandedTickets, setExpandedTickets] = useState<any[]>([])
   const [expandedLoading, setExpandedLoading] = useState(false)
+
+  const [adminTicketId, setAdminTicketId] = useState<string | null>(null)
+  const [adminTicketData, setAdminTicketData] = useState<any>(null)
+  const [adminTicketLoading, setAdminTicketLoading] = useState(false)
+
+  const [orderDetailId, setOrderDetailId] = useState<string | null>(null)
+  const [orderDetailData, setOrderDetailData] = useState<any>(null)
+  const [orderDetailLoading, setOrderDetailLoading] = useState(false)
+
+  const [physicalPreview, setPhysicalPreview] = useState<{
+    event: GeneratedBatch['event']
+    ticketType: GeneratedBatch['ticketType']
+    ticket: { ticketNumber: string; qrDataUrl: string; activationCode: string }
+  } | null>(null)
+
+  useEffect(() => {
+    if (!adminTicketId) {
+      setAdminTicketData(null)
+      return
+    }
+    setAdminTicketLoading(true)
+    fetch(`/api/admin/tickets/${adminTicketId}`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setAdminTicketData(d.data) })
+      .finally(() => setAdminTicketLoading(false))
+  }, [adminTicketId])
+
+  useEffect(() => {
+    if (!orderDetailId) {
+      setOrderDetailData(null)
+      return
+    }
+    setOrderDetailLoading(true)
+    fetch(`/api/admin/orders/${orderDetailId}`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setOrderDetailData(d.data) })
+      .finally(() => setOrderDetailLoading(false))
+  }, [orderDetailId])
 
   const load = useCallback(async () => {
     if (tab === 'hardcopy') return
@@ -466,15 +514,20 @@ export default function AdminTicketsClient() {
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {hcBatch.tickets.map(t => (
-                    <div key={t.ticketNumber} className="bg-[#111] border border-[#2a2a2a] rounded-xl p-3 flex flex-col items-center gap-2">
-                      <img src={t.qrDataUrl} alt={t.ticketNumber} className="w-20 h-20 rounded-lg bg-white p-1" />
+                    <button
+                      type="button"
+                      key={t.ticketNumber}
+                      onClick={() => setPhysicalPreview({ event: hcBatch.event, ticketType: hcBatch.ticketType, ticket: t })}
+                      className="bg-[#111] border border-[#2a2a2a] rounded-xl p-3 flex flex-col items-center gap-2 hover:border-purple-500/40 transition-colors text-left cursor-pointer"
+                    >
+                      <img src={t.qrDataUrl} alt={t.ticketNumber} className="w-20 h-20 rounded-lg bg-white p-1 pointer-events-none" />
                       <span className="text-xs font-mono text-gray-400 text-center break-all">{t.ticketNumber}</span>
                       <div className="flex flex-col items-center gap-0.5">
                         <span className="text-xs text-gray-600 uppercase tracking-widest">Activation</span>
                         <span className="text-base font-black font-mono text-orange-400 tracking-widest">{t.activationCode}</span>
                       </div>
                       <span className="text-xs font-bold text-purple-400">{formatCurrency(hcBatch.ticketType.price)}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -557,11 +610,23 @@ export default function AdminTicketsClient() {
                                 </div>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                                   {expandedTickets.map((t: any) => (
-                                    <div key={t.ticketNumber} className="bg-[#111] border border-[#2a2a2a] rounded-xl p-2.5 flex flex-col items-center gap-1.5">
-                                      <img src={t.qrDataUrl} alt={t.ticketNumber} className="w-16 h-16 rounded-lg bg-white p-0.5" />
+                                    <button
+                                      type="button"
+                                      key={t.ticketNumber}
+                                      onClick={() => {
+                                        if (!b.event || !b.ticketType) return
+                                        setPhysicalPreview({
+                                          event: { name: b.event.name, date: b.event.date, venue: b.event.venue },
+                                          ticketType: { name: b.ticketType.name, color: b.ticketType.color, price: b.ticketType.price },
+                                          ticket: t,
+                                        })
+                                      }}
+                                      className="bg-[#111] border border-[#2a2a2a] rounded-xl p-2.5 flex flex-col items-center gap-1.5 hover:border-purple-500/40 transition-colors cursor-pointer text-left"
+                                    >
+                                      <img src={t.qrDataUrl} alt={t.ticketNumber} className="w-16 h-16 rounded-lg bg-white p-0.5 pointer-events-none" />
                                       <span className="text-[10px] font-mono text-gray-500 text-center break-all">{t.ticketNumber}</span>
                                       <span className="text-xs font-black font-mono text-orange-400 tracking-wider">{t.activationCode}</span>
-                                    </div>
+                                    </button>
                                   ))}
                                 </div>
                               </>
@@ -607,7 +672,12 @@ export default function AdminTicketsClient() {
                 <div className="space-y-2">
                   {tickets.length === 0 && <p className="text-gray-500 text-center py-12">No tickets found.</p>}
                   {tickets.map(t => (
-                    <div key={t.id} className="card p-4 flex items-center gap-4">
+                    <button
+                      type="button"
+                      key={t.id}
+                      onClick={() => setAdminTicketId(t.id)}
+                      className="card p-4 flex items-center gap-4 w-full text-left hover:border-purple-500/35 transition-colors cursor-pointer"
+                    >
                       <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: t.ticketType.color }} />
                       <div className="flex-1 min-w-0 grid grid-cols-4 gap-4 text-sm">
                         <div>
@@ -623,10 +693,10 @@ export default function AdminTicketsClient() {
                           <p className="text-gray-500 text-xs">{formatDate(t.event.date, 'MMM d, yyyy')}</p>
                         </div>
                         <div className="flex items-center justify-end gap-2">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[t.status] ?? ''}`}>{t.status}</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[t.status] ?? STATUS_COLOR_EXTRA[t.status] ?? ''}`}>{t.status}</span>
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </>
@@ -636,22 +706,36 @@ export default function AdminTicketsClient() {
                   {orders.length === 0 && <p className="text-gray-500 text-center py-12">No orders found.</p>}
                   {orders.map(o => (
                     <div key={o.id} className="card p-4">
-                      <div className="flex items-start gap-4">
-                        <div className="flex-1 min-w-0 grid grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <p className="text-white font-semibold truncate">{o.guestName || o.user.name}</p>
-                            <p className="text-gray-500 text-xs truncate">{o.guestPhone || o.user.phone}</p>
-                          </div>
-                          <div>
-                            <p className="text-white font-mono text-xs">{o.orderNumber}</p>
-                            <p className="text-gray-500 text-xs">{o.paymentMethod ?? '—'} · {formatCurrency(o.total)}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-300 text-xs">{o.items.map(i => i.name).join(', ')}</p>
-                            <p className="text-gray-500 text-xs">{formatDate(o.createdAt, 'MMM d, h:mm a')}</p>
-                          </div>
-                          <div className="flex items-center gap-2 justify-end">
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[o.status] ?? ''}`}>{o.status}</span>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="cursor-pointer rounded-xl -m-1 p-1 hover:bg-white/[0.03] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-purple-500/40"
+                        onClick={() => setOrderDetailId(o.id)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setOrderDetailId(o.id)
+                          }
+                        }}
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="flex-1 min-w-0 grid grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <p className="text-white font-semibold truncate">{o.guestName || o.user.name}</p>
+                              <p className="text-gray-500 text-xs truncate">{o.guestPhone || o.user.phone}</p>
+                            </div>
+                            <div>
+                              <p className="text-white font-mono text-xs">{o.orderNumber}</p>
+                              <p className="text-gray-500 text-xs">{o.paymentMethod ?? '—'} · {formatCurrency(o.total)}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-300 text-xs">{o.items.map(i => i.name).join(', ')}</p>
+                              <p className="text-gray-500 text-xs">{formatDate(o.createdAt, 'MMM d, h:mm a')}</p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[o.status] ?? ''}`}>{o.status}</span>
+                              <span className="text-[10px] text-purple-400 font-medium">Open details</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -659,15 +743,20 @@ export default function AdminTicketsClient() {
                       {o.tickets.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1 pl-0">
                           {o.tickets.map(t => (
-                            <span key={t.id} className="text-xs font-mono bg-[#111] border border-[#2a2a2a] px-2 py-0.5 rounded">
+                            <button
+                              type="button"
+                              key={t.id}
+                              onClick={e => { e.stopPropagation(); setAdminTicketId(t.id) }}
+                              className="text-xs font-mono bg-[#111] border border-[#2a2a2a] px-2 py-0.5 rounded hover:border-purple-500/40 transition-colors"
+                            >
                               {t.ticketNumber} <span className="text-gray-600">· {t.status}</span>
-                            </span>
+                            </button>
                           ))}
                         </div>
                       )}
 
                       {o.status !== 'paid' && (
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <div className="mt-3 flex flex-wrap gap-2" onClick={e => e.stopPropagation()}>
                           <button
                             onClick={() => orderAction(o.id, 'check')}
                             disabled={!!actionLoading}
@@ -719,6 +808,263 @@ export default function AdminTicketsClient() {
           </>
         )}
       </div>
+
+      {/* Full ticket (admin list) */}
+      {adminTicketId && (
+        <div
+          className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => { setAdminTicketId(null); setAdminTicketData(null) }}
+        >
+          <div
+            className="relative w-full max-w-md bg-[#101010] border border-[#2a2a2a] rounded-2xl shadow-2xl my-auto overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="absolute top-3 right-3 z-10 text-gray-500 hover:text-white p-1"
+              onClick={() => { setAdminTicketId(null); setAdminTicketData(null) }}
+              aria-label="Close"
+            >
+              <X size={22} />
+            </button>
+            {adminTicketLoading ? (
+              <div className="flex justify-center py-20">
+                <Loader2 size={28} className="animate-spin text-purple-500" />
+              </div>
+            ) : adminTicketData ? (
+              <div className="p-6 pt-10">
+                {adminTicketData.event?.posterImage && (
+                  <img src={adminTicketData.event.posterImage} alt="" className="w-full h-36 object-cover rounded-xl mb-4 -mt-2" />
+                )}
+                <div className="flex items-start gap-3 mb-4">
+                  <img src={LOGO_URL} alt="NXT STOP" className="h-16 w-auto max-w-[220px] object-contain object-left shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">NXT STOP</p>
+                    <h2 className="text-lg font-black text-white leading-tight">{adminTicketData.event.name}</h2>
+                    <span
+                      className="inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full text-white mt-1"
+                      style={{ background: adminTicketData.ticketType.color }}
+                    >
+                      {adminTicketData.ticketType.name}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1.5 text-sm text-gray-400 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} className="text-purple-400 shrink-0" />
+                    {formatDate(adminTicketData.event.date, 'EEE, MMM d, yyyy · h:mm a')}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin size={14} className="text-purple-400 shrink-0" />
+                    {adminTicketData.event.venue}
+                    {adminTicketData.event.address ? `, ${adminTicketData.event.address}` : ''}
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-5 items-center border-t border-dashed border-[#2a2a2a] pt-5">
+                  <img src={adminTicketData.qrDataUrl} alt="QR" className="w-36 h-36 rounded-xl bg-white p-1.5 border border-gray-200 shrink-0" />
+                  <div className="flex-1 w-full min-w-0 space-y-2">
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">Holder / account</p>
+                      <p className="text-white font-semibold">{adminTicketData.user?.name}</p>
+                      <a href={`tel:${adminTicketData.user?.phone}`} className="text-lg font-mono text-green-400 hover:text-green-300 break-all">
+                        {adminTicketData.user?.phone}
+                      </a>
+                    </div>
+                    {(adminTicketData.order?.recipientName || adminTicketData.order?.guestName) && (
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-widest">On ticket</p>
+                        <p className="text-gray-200">{adminTicketData.order?.recipientName || adminTicketData.order?.guestName}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest">Ticket no.</p>
+                      <p className="font-mono text-sm text-gray-300 break-all">{adminTicketData.ticketNumber}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[adminTicketData.status] ?? STATUS_COLOR_EXTRA[adminTicketData.status] ?? ''}`}>
+                        {adminTicketData.status}
+                      </span>
+                      <span className="text-purple-300 font-bold">{formatCurrency(money(adminTicketData.ticketType.price))}</span>
+                    </div>
+                    {adminTicketData.activationCode && (
+                      <p className="text-xs text-orange-400 font-mono">Activation: {adminTicketData.activationCode}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="p-8 text-center text-gray-500">Could not load ticket.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Order detail (call failed payments, etc.) */}
+      {orderDetailId && (
+        <div
+          className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => { setOrderDetailId(null); setOrderDetailData(null) }}
+        >
+          <div
+            className="relative w-full max-w-lg bg-[#101010] border border-[#2a2a2a] rounded-2xl shadow-2xl my-auto max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="absolute top-3 right-3 z-10 text-gray-500 hover:text-white p-1"
+              onClick={() => { setOrderDetailId(null); setOrderDetailData(null) }}
+              aria-label="Close"
+            >
+              <X size={22} />
+            </button>
+            {orderDetailLoading ? (
+              <div className="flex justify-center py-20">
+                <Loader2 size={28} className="animate-spin text-purple-500" />
+              </div>
+            ) : orderDetailData ? (
+              <div className="p-6 pt-10 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest">Order</p>
+                    <p className="font-mono text-white font-bold">{orderDetailData.orderNumber}</p>
+                  </div>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${STATUS_COLOR[orderDetailData.status] ?? ''}`}>
+                    {orderDetailData.status}
+                  </span>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                  <div className="bg-[#151515] rounded-xl p-3 border border-[#2a2a2a]">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Buyer</p>
+                    <p className="text-white font-medium">{orderDetailData.user?.name}</p>
+                    <a href={`tel:${orderDetailData.user?.phone}`} className="text-green-400 font-mono hover:text-green-300 break-all">
+                      {orderDetailData.user?.phone}
+                    </a>
+                  </div>
+                  <div className="bg-[#151515] rounded-xl p-3 border border-[#2a2a2a]">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Guest / recipient</p>
+                    {orderDetailData.guestName || orderDetailData.guestPhone ? (
+                      <>
+                        <p className="text-white font-medium">{orderDetailData.guestName || '—'}</p>
+                        {orderDetailData.guestPhone && (
+                          <a href={`tel:${orderDetailData.guestPhone}`} className="text-green-400 font-mono hover:text-green-300 break-all">
+                            {orderDetailData.guestPhone}
+                          </a>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-gray-600">Same as buyer</p>
+                    )}
+                  </div>
+                </div>
+                {orderDetailData.recipientName && (
+                  <div className="text-sm">
+                    <span className="text-gray-500">Recipient on ticket: </span>
+                    <span className="text-white">{orderDetailData.recipientName}</span>
+                  </div>
+                )}
+                <div className="text-sm space-y-1 text-gray-400">
+                  <p><span className="text-gray-600">Payment:</span> {orderDetailData.paymentMethod ?? '—'}</p>
+                  <p className="font-mono break-all"><span className="text-gray-600">Ref:</span> {orderDetailData.paymentRef ?? '—'}</p>
+                  <p><span className="text-gray-600">Created:</span> {formatDate(orderDetailData.createdAt, 'PPp')}</p>
+                  {orderDetailData.paidAt && (
+                    <p><span className="text-gray-600">Paid:</span> {formatDate(orderDetailData.paidAt, 'PPp')}</p>
+                  )}
+                </div>
+                <div className="border border-[#2a2a2a] rounded-xl overflow-hidden">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-widest px-3 py-2 bg-[#151515]">Line items</p>
+                  <ul className="divide-y divide-[#2a2a2a]">
+                    {orderDetailData.items?.map((it: { id: string; name: string; quantity: number; price: unknown }) => (
+                      <li key={it.id} className="px-3 py-2 flex justify-between text-sm">
+                        <span className="text-gray-300">{it.name} × {it.quantity}</span>
+                        <span className="text-white font-medium">{formatCurrency(money(it.price) * it.quantity)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="px-3 py-2 flex justify-between text-sm border-t border-[#2a2a2a] bg-[#151515]">
+                    <span className="text-gray-500">Subtotal</span>
+                    <span>{formatCurrency(money(orderDetailData.subtotal))}</span>
+                  </div>
+                  <div className="px-3 py-2 flex justify-between text-sm bg-[#151515]">
+                    <span className="text-gray-500">Fees</span>
+                    <span>{formatCurrency(money(orderDetailData.platformFees))}</span>
+                  </div>
+                  <div className="px-3 py-2 flex justify-between font-bold text-white bg-[#1a1a1a]">
+                    <span>Total</span>
+                    <span>{formatCurrency(money(orderDetailData.total))}</span>
+                  </div>
+                </div>
+                {orderDetailData.tickets?.length > 0 && (
+                  <div>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Tickets</p>
+                    <div className="flex flex-wrap gap-2">
+                      {orderDetailData.tickets.map((tk: { id: string; ticketNumber: string; status: string }) => (
+                        <button
+                          type="button"
+                          key={tk.id}
+                          onClick={() => { setOrderDetailId(null); setOrderDetailData(null); setAdminTicketId(tk.id) }}
+                          className="text-xs font-mono bg-[#151515] border border-[#2a2a2a] px-2 py-1 rounded hover:border-purple-500/40"
+                        >
+                          {tk.ticketNumber} · {tk.status}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="p-8 text-center text-gray-500">Could not load order.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Physical ticket full view (hard copy tab) */}
+      {physicalPreview && (
+        <div
+          className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setPhysicalPreview(null)}
+        >
+          <div
+            className="relative w-full max-w-sm bg-gradient-to-br from-[#1a0a24] to-[#0a0a0a] border border-purple-500/20 rounded-2xl shadow-2xl my-auto overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <button type="button" className="absolute top-3 right-3 z-10 text-gray-400 hover:text-white" onClick={() => setPhysicalPreview(null)} aria-label="Close">
+              <X size={22} />
+            </button>
+            <div className="p-6 pt-12">
+              <div className="flex items-start gap-3 mb-4">
+                <img src={LOGO_URL} alt="" className="h-14 w-auto max-w-[200px] object-contain object-left invert shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-white/50 uppercase tracking-widest">Physical · not sold until activated</p>
+                  <h2 className="text-lg font-black text-white leading-tight">{physicalPreview.event.name}</h2>
+                  <span
+                    className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full text-white mt-1"
+                    style={{ background: physicalPreview.ticketType.color }}
+                  >
+                    {physicalPreview.ticketType.name}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-1 text-sm text-gray-400 mb-4">
+                <div className="flex items-center gap-2"><Calendar size={14} />{formatDate(physicalPreview.event.date, 'EEE, MMM d, yyyy · h:mm a')}</div>
+                <div className="flex items-center gap-2"><MapPin size={14} />{physicalPreview.event.venue}</div>
+              </div>
+              <div className="flex flex-col items-center gap-3 bg-black/30 rounded-2xl p-5 border border-white/5">
+                <img src={physicalPreview.ticket.qrDataUrl} alt="QR" className="w-48 h-48 rounded-2xl bg-white p-2" />
+                <p className="font-mono text-xs text-gray-500 break-all text-center">{physicalPreview.ticket.ticketNumber}</p>
+                <div className="text-center">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-widest">Activation code</p>
+                  <p className="text-2xl font-black font-mono text-orange-400 tracking-[0.2em]">{physicalPreview.ticket.activationCode}</p>
+                </div>
+                <p className="text-xl font-black text-purple-300">{formatCurrency(physicalPreview.ticketType.price)}</p>
+              </div>
+              <p className="text-[10px] text-center text-gray-600 mt-4 flex items-center justify-center gap-1">
+                <QrCode size={12} /> Tap outside or ✕ to close
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   )
 }

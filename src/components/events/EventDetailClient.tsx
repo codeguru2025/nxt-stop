@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useRef } from 'react'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import {
   Calendar, MapPin, Clock, Users, Ticket, Share2,
   Check, AlertCircle, Loader2, Music, Video, Star, Phone, ExternalLink,
   ChevronDown, ChevronUp, User
 } from 'lucide-react'
-import { formatDate, formatCurrency, buildReferralUrl } from '@/lib/utils'
+import { formatDate, formatCurrency, buildReferralUrl, getEventTimePhase } from '@/lib/utils'
 
 const VenueMap = dynamic(() => import('./VenueMap'), { ssr: false })
 
@@ -246,6 +247,15 @@ export default function EventDetailClient() {
 
   const isCheckoutVisible = stage.name === 'checkout' || stage.name === 'processing' || stage.name === 'error'
 
+  const timePhase = getEventTimePhase(event.date, event.endDate)
+  const eventEnded =
+    event.status === 'cancelled' ||
+    event.status === 'ended' ||
+    timePhase === 'ended'
+  const showEndedNotice =
+    eventEnded &&
+    !['paid', 'mobile_pending', 'innbucks_pending', 'payment_failed'].includes(stage.name)
+
   return (
     <div>
       {/* Hero Banner */}
@@ -263,9 +273,19 @@ export default function EventDetailClient() {
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/50 to-transparent" />
-        {event.status === 'live' && (
+        {timePhase === 'upcoming' && (
+          <div className="absolute top-6 left-6 bg-sky-600 text-white text-sm font-bold px-4 py-2 rounded-xl uppercase tracking-wide">
+            Coming soon
+          </div>
+        )}
+        {timePhase === 'live' && (
           <div className="absolute top-6 left-6 bg-red-500 text-white text-sm font-bold px-4 py-2 rounded-xl pulse-glow uppercase tracking-wide">
-            🔴 LIVE NOW
+            🔴 Live now
+          </div>
+        )}
+        {timePhase === 'ended' && (
+          <div className="absolute top-6 left-6 bg-zinc-700 text-white text-sm font-bold px-4 py-2 rounded-xl uppercase tracking-wide">
+            Event ended
           </div>
         )}
       </div>
@@ -374,6 +394,19 @@ export default function EventDetailClient() {
                 <MobilePendingCard instructions={stage.instructions} method={paymentMethod} phone={phone} orderId={stage.orderId} guestToken={stage.guestToken} />
               ) : stage.name === 'innbucks_pending' ? (
                 <InnbucksCard code={stage.code} orderId={stage.orderId} guestToken={stage.guestToken} />
+              ) : showEndedNotice ? (
+                <div className="card p-6 text-center">
+                  <h3 className="text-xl font-bold text-white mb-2">Ticket sales closed</h3>
+                  <p className="text-gray-400 text-sm mb-5">
+                    This event is no longer on sale. If you already bought tickets, they stay in your account.
+                  </p>
+                  <Link href="/dashboard/tickets" className="btn-primary w-full flex justify-center mb-3">
+                    My tickets
+                  </Link>
+                  <Link href="/events" className="text-sm text-purple-400 hover:text-purple-300">
+                    Browse more events
+                  </Link>
+                </div>
               ) : (
                 <div className="card p-6">
                   <h3 className="text-xl font-bold text-white mb-5">Get Your Tickets</h3>

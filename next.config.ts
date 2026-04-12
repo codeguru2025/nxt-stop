@@ -30,6 +30,10 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  // Tree-shake heavy icon/date packages (smaller client bundles, same imports).
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'date-fns'],
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.digitaloceanspaces.com' },

@@ -4,13 +4,17 @@ import crypto from 'crypto'
 
 export async function fulfillOrder(orderId: string, paymentMethod: string, paymentRef?: string) {
   await prisma.$transaction(async (tx) => {
-    // Idempotency guard: only proceed if order is still pending.
-    // updateMany returns a count — if 0, another process already fulfilled it.
+    // Idempotent replay (e.g. Paynow webhook retries): tickets already minted.
+    if ((await tx.ticket.count({ where: { orderId } })) > 0) {
+      return
+    }
+
+    // Only transition pending → paid when we are about to issue tickets.
     const { count } = await tx.order.updateMany({
       where: { id: orderId, status: 'pending' },
       data: { status: 'paid', paymentMethod, paymentRef: paymentRef ?? null, paidAt: new Date() },
     })
-    if (count === 0) return // already fulfilled or cancelled — nothing to do
+    if (count === 0) return // already fulfilled, cancelled, or another worker won the race
 
     const order = await tx.order.findUnique({
       where: { id: orderId },
@@ -62,51 +66,59 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
       })
     }
 
-    // Award referral points
+    // Award referral points (skip if this order was already recorded — extra safety)
     if (order.referralCode) {
-      const referrer = await tx.user.findUnique({ where: { referralCode: order.referralCode } })
-      if (referrer && referrer.id !== order.userId) {
-        const config = await tx.pointsConfig.findFirst({ where: { active: true } })
-        const pointsPerSale = config?.pointsPerSale ?? 10
-        const bonus = config?.bonusMultiplier ?? 1.0
-        const totalQty = ticketItems.reduce((s, i) => s + i.quantity, 0)
-        const points = Math.round(pointsPerSale * totalQty * bonus)
+      const existingRef = await tx.referral.findFirst({ where: { orderId: order.id } })
+      if (!existingRef) {
+        const referrer = await tx.user.findUnique({ where: { referralCode: order.referralCode } })
+        if (referrer && referrer.id !== order.userId) {
+          const config = await tx.pointsConfig.findFirst({ where: { active: true } })
+          const pointsPerSale = config?.pointsPerSale ?? 10
+          const bonus = config?.bonusMultiplier ?? 1.0
+          const totalQty = ticketItems.reduce((s, i) => s + i.quantity, 0)
+          const points = Math.round(pointsPerSale * totalQty * bonus)
 
-        await tx.user.update({
-          where: { id: referrer.id },
-          data: { points: { increment: points }, totalEarned: { increment: points } },
-        })
+          await tx.user.update({
+            where: { id: referrer.id },
+            data: { points: { increment: points }, totalEarned: { increment: points } },
+          })
 
-        await tx.referral.create({
-          data: {
-            sourceUserId: referrer.id,
-            targetUserId: order.userId,
-            orderId: order.id,
-            pointsAwarded: points,
-          },
-        })
+          await tx.referral.create({
+            data: {
+              sourceUserId: referrer.id,
+              targetUserId: order.userId,
+              orderId: order.id,
+              pointsAwarded: points,
+            },
+          })
+        }
       }
     }
 
-    // Partner commission
+    // Partner commission (skip duplicate row for same order + partner)
     if (order.partnerId) {
-      const partner = await tx.partner.findUnique({ where: { id: order.partnerId } })
-      if (partner) {
-        const totalQty = ticketItems.reduce((s, i) => s + i.quantity, 0)
-        const perTicket = Number(partner.commissionPerTicket)
-        const commissionAmount = perTicket > 0
-          ? perTicket * totalQty
-          : Number(order.subtotal) * (Number(partner.commissionRate) / 100)
-        await tx.commission.create({
-          data: { partnerId: order.partnerId, orderId: order.id, amount: commissionAmount },
-        })
-        await tx.partner.update({
-          where: { id: order.partnerId },
-          data: {
-            totalSales: { increment: totalQty },
-            totalEarned: { increment: commissionAmount },
-          },
-        })
+      const existingComm = await tx.commission.findFirst({
+        where: { orderId: order.id, partnerId: order.partnerId },
+      })
+      if (!existingComm) {
+        const partner = await tx.partner.findUnique({ where: { id: order.partnerId } })
+        if (partner) {
+          const totalQty = ticketItems.reduce((s, i) => s + i.quantity, 0)
+          const perTicket = Number(partner.commissionPerTicket)
+          const commissionAmount = perTicket > 0
+            ? perTicket * totalQty
+            : Number(order.subtotal) * (Number(partner.commissionRate) / 100)
+          await tx.commission.create({
+            data: { partnerId: order.partnerId, orderId: order.id, amount: commissionAmount },
+          })
+          await tx.partner.update({
+            where: { id: order.partnerId },
+            data: {
+              totalSales: { increment: totalQty },
+              totalEarned: { increment: commissionAmount },
+            },
+          })
+        }
       }
     }
   }, {

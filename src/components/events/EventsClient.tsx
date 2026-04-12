@@ -1,37 +1,50 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, memo } from 'react'
 import Link from 'next/link'
 import { Calendar, MapPin, Search, ArrowRight } from 'lucide-react'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate, formatCurrency, getEventTimePhase, type EventTimePhase } from '@/lib/utils'
 
 type Event = {
-  id: string; name: string; slug: string; date: string; venue: string
+  id: string; name: string; slug: string; date: string; endDate?: string; venue: string
   description?: string; posterImage?: string; status: string
   ticketTypes: { name: string; price: number; capacity: number; sold: number }[]
   _count: { tickets: number }
 }
 
-function EventCard({ event, referral }: { event: Event; referral?: string }) {
+function phaseBadge(phase: EventTimePhase) {
+  if (phase === 'live') {
+    return <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md uppercase pulse-glow">Live</div>
+  }
+  if (phase === 'upcoming') {
+    return <div className="absolute top-3 left-3 bg-sky-600 text-white text-xs font-bold px-2 py-1 rounded-md uppercase">Coming soon</div>
+  }
+  return <div className="absolute top-3 left-3 bg-zinc-600 text-white text-xs font-bold px-2 py-1 rounded-md uppercase">Ended</div>
+}
+
+const EventCard = memo(function EventCard({ event, referral }: { event: Event; referral?: string }) {
   const [imgError, setImgError] = useState(false)
   const eventUrl = referral ? `/events/${event.slug}?ref=${referral}` : `/events/${event.slug}`
+  const timePhase = getEventTimePhase(event.date, event.endDate)
 
   const minPrice = event.ticketTypes.length > 0 ? Math.min(...event.ticketTypes.map(t => t.price)) : 0
   const totalCap = event.ticketTypes.reduce((s, t) => s + t.capacity, 0)
   const totalSold = event.ticketTypes.reduce((s, t) => s + t.sold, 0)
   const pct = totalCap > 0 ? (totalSold / totalCap) * 100 : 0
-  const isLow = pct > 80
+  const isLow = pct > 80 && timePhase !== 'ended'
 
   return (
     <Link
       href={eventUrl}
-      className="group card overflow-hidden hover:border-[#3a3a3a] transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-black/50"
+      className={`group card overflow-hidden hover:border-[#3a3a3a] transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-black/50 ${timePhase === 'ended' ? 'opacity-75' : ''}`}
     >
       <div className="relative h-52 bg-gradient-to-br from-[#1a1a2e] to-[#16213e] overflow-hidden">
         {event.posterImage && !imgError ? (
           <img
             src={event.posterImage}
             alt={event.name}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             onError={() => setImgError(true)}
           />
@@ -40,9 +53,7 @@ function EventCard({ event, referral }: { event: Event; referral?: string }) {
             <div className="text-5xl">🎧</div>
           </div>
         )}
-        {event.status === 'live' && (
-          <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-md uppercase pulse-glow">LIVE</div>
-        )}
+        {phaseBadge(timePhase)}
         {isLow && (
           <div className="absolute top-3 right-3 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-md">Selling Fast</div>
         )}
@@ -102,7 +113,7 @@ function EventCard({ event, referral }: { event: Event; referral?: string }) {
       </div>
     </Link>
   )
-}
+})
 
 export default function EventsClient() {
   const [events, setEvents] = useState<Event[]>([])
@@ -120,10 +131,23 @@ export default function EventsClient() {
       .finally(() => setLoading(false))
   }, [])
 
-  const filtered = events.filter(e =>
-    e.name.toLowerCase().includes(search.toLowerCase()) ||
-    e.venue.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    return events.filter(e =>
+      e.name.toLowerCase().includes(q) ||
+      e.venue.toLowerCase().includes(q)
+    )
+  }, [events, search])
+
+  const sorted = useMemo(() => {
+    const rank: Record<EventTimePhase, number> = { upcoming: 0, live: 1, ended: 2 }
+    return [...filtered].sort((a, b) => {
+      const pa = getEventTimePhase(a.date, a.endDate)
+      const pb = getEventTimePhase(b.date, b.endDate)
+      if (rank[pa] !== rank[pb]) return rank[pa] - rank[pb]
+      return new Date(a.date).getTime() - new Date(b.date).getTime()
+    })
+  }, [filtered])
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
@@ -160,7 +184,7 @@ export default function EventsClient() {
             </div>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <div className="text-center py-20">
           <div className="text-6xl mb-4">🎵</div>
           <h3 className="text-xl font-semibold text-white mb-2">No Events Found</h3>
@@ -170,7 +194,7 @@ export default function EventsClient() {
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map(event => <EventCard key={event.id} event={event} referral={ref || undefined} />)}
+          {sorted.map(event => <EventCard key={event.id} event={event} referral={ref || undefined} />)}
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl } from '../utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl, getEventTimePhase } from '../utils'
 
 describe('slugify', () => {
   it('lowercases and hyphenates', () => {
@@ -92,5 +92,36 @@ describe('buildReferralUrl', () => {
   it('builds URL with code', () => {
     const url = buildReferralUrl('ABC123')
     expect(url).toContain('/r/ABC123')
+  })
+})
+
+describe('getEventTimePhase', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('returns upcoming before start', () => {
+    vi.setSystemTime(new Date('2026-06-01T12:00:00Z'))
+    expect(getEventTimePhase('2026-06-15T20:00:00Z')).toBe('upcoming')
+  })
+
+  it('returns live between start and endDate', () => {
+    vi.setSystemTime(new Date('2026-06-15T21:00:00Z'))
+    expect(getEventTimePhase('2026-06-15T20:00:00Z', '2026-06-16T04:00:00Z')).toBe('live')
+  })
+
+  it('returns ended after endDate', () => {
+    vi.setSystemTime(new Date('2026-06-16T10:00:00Z'))
+    expect(getEventTimePhase('2026-06-15T20:00:00Z', '2026-06-16T04:00:00Z')).toBe('ended')
+  })
+
+  it('uses default duration when endDate missing', () => {
+    vi.setSystemTime(new Date('2026-06-15T23:00:00Z'))
+    expect(getEventTimePhase('2026-06-15T20:00:00Z')).toBe('live')
+    vi.setSystemTime(new Date('2026-06-16T06:00:00Z'))
+    expect(getEventTimePhase('2026-06-15T20:00:00Z')).toBe('ended')
   })
 })

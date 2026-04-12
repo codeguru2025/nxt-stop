@@ -60,3 +60,23 @@ export function parseReferralCode(url: string): string | null {
     return null
   }
 }
+
+/** When `endDate` is missing, treat the event as ending this many hours after doors (typical night show). */
+const DEFAULT_EVENT_DURATION_MS = 8 * 60 * 60 * 1000
+
+export type EventTimePhase = 'upcoming' | 'live' | 'ended'
+
+/** Derive coming soon / live / ended from wall-clock time (not only DB `status`). */
+export function getEventTimePhase(
+  start: string | Date,
+  endDate?: string | Date | null
+): EventTimePhase {
+  const startMs = new Date(start).getTime()
+  const endMs = endDate != null && endDate !== ''
+    ? new Date(endDate).getTime()
+    : startMs + DEFAULT_EVENT_DURATION_MS
+  const now = Date.now()
+  if (now < startMs) return 'upcoming'
+  if (now < endMs) return 'live'
+  return 'ended'
+}

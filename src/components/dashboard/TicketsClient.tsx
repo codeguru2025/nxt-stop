@@ -206,7 +206,11 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
 
             <div className="body p-6">
               <div className="flex items-start gap-3 mb-4">
-                <img src={LOGO_URL} alt="NXT STOP" className="h-10 w-auto object-contain shrink-0" />
+                <img
+                  src={LOGO_URL}
+                  alt="NXT STOP"
+                  className="h-16 sm:h-20 w-auto max-w-[min(100%,240px)] object-contain object-left shrink-0"
+                />
                 <div>
                   <p className="lbl text-xs text-gray-400 uppercase tracking-widest font-semibold">NXT STOP</p>
                   <h2 className="text-xl font-black text-gray-900 leading-tight">{ticket.event.name}</h2>

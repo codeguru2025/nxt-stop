@@ -153,3 +153,16 @@ export async function acquireScanLock(qrCode: string): Promise<boolean> {
   )
 }
 
+/** Drop scan lock immediately so the next validation isn’t blocked until key TTL. */
+export async function releaseScanLock(qrCode: string): Promise<void> {
+  if (!redis) return
+  try {
+    await Promise.race([
+      redis.del(`lock:scan:${qrCode}`).then(() => undefined),
+      new Promise<void>((_, rej) => setTimeout(() => rej(new Error('timeout')), 2000)),
+    ])
+  } catch {
+    // Key may have expired; ignore
+  }
+}
+

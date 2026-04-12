@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db'
 import { requireGateOrAdmin } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
-import { acquireScanLock, checkScanLimit } from '@/lib/rateLimit'
+import { acquireScanLock, checkScanLimit, releaseScanLock } from '@/lib/rateLimit'
 
 function emitScanEvent(eventId: string, payload: object) {
   try {
@@ -15,6 +15,7 @@ function emitScanEvent(eventId: string, payload: object) {
 }
 
 export async function POST(req: Request) {
+  let scanLockKey: string | null = null
   try {
     const session = await requireGateOrAdmin().catch(() => null)
     if (!session) return unauthorized()
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
     if (!locked) {
       return ok({ result: 'invalid', message: 'Scan already in progress — please try again' })
     }
+    scanLockKey = qrCode
 
     const ticketInclude = {
       event: { select: { id: true, name: true, date: true, venue: true, posterImage: true } },
@@ -81,6 +83,7 @@ export async function POST(req: Request) {
         ticket: {
           number: ticket.ticketNumber,
           holder: usedHolder,
+          phone: ticket.user?.phone,
           type: ticket.ticketType.name,
           color: (ticket.ticketType as any).color,
           price: (ticket.ticketType as any).price,
@@ -130,6 +133,7 @@ export async function POST(req: Request) {
         ticket: {
           number: ticket.ticketNumber,
           holder: holderName,
+          phone: ticket.user?.phone,
           type: ticket.ticketType.name,
           color: (ticket.ticketType as any).color,
           price: (ticket.ticketType as any).price,
@@ -164,6 +168,8 @@ export async function POST(req: Request) {
     return ok(payload)
   } catch (e) {
     return serverError(e)
+  } finally {
+    if (scanLockKey) void releaseScanLock(scanLockKey)
   }
 }
 
