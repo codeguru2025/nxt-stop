@@ -59,14 +59,50 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
+  // Re-sync session on navigation, but avoid re-renders when nothing changed (reduces flicker).
   useEffect(() => {
+    let cancelled = false
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(d => {
-        if (d.success) setUser(d.data)
+        if (cancelled) return
+        if (d.success) {
+          const next: NavUser = {
+            name: d.data.name,
+            role: d.data.role,
+            phone: d.data.phone,
+          }
+          setUser(prev => {
+            if (
+              prev &&
+              prev.phone === next.phone &&
+              prev.role === next.role &&
+              prev.name === next.name
+            ) {
+              return prev
+            }
+            return next
+          })
+        } else {
+          setUser(prev => (prev === null ? prev : null))
+        }
       })
       .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [pathname])
+
+  // Warm route bundles while the menu is open so taps feel instant.
+  useEffect(() => {
+    if (!menuOpen) return
+    for (const item of MOBILE_SHEET_LINKS) {
+      router.prefetch(item.href)
+    }
+    router.prefetch('/login')
+    router.prefetch('/admin')
+    router.prefetch('/dashboard')
+  }, [menuOpen, router])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -101,8 +137,8 @@ export default function Navbar() {
     <>
       <nav
         className={cn(
-          'fixed top-0 left-0 right-0 z-50 transition-all duration-300 h-16',
-          scrolled ? 'bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#2a2a2a]' : 'bg-transparent'
+          'fixed top-0 left-0 right-0 z-50 h-16 transition-[background-color,backdrop-filter,border-color] duration-150 ease-out',
+          scrolled ? 'bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#2a2a2a]' : 'bg-transparent border-b border-transparent'
         )}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center justify-between">
