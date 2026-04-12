@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import AdminLayout from './AdminLayout'
 import {
   Plus, AlertTriangle, Package, ShoppingBag, Loader2,
-  Check, X, RefreshCw, Pencil, Trash2, ChevronDown,
+  Check, X, RefreshCw, Pencil, Trash2, Upload, ImageIcon,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
@@ -73,6 +73,31 @@ export default function AdminStoreClient() {
   const [merchForm, setMerchForm] = useState({ ...BLANK_MERCH })
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [stockEdit, setStockEdit] = useState<{ id: string; stock: string } | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
+  const merchFileRef = useRef<HTMLInputElement>(null)
+  const drinkFileRef = useRef<HTMLInputElement>(null)
+
+  const uploadImage = async (
+    file: File,
+    setUrl: (url: string) => void,
+  ) => {
+    setImageUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('folder', 'products')
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd }).then(r => r.json())
+      if (res.success) {
+        setUrl(res.data.url)
+      } else {
+        alert(res.error ?? 'Image upload failed')
+      }
+    } catch {
+      alert('Image upload failed — check your connection')
+    } finally {
+      setImageUploading(false)
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -255,15 +280,57 @@ export default function AdminStoreClient() {
               </div>
 
               <div className="sm:col-span-2 lg:col-span-3">
-                <label>Image URL</label>
-                <input value={merchForm.image} onChange={e => setMerchForm(f => ({ ...f, image: e.target.value }))} placeholder="https://..." />
+                <label>Product Image</label>
+                <input
+                  ref={merchFileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    if (file) uploadImage(file, url => setMerchForm(f => ({ ...f, image: url })))
+                    e.target.value = ''
+                  }}
+                />
+                {merchForm.image ? (
+                  <div className="flex items-center gap-3 mt-1">
+                    <img src={merchForm.image} alt="" className="w-16 h-16 rounded-lg object-cover border border-[#2a2a2a]" />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => merchFileRef.current?.click()}
+                        disabled={imageUploading}
+                        className="text-xs text-purple-400 hover:text-purple-300"
+                      >
+                        Change
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMerchForm(f => ({ ...f, image: '' }))}
+                        className="text-xs text-red-400 hover:text-red-300"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => merchFileRef.current?.click()}
+                    disabled={imageUploading}
+                    className="mt-1 flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-dashed border-[#2a2a2a] hover:border-purple-500/40 rounded-xl px-4 py-3 transition-all w-full justify-center"
+                  >
+                    {imageUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                    {imageUploading ? 'Uploading…' : 'Upload image'}
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="flex gap-2 mt-4">
               <button
                 onClick={saveMerch}
-                disabled={saving || !merchForm.eventId || !merchForm.price}
+                disabled={saving || imageUploading || !merchForm.eventId || !merchForm.price}
                 className="btn-primary flex items-center gap-2 text-sm"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
@@ -301,9 +368,43 @@ export default function AdminStoreClient() {
               <div><label>Initial Stock</label><input type="number" value={drinkForm.stock} onChange={e => setDrinkForm(f => ({ ...f, stock: parseInt(e.target.value) || 0 }))} /></div>
               <div><label>Low Stock Alert At</label><input type="number" value={drinkForm.lowStockAt} onChange={e => setDrinkForm(f => ({ ...f, lowStockAt: parseInt(e.target.value) || 0 }))} /></div>
               <div className="sm:col-span-2"><label>Description</label><input value={drinkForm.description} onChange={e => setDrinkForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional" /></div>
+
+              <div className="sm:col-span-2">
+                <label>Product Image</label>
+                <input
+                  ref={drinkFileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    if (file) uploadImage(file, url => setDrinkForm(f => ({ ...f, image: url })))
+                    e.target.value = ''
+                  }}
+                />
+                {drinkForm.image ? (
+                  <div className="flex items-center gap-3 mt-1">
+                    <img src={drinkForm.image} alt="" className="w-16 h-16 rounded-lg object-cover border border-[#2a2a2a]" />
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => drinkFileRef.current?.click()} disabled={imageUploading} className="text-xs text-purple-400 hover:text-purple-300">Change</button>
+                      <button type="button" onClick={() => setDrinkForm(f => ({ ...f, image: '' }))} className="text-xs text-red-400 hover:text-red-300">Remove</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => drinkFileRef.current?.click()}
+                    disabled={imageUploading}
+                    className="mt-1 flex items-center gap-2 text-sm text-gray-400 hover:text-white border border-dashed border-[#2a2a2a] hover:border-purple-500/40 rounded-xl px-4 py-3 transition-all w-full justify-center"
+                  >
+                    {imageUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                    {imageUploading ? 'Uploading…' : 'Upload image'}
+                  </button>
+                )}
+              </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={saveDrink} disabled={saving || !drinkForm.eventId || !drinkForm.name} className="btn-primary flex items-center gap-2 text-sm">
+              <button onClick={saveDrink} disabled={saving || imageUploading || !drinkForm.eventId || !drinkForm.name} className="btn-primary flex items-center gap-2 text-sm">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 Add Product
               </button>
@@ -335,19 +436,28 @@ export default function AdminStoreClient() {
               return (
                 <div key={p.id} className={`card p-4 flex flex-col gap-3 transition-all ${!p.active ? 'opacity-40' : ''}`}>
                   {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-white text-sm truncate">{p.name}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {tab === 'merch' ? (
-                          <>{merchLabel ?? p.category}{p.size ? ` · ${p.size}` : ''}{p.color ? ` · ${p.color}` : ''}</>
-                        ) : (
-                          <span className="capitalize">{p.category}</span>
-                        )}
-                        {' · '}{p.event.name}
-                      </p>
+                  <div className="flex items-start gap-3">
+                    {p.image ? (
+                      <img src={p.image} alt="" className="w-12 h-12 rounded-lg object-cover border border-[#2a2a2a] shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center shrink-0">
+                        <ImageIcon size={16} className="text-gray-600" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0 flex items-start justify-between">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-white text-sm truncate">{p.name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {tab === 'merch' ? (
+                            <>{merchLabel ?? p.category}{p.size ? ` · ${p.size}` : ''}{p.color ? ` · ${p.color}` : ''}</>
+                          ) : (
+                            <span className="capitalize">{p.category}</span>
+                          )}
+                          {' · '}{p.event.name}
+                        </p>
+                      </div>
+                      <span className="text-white font-black text-sm shrink-0 ml-2">{formatCurrency(p.price)}</span>
                     </div>
-                    <span className="text-white font-black text-sm shrink-0 ml-2">{formatCurrency(p.price)}</span>
                   </div>
 
                   {/* Stock bar */}
