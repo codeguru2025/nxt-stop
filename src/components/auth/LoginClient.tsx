@@ -8,7 +8,15 @@ import { Loader2, Eye, EyeOff } from 'lucide-react'
 export default function LoginClient() {
   const router = useRouter()
   const params = useSearchParams()
-  const redirect = params.get('redirect') ?? '/dashboard'
+
+  /** Middleware sends `from`; older links may use `redirect`. Must be same-origin path only. */
+  function safeReturnPath(raw: string | null): string | undefined {
+    if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return undefined
+    return raw
+  }
+
+  const explicitReturn =
+    safeReturnPath(params.get('from')) ?? safeReturnPath(params.get('redirect'))
 
   const [form, setForm] = useState({ phone: '', password: '' })
   const [showPw, setShowPw] = useState(false)
@@ -29,7 +37,8 @@ export default function LoginClient() {
 
       if (res.success) {
         const role = res.data?.user?.role
-        const dest = role === 'admin' ? '/admin' : role === 'gate_staff' ? '/gate' : redirect
+        const dest = explicitReturn
+          ?? (role === 'gate_staff' ? '/gate' : role === 'admin' ? '/admin' : '/dashboard')
         router.push(dest)
         router.refresh()
       } else {

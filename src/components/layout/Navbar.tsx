@@ -9,11 +9,13 @@ import { cn } from '@/lib/utils'
 type NavUser = { name: string; role: string; phone: string } | null
 
 const NAV_LINKS = [
-  { href: '/',       label: 'Home'    },
-  { href: '/events', label: 'Events'  },
-  { href: '/merch',  label: 'Merch'   },
-  { href: '/gallery',label: 'Gallery' },
-  { href: '/about',  label: 'About'   },
+  { href: '/', label: 'Home' },
+  { href: '/events', label: 'Events' },
+  { href: '/merch', label: 'Merch' },
+  { href: '/gallery', label: 'Gallery' },
+  { href: '/videos', label: 'Past Videos' },
+  { href: '/dashboard/tickets', label: 'Tickets' },
+  { href: '/about', label: 'About' },
 ]
 
 export default function Navbar() {
@@ -60,15 +62,17 @@ export default function Navbar() {
           />
         </Link>
 
-        {/* Desktop centre links */}
-        <div className="hidden md:flex items-center gap-6 absolute left-1/2 -translate-x-1/2">
+        {/* Desktop centre links — one row; wraps slightly on mid-width screens */}
+        <div className="hidden md:flex flex-wrap justify-center items-center gap-x-5 gap-y-1 max-w-[min(52rem,calc(100%-11rem))] absolute left-1/2 -translate-x-1/2">
           {NAV_LINKS.map(l => (
             <Link
               key={l.href}
               href={l.href}
               className={cn(
-                'text-sm font-medium transition-colors',
-                pathname === l.href ? 'text-purple-400' : 'text-gray-400 hover:text-white'
+                'text-sm font-medium transition-colors whitespace-nowrap',
+                pathname === l.href || (l.href !== '/' && pathname.startsWith(l.href))
+                  ? 'text-purple-400'
+                  : 'text-gray-400 hover:text-white'
               )}
             >
               {l.label}

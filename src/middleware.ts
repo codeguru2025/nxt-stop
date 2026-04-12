@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
+import { env } from '@/lib/env'
 
 const PROTECTED_PATHS = ['/dashboard', '/admin', '/gate']
 const ADMIN_PATHS = ['/admin']
@@ -11,7 +12,7 @@ const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS']
 const CSRF_EXEMPT = ['/api/paynow/webhook', '/api/health']
 
 function getJwtSecret(): Uint8Array {
-  return new TextEncoder().encode(process.env.JWT_SECRET)
+  return new TextEncoder().encode(env.JWT_SECRET)
 }
 
 function generateToken(): string {

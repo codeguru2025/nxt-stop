@@ -303,6 +303,21 @@ label {
   background: #E8174A;
 }
 
+/* Horizontal scroll row for many bottom tabs (mobile) */
+.bottom-nav-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.bottom-nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+.bottom-nav-scroll .bottom-nav-tab--scroll {
+  flex: 0 0 auto;
+  min-width: 3.35rem;
+  max-width: 4.25rem;
+}
+
 /* ─── Divider ─────────────────────────────────────────────── */
 .divider {
   height: 1px;

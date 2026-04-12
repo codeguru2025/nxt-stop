@@ -21,6 +21,7 @@ const securityHeaders = [
         : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline' https://unpkg.com",
       "img-src 'self' https: data: blob:",
+      "media-src 'self' https: blob:",
       "font-src 'self'",
       "connect-src 'self' https://www.paynow.co.zw https://*.tile.openstreetmap.org wss:",
       "worker-src blob:",
