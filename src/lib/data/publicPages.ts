@@ -100,6 +100,70 @@ export function getPublishedEventsForList(limit: number) {
   return getPublishedEventsCached(take)
 }
 
+/** Single published event — same query shape as GET /api/events/[id] (slug or id). */
+export function getPublicEventDetailForPage(slug: string) {
+  const cached = unstable_cache(
+    async () => {
+      const row = await prisma.event.findFirst({
+        where: {
+          OR: [{ id: slug }, { slug }],
+          status: { in: ['published', 'live', 'ended'] },
+        },
+        include: {
+          ticketTypes: {
+            where: { active: true },
+            orderBy: { price: 'asc' },
+          },
+          media: { orderBy: { order: 'asc' } },
+          _count: {
+            select: { tickets: true, socialPosts: true },
+          },
+        },
+      })
+      if (!row) return null
+      return {
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        description: row.description ?? undefined,
+        venue: row.venue,
+        address: row.address ?? undefined,
+        date: row.date.toISOString(),
+        endDate: row.endDate?.toISOString(),
+        posterImage: row.posterImage ?? undefined,
+        bannerImage: row.bannerImage ?? undefined,
+        videoUrl: row.videoUrl ?? undefined,
+        lineup: row.lineup ?? undefined,
+        hasVirtual: row.hasVirtual,
+        virtualPrice: Number(row.virtualPrice),
+        platformFee: Number(row.platformFee),
+        status: row.status,
+        lat: row.lat ?? undefined,
+        lng: row.lng ?? undefined,
+        ticketTypes: row.ticketTypes.map(t => ({
+          id: t.id,
+          name: t.name,
+          description: t.description ?? undefined,
+          price: Number(t.price),
+          capacity: t.capacity,
+          sold: t.sold,
+          color: t.color,
+        })),
+        media: row.media.map(m => ({
+          id: m.id,
+          type: m.type,
+          url: m.url,
+          caption: m.caption ?? undefined,
+        })),
+        _count: row._count,
+      }
+    },
+    ['public-event-detail', slug],
+    { revalidate: 60 }
+  )
+  return cached()
+}
+
 /** Past-event video teasers — same as GET /api/media/teasers. */
 export const getPublicTeasers = unstable_cache(
   async () => {

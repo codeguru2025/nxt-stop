@@ -3,6 +3,8 @@ import Footer from '@/components/layout/Footer'
 import PastVideosClient from '@/components/videos/PastVideosClient'
 import { getPublicTeasers } from '@/lib/data/publicPages'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Past Event Videos | NXT STOP',
   description: 'Relive past NXT STOP events — teaser clips and full sets on YouTube.',

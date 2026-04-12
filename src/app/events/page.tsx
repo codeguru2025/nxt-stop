@@ -3,6 +3,8 @@ import Footer from '@/components/layout/Footer'
 import EventsClient from '@/components/events/EventsClient'
 import { getPublishedEventsForList } from '@/lib/data/publicPages'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = { title: 'Events' }
 
 type PageProps = { searchParams: Promise<{ ref?: string }> }

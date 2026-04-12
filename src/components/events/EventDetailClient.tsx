@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useParams, useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Calendar, MapPin, Clock, Users, Ticket, Share2,
   Check, AlertCircle, Loader2, Music, Video, Star, Phone, ExternalLink,
@@ -48,15 +48,15 @@ type Stage =
   | { name: 'payment_failed'; message: string; guestToken?: string }
   | { name: 'error'; message: string }
 
-export default function EventDetailClient() {
-  const { slug } = useParams<{ slug: string }>()
+export default function EventDetailClient({ initialEvent }: { initialEvent: Event | null }) {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  const [event, setEvent] = useState<Event | null>(null)
-  const [loading, setLoading] = useState(true)
+  const event = initialEvent
   const [imgError, setImgError] = useState(false)
-  const [selectedType, setSelectedType] = useState<string>('')
+  const [selectedType, setSelectedType] = useState<string>(
+    () => initialEvent?.ticketTypes[0]?.id ?? ''
+  )
   const [quantity, setQuantity] = useState(1)
   const [paymentMethod, setPaymentMethod] = useState('ecocash')
   const [phone, setPhone] = useState('')
@@ -75,17 +75,12 @@ export default function EventDetailClient() {
   const POLL_TIMEOUT = 72 // 72 × 5s = 6 minutes
 
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/events/${slug}`).then(r => r.json()),
-      fetch('/api/auth/me').then(r => r.json()),
-    ]).then(([evRes, userRes]) => {
-      if (evRes.success) {
-        setEvent(evRes.data)
-        if (evRes.data.ticketTypes[0]) setSelectedType(evRes.data.ticketTypes[0].id)
-      }
-      if (userRes.success) setUser(userRes.data)
-    }).finally(() => setLoading(false))
-  }, [slug])
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then((userRes: { success?: boolean; data?: unknown }) => {
+        if (userRes.success) setUser(userRes.data)
+      })
+  }, [])
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
@@ -232,12 +227,6 @@ export default function EventDetailClient() {
   type LineupArtist = { name: string; role: string; image?: string }
   let lineup: LineupArtist[] = []
   try { lineup = event?.lineup ? JSON.parse(event.lineup) : [] } catch {}
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 size={32} className="animate-spin text-purple-500" />
-    </div>
-  )
 
   if (!event) return (
     <div className="min-h-screen flex items-center justify-center">

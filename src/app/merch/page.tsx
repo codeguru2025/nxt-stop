@@ -3,6 +3,8 @@ import Footer from '@/components/layout/Footer'
 import MerchClient from '@/components/merch/MerchClient'
 import { getMerchForPage } from '@/lib/data/publicPages'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Merch | NXT STOP',
   description: 'Official NXT STOP merchandise — T-shirts, hoodies, caps and more.',
