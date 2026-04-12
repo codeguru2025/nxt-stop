@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, memo } from 'react'
+import { useState, useMemo, memo } from 'react'
 import Link from 'next/link'
 import { Calendar, MapPin, Search, ArrowRight } from 'lucide-react'
 import { formatDate, formatCurrency, getEventTimePhase, type EventTimePhase } from '@/lib/utils'
@@ -115,21 +115,12 @@ const EventCard = memo(function EventCard({ event, referral }: { event: Event; r
   )
 })
 
-export default function EventsClient() {
-  const [events, setEvents] = useState<Event[]>([])
-  const [loading, setLoading] = useState(true)
+type EventsPageProps = { initialEvents: Event[]; referralRef?: string }
+
+export default function EventsClient({ initialEvents, referralRef = '' }: EventsPageProps) {
+  const events = initialEvents
   const [search, setSearch] = useState('')
-
-  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
-  const ref = searchParams?.get('ref') ?? ''
-
-  useEffect(() => {
-    fetch('/api/events?status=published&limit=50')
-      .then(r => r.json())
-      .then(d => { if (d.success) setEvents(d.data) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+  const ref = referralRef
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
@@ -171,20 +162,7 @@ export default function EventsClient() {
       </div>
 
       {/* Events grid */}
-      {loading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="card overflow-hidden">
-              <div className="skeleton h-52" />
-              <div className="p-5">
-                <div className="skeleton h-5 rounded mb-3 w-3/4" />
-                <div className="skeleton h-4 rounded mb-2 w-1/2" />
-                <div className="skeleton h-4 rounded w-2/3" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : sorted.length === 0 ? (
+      {sorted.length === 0 ? (
         <div className="text-center py-20">
           <div className="text-6xl mb-4">🎵</div>
           <h3 className="text-xl font-semibold text-white mb-2">No Events Found</h3>

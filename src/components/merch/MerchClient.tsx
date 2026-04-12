@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ShoppingBag, Filter } from 'lucide-react'
@@ -32,17 +32,11 @@ const TYPE_ICONS: Record<string, string> = {
   poster: '🖼️', wristband: '📿', other: '🛍️',
 }
 
-export default function MerchClient() {
-  const [items, setItems] = useState<MerchItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [typeFilter, setTypeFilter] = useState('')
+type Props = { initialItems: MerchItem[] }
 
-  useEffect(() => {
-    fetch('/api/merch')
-      .then(r => r.json())
-      .then(d => { if (d.success) setItems(d.data) })
-      .finally(() => setLoading(false))
-  }, [])
+export default function MerchClient({ initialItems }: Props) {
+  const items = initialItems
+  const [typeFilter, setTypeFilter] = useState('')
 
   const types = Array.from(new Set(items.map(i => i.merchType).filter(Boolean))) as string[]
   const displayed = typeFilter ? items.filter(i => i.merchType === typeFilter) : items
@@ -81,11 +75,7 @@ export default function MerchClient() {
         )}
 
         {/* Grid */}
-        {loading ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => <div key={i} className="skeleton h-64 rounded-2xl" />)}
-          </div>
-        ) : displayed.length === 0 ? (
+        {displayed.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-6xl mb-4">🛍️</div>
             <h2 className="text-xl font-bold text-white mb-2">Merch coming soon</h2>

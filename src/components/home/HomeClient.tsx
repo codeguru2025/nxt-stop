@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Calendar, MapPin, ArrowRight, Play } from 'lucide-react'
 import { formatDate, formatCurrency, getEventTimePhase } from '@/lib/utils'
-import PastVideosClient from '@/components/videos/PastVideosClient'
+import PastVideosClient, { type TeaserItem } from '@/components/videos/PastVideosClient'
 
 type LineupArtist = {
   name: string
@@ -25,7 +25,7 @@ type Event = {
   posterImage?: string
   status: string
   lineup?: string
-  ticketTypes: { name: string; price: number; sold: number }[]
+  ticketTypes: { name: string; price: number; sold: number; capacity?: number }[]
   _count: { tickets: number }
 }
 
@@ -74,18 +74,11 @@ function Countdown({ date }: { date: string }) {
   )
 }
 
-export default function HomeClient() {
-  const [events, setEvents] = useState<Event[]>([])
-  const [loading, setLoading] = useState(true)
-  const [featuredImgError, setFeaturedImgError] = useState(false)
+type HomeProps = { initialEvents: Event[]; initialTeasers: TeaserItem[] }
 
-  useEffect(() => {
-    fetch('/api/events?status=published&limit=12')
-      .then(r => r.json())
-      .then(d => { if (d.success) setEvents(d.data) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+export default function HomeClient({ initialEvents, initialTeasers }: HomeProps) {
+  const events = initialEvents
+  const [featuredImgError, setFeaturedImgError] = useState(false)
 
   const sortedEvents = useMemo(() => {
     const rank = { upcoming: 0, live: 1, ended: 2 } as const
@@ -285,20 +278,7 @@ export default function HomeClient() {
             </Link>
           </div>
 
-          {loading ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="card overflow-hidden">
-                  <div className="skeleton h-48" />
-                  <div className="p-4">
-                    <div className="skeleton h-5 rounded mb-3 w-3/4" />
-                    <div className="skeleton h-4 rounded mb-2 w-1/2" />
-                    <div className="skeleton h-4 rounded w-2/3" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : events.length === 0 ? (
+          {events.length === 0 ? (
             <div className="text-center py-16">
               <div className="text-5xl mb-4">🎵</div>
               <p className="text-gray-500">No upcoming events — check back soon.</p>
@@ -351,7 +331,7 @@ export default function HomeClient() {
       </section>
 
       {/* Past Event Videos */}
-      <PastVideosClient mode="home" />
+      <PastVideosClient mode="home" initialTeasers={initialTeasers} />
 
       {/* Referral CTA */}
       <section className="py-20 border-t border-[#1a1a1a]">

@@ -12,20 +12,21 @@ export type TeaserItem = {
   event: { name: string; date: string; slug: string }
 }
 
-type Props = { mode: 'home' | 'page' }
+type Props = { mode: 'home' | 'page'; initialTeasers?: TeaserItem[] }
 
-export default function PastVideosClient({ mode }: Props) {
-  const [teasers, setTeasers] = useState<TeaserItem[]>([])
-  const [loading, setLoading] = useState(true)
+export default function PastVideosClient({ mode, initialTeasers }: Props) {
+  const [teasers, setTeasers] = useState<TeaserItem[]>(initialTeasers ?? [])
+  const [loading, setLoading] = useState(initialTeasers === undefined)
 
   useEffect(() => {
+    if (initialTeasers !== undefined) return
     fetch('/api/media/teasers')
       .then(r => r.json())
       .then(d => {
         if (d.success) setTeasers(d.data)
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [initialTeasers])
 
   const grid = (
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -72,7 +73,8 @@ export default function PastVideosClient({ mode }: Props) {
   )
 
   if (mode === 'home') {
-    if (loading || teasers.length === 0) return null
+    if (loading) return null
+    if (teasers.length === 0) return null
     return (
       <section className="py-20 border-t border-[#1a1a1a]">
         <div className="max-w-7xl mx-auto px-4">

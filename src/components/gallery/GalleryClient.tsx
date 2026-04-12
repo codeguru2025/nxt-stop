@@ -1,19 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
-type Photo = { id: string; url: string; caption: string | null }
+export type GalleryPhoto = { id: string; url: string; caption: string | null }
 
-export default function GalleryClient() {
-  const [photos, setPhotos] = useState<Photo[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState<Photo | null>(null)
+type Props = { initialPhotos: GalleryPhoto[] }
 
-  useEffect(() => {
-    fetch('/api/gallery').then(r => r.json()).then(d => {
-      if (d.success) setPhotos(d.data.photos ?? [])
-    }).finally(() => setLoading(false))
-  }, [])
+export default function GalleryClient({ initialPhotos }: Props) {
+  const [selected, setSelected] = useState<GalleryPhoto | null>(null)
+  const photos = initialPhotos
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pt-20 pb-16 px-4">
@@ -23,13 +18,7 @@ export default function GalleryClient() {
           <p className="text-gray-500">Moments from our events</p>
         </div>
 
-        {loading ? (
-          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3 space-y-3">
-            {[...Array(12)].map((_, i) => (
-              <div key={i} className={`skeleton rounded-xl w-full ${i % 3 === 0 ? 'h-64' : i % 3 === 1 ? 'h-48' : 'h-56'}`} />
-            ))}
-          </div>
-        ) : photos.length === 0 ? (
+        {photos.length === 0 ? (
           <div className="text-center py-24">
             <div className="text-6xl mb-4">📸</div>
             <p className="text-gray-500 text-lg">No photos yet — check back after the next event.</p>
@@ -45,6 +34,8 @@ export default function GalleryClient() {
                 <img
                   src={photo.url}
                   alt={photo.caption ?? ''}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
                 {photo.caption && (
