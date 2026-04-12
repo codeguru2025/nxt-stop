@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminLayout from './AdminLayout'
-import { Plus, Trash2, Loader2, Video, ExternalLink } from 'lucide-react'
+import { Plus, Trash2, Loader2, Video, ExternalLink, Upload } from 'lucide-react'
 
 type Teaser = {
   id: string
+  eventId: string
   url: string
   youtubeUrl: string | null
   caption: string | null
@@ -15,54 +16,130 @@ type Teaser = {
 
 type EventOption = { id: string; name: string }
 
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export default function AdminVideosClient() {
   const router = useRouter()
-  const fileRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [teasers, setTeasers] = useState<Teaser[]>([])
   const [events, setEvents] = useState<EventOption[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState({ eventId: '', youtubeUrl: '', caption: '' })
+  /** File chosen from device — kept in state so selection is visible and upload is reliable on mobile */
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   const load = () => {
-    fetch('/api/media/teasers').then(r => r.json()).then(d => {
-      if (d.success) setTeasers(d.data)
-    }).finally(() => setLoading(false))
+    fetch('/api/media/teasers')
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) setTeasers(d.data)
+      })
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => {
-      if (!d.success || d.data.role !== 'admin') { router.push('/login'); return }
-      fetch('/api/admin/events').then(r => r.json()).then(d => {
-        if (d.success) setEvents(d.data.map((e: any) => ({ id: e.id, name: e.name })))
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => {
+        if (!d.success || d.data.role !== 'admin') {
+          router.push('/login')
+          return
+        }
+        fetch('/api/admin/events')
+          .then(r => r.json())
+          .then(ev => {
+            if (ev.success) setEvents(ev.data.map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })))
+          })
+        load()
       })
-      load()
-    })
   }, [router])
 
+  useEffect(() => {
+    if (!pendingFile) {
+      setPreviewUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(pendingFile)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [pendingFile])
+
+  const onFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null
+    setUploadError(null)
+    setPendingFile(file)
+    e.target.value = ''
+  }
+
   const upload = async () => {
-    const file = fileRef.current?.files?.[0]
-    if (!file || !form.eventId) return
+    if (!pendingFile) {
+      setUploadError('Choose a teaser video file from your device.')
+      return
+    }
+    if (!form.eventId) {
+      setUploadError('Select which event this teaser is for.')
+      return
+    }
+
     setUploading(true)
+    setUploadError(null)
+
     const fd = new FormData()
-    fd.append('file', file)
+    fd.append('file', pendingFile)
     fd.append('type', 'teaser')
-    if (form.youtubeUrl) fd.append('youtubeUrl', form.youtubeUrl)
-    if (form.caption) fd.append('caption', form.caption)
-    await fetch(`/api/admin/events/${form.eventId}/media`, { method: 'POST', body: fd })
-    setForm({ eventId: '', youtubeUrl: '', caption: '' })
-    if (fileRef.current) fileRef.current.value = ''
-    setUploading(false)
-    load()
+    if (form.youtubeUrl.trim()) fd.append('youtubeUrl', form.youtubeUrl.trim())
+    if (form.caption.trim()) fd.append('caption', form.caption.trim())
+
+    try {
+      const res = await fetch(`/api/admin/events/${form.eventId}/media`, { method: 'POST', body: fd })
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean
+        error?: string
+        message?: string
+      }
+
+      if (!res.ok || data.success !== true) {
+        const msg =
+          typeof data.error === 'string'
+            ? data.error
+            : typeof data.message === 'string'
+              ? data.message
+              : res.status === 403
+                ? 'Session or security check failed. Refresh the page and try again.'
+                : `Upload failed (${res.status}). Try a smaller file or MP4/MOV format.`
+        setUploadError(msg)
+        return
+      }
+
+      setForm({ eventId: '', youtubeUrl: '', caption: '' })
+      setPendingFile(null)
+      load()
+    } catch {
+      setUploadError('Network error — check your connection and try again.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const remove = async (teaser: Teaser) => {
     if (!confirm('Delete this video?')) return
-    await fetch(`/api/admin/events/${(teaser as any).eventId}/media`, {
+    const res = await fetch(`/api/admin/events/${teaser.eventId}/media`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mediaId: teaser.id }),
     })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || data.success === false) {
+      alert(typeof data.error === 'string' ? data.error : 'Could not delete video')
+      return
+    }
     load()
   }
 
@@ -78,13 +155,19 @@ export default function AdminVideosClient() {
 
         {/* Upload */}
         <div className="card p-5 mb-6">
-          <h3 className="font-bold text-white mb-4 flex items-center gap-2"><Video size={16} /> Add Video Teaser</h3>
+          <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+            <Video size={16} /> Add Video Teaser
+          </h3>
           <div className="grid sm:grid-cols-2 gap-3 mb-3">
             <div>
               <label>Event *</label>
               <select value={form.eventId} onChange={e => setForm(f => ({ ...f, eventId: e.target.value }))}>
                 <option value="">Select event...</option>
-                {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+                {events.map(ev => (
+                  <option key={ev.id} value={ev.id}>
+                    {ev.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
@@ -95,16 +178,46 @@ export default function AdminVideosClient() {
                 placeholder="https://youtube.com/watch?v=..."
               />
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <label>Teaser Video File *</label>
               <input
-                ref={fileRef}
+                ref={fileInputRef}
                 type="file"
-                accept="video/*"
-                className="text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-purple-500/20 file:text-purple-300 hover:file:bg-purple-500/30 cursor-pointer"
+                accept="video/*,.mp4,.mov,.m4v,.webm,.3gp,video/mp4,video/quicktime"
+                className="sr-only"
+                onChange={onFileChosen}
               />
+              <div className="mt-1 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="flex items-center justify-center gap-2 text-sm text-gray-300 hover:text-white border border-dashed border-[#2a2a2a] hover:border-purple-500/50 rounded-xl px-4 py-3 transition-all w-full sm:w-auto sm:inline-flex"
+                >
+                  <Upload size={16} className="text-purple-400 shrink-0" />
+                  {pendingFile ? 'Choose a different video' : 'Choose video from gallery / files'}
+                </button>
+                {pendingFile && (
+                  <div className="rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] px-3 py-2 text-sm">
+                    <p className="text-white font-medium truncate" title={pendingFile.name}>
+                      {pendingFile.name || 'Video selected'}
+                    </p>
+                    <p className="text-gray-500 text-xs mt-0.5">{formatBytes(pendingFile.size)}</p>
+                    <button
+                      type="button"
+                      onClick={() => setPendingFile(null)}
+                      className="text-xs text-red-400 hover:text-red-300 mt-2"
+                    >
+                      Clear selection
+                    </button>
+                  </div>
+                )}
+                {previewUrl && (
+                  <video src={previewUrl} className="w-full max-w-md rounded-lg border border-[#2a2a2a] bg-black mt-1" controls muted playsInline />
+                )}
+              </div>
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <label>Caption</label>
               <input
                 value={form.caption}
@@ -113,7 +226,22 @@ export default function AdminVideosClient() {
               />
             </div>
           </div>
-          <button onClick={upload} disabled={uploading || !form.eventId} className="btn-primary flex items-center gap-2 text-sm">
+
+          {uploadError && (
+            <p className="text-sm text-red-400 mb-3" role="alert">
+              {uploadError}
+            </p>
+          )}
+
+          {!form.eventId && pendingFile && (
+            <p className="text-sm text-amber-400/90 mb-3">Select an event above, then click &quot;Upload Teaser&quot; to save.</p>
+          )}
+
+          <button
+            onClick={upload}
+            disabled={uploading || !form.eventId || !pendingFile}
+            className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
+          >
             {uploading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
             {uploading ? 'Uploading...' : 'Upload Teaser'}
           </button>
@@ -131,21 +259,38 @@ export default function AdminVideosClient() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {teasers.map(t => (
               <div key={t.id} className="card overflow-hidden">
-                <video src={t.url} className="w-full aspect-video object-cover bg-black" muted loop playsInline
+                <video
+                  src={t.url}
+                  className="w-full aspect-video object-cover bg-black"
+                  muted
+                  loop
+                  playsInline
                   onMouseEnter={e => (e.target as HTMLVideoElement).play()}
-                  onMouseLeave={e => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
+                  onMouseLeave={e => {
+                    const v = e.target as HTMLVideoElement
+                    v.pause()
+                    v.currentTime = 0
+                  }}
                 />
                 <div className="p-3">
                   <p className="text-white text-sm font-medium truncate">{t.event.name}</p>
                   {t.caption && <p className="text-gray-500 text-xs truncate">{t.caption}</p>}
                   <div className="flex items-center gap-2 mt-2">
                     {t.youtubeUrl && (
-                      <a href={t.youtubeUrl} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300">
+                      <a
+                        href={t.youtubeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300"
+                      >
                         <ExternalLink size={11} /> YouTube
                       </a>
                     )}
-                    <button onClick={() => remove(t)} className="ml-auto text-gray-600 hover:text-red-400 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => remove(t)}
+                      className="ml-auto text-gray-600 hover:text-red-400 transition-colors"
+                    >
                       <Trash2 size={14} />
                     </button>
                   </div>

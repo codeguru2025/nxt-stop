@@ -1,7 +1,9 @@
 import { prisma } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
-import { ok, forbidden, serverError } from '@/lib/api'
+import { ok, forbidden, serverError, error } from '@/lib/api'
 import { uploadFile, deleteFile } from '@/lib/storage'
+
+const MAX_VIDEO_BYTES = 250 * 1024 * 1024 // 250 MB
 
 export async function GET(
   _req: Request,
@@ -40,7 +42,17 @@ export async function POST(
     const caption = formData.get('caption') as string | null
     const type = (formData.get('type') as string) ?? 'teaser'
 
-    if (!file) return Response.json({ error: 'file required' }, { status: 400 })
+    if (!file) return error('file required', 400)
+
+    if (type === 'teaser') {
+      if (file.size > MAX_VIDEO_BYTES) {
+        return error(`Video too large — maximum size is ${Math.round(MAX_VIDEO_BYTES / (1024 * 1024))} MB`, 400)
+      }
+      const ct = file.type || ''
+      if (ct.startsWith('image/')) {
+        return error('That file looks like an image. Pick a video from your gallery.', 400)
+      }
+    }
 
     const buffer = Buffer.from(await file.arrayBuffer())
     const ext = file.name.split('.').pop() ?? 'bin'
