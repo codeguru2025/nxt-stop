@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
-import { env } from '@/lib/env'
 
 const PROTECTED_PATHS = ['/dashboard', '/admin', '/gate']
 const ADMIN_PATHS = ['/admin']
@@ -11,8 +10,10 @@ const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS']
 
 const CSRF_EXEMPT = ['/api/paynow/webhook', '/api/health']
 
+// Middleware runs in Edge Runtime — must use static process.env access
+// (dynamic process.env[name] doesn't work in Edge; Next.js inlines static refs at build)
 function getJwtSecret(): Uint8Array {
-  return new TextEncoder().encode(env.JWT_SECRET)
+  return new TextEncoder().encode(process.env.JWT_SECRET)
 }
 
 function generateToken(): string {
