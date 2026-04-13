@@ -122,7 +122,10 @@ export async function sendOrderTicketsWhatsApp(orderId: string): Promise<void> {
   const phoneNumberId = env.META_WHATSAPP_PHONE_NUMBER_ID
   const templateName = env.WHATSAPP_TEMPLATE_NAME
   const templateLang = env.WHATSAPP_TEMPLATE_LANG
-  if (!token || !phoneNumberId) return
+  if (!token || !phoneNumberId) {
+    console.warn('[whatsapp] missing META_WHATSAPP_TOKEN or META_WHATSAPP_PHONE_NUMBER_ID/WHATSAPP_PHONE_NUMBER_ID')
+    return
+  }
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
@@ -137,7 +140,10 @@ export async function sendOrderTicketsWhatsApp(orderId: string): Promise<void> {
     },
   })
   if (!order || order.status !== 'paid' || order.tickets.length === 0) return
-  if (!order.whatsappPhone) return
+  if (!order.whatsappPhone) {
+    console.warn(`[whatsapp] order ${orderId} has no whatsappPhone`)
+    return
+  }
 
   const recipient = toWhatsAppRecipient(order.whatsappPhone)
   const holderName = order.recipientName || order.whatsappName || order.user.name

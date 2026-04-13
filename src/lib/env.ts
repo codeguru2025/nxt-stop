@@ -18,7 +18,9 @@ export const env = {
 
   get PAYNOW_EMAIL()    { return required('PAYNOW_EMAIL') },
   get META_WHATSAPP_TOKEN() { return process.env.META_WHATSAPP_TOKEN },
-  get META_WHATSAPP_PHONE_NUMBER_ID() { return process.env.META_WHATSAPP_PHONE_NUMBER_ID },
+  get META_WHATSAPP_PHONE_NUMBER_ID() {
+    return process.env.META_WHATSAPP_PHONE_NUMBER_ID ?? process.env.WHATSAPP_PHONE_NUMBER_ID
+  },
   get WHATSAPP_TEMPLATE_NAME() { return process.env.WHATSAPP_TEMPLATE_NAME },
   get WHATSAPP_TEMPLATE_LANG() { return process.env.WHATSAPP_TEMPLATE_LANG ?? 'en' },
   get WHATSAPP_WEBHOOK_VERIFY_TOKEN() { return process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN },
