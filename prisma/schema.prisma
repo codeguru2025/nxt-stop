@@ -196,6 +196,9 @@ model Order {
   guestToken    String?   @unique
   guestPhone    String?
   guestName     String?
+  whatsappPhone String?
+  whatsappName  String?
+  whatsappSentAt DateTime?
   recipientName String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

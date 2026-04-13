@@ -23,6 +23,8 @@ export async function GET(req: Request) {
         { orderNumber: { contains: search, mode: 'insensitive' } },
         { user: { name: { contains: search, mode: 'insensitive' } } },
         { user: { phone: { contains: search, mode: 'insensitive' } } },
+        { whatsappName: { contains: search, mode: 'insensitive' } },
+        { whatsappPhone: { contains: search, mode: 'insensitive' } },
         { guestName: { contains: search, mode: 'insensitive' } },
         { guestPhone: { contains: search, mode: 'insensitive' } },
       ]

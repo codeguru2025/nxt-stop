@@ -63,9 +63,9 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
   const [stage, setStage] = useState<Stage>({ name: 'idle' })
   const [user, setUser] = useState<any>(null)
 
-  // Guest / "for someone else" fields
-  const [guestName, setGuestName]           = useState('')
-  const [guestPhone, setGuestPhone]         = useState('')
+  // Buyer and delivery fields
+  const [whatsAppName, setWhatsAppName]     = useState('')
+  const [whatsAppPhone, setWhatsAppPhone]   = useState('')
   const [forSomeoneElse, setForSomeoneElse] = useState(false)
   const [recipientName, setRecipientName]   = useState('')
 
@@ -81,6 +81,12 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
         if (userRes.success) setUser(userRes.data)
       })
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    if (!whatsAppName.trim() && user.name) setWhatsAppName(user.name)
+    if (!whatsAppPhone.trim() && user.phone) setWhatsAppPhone(user.phone)
+  }, [user, whatsAppName, whatsAppPhone])
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
@@ -146,11 +152,8 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
       return
     }
 
-    // Validate guest fields if not logged in
-    if (!user) {
-      if (!guestPhone.trim()) return
-      if (!guestName.trim()) return
-    }
+    if (!whatsAppPhone.trim()) return
+    if (!whatsAppName.trim()) return
 
     // Validate phone for mobile methods
     if (isMobile && !phone.trim()) return
@@ -164,11 +167,13 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
         ticketTypeId: selectedType,
         quantity,
         referralCode: ref || undefined,
+        whatsappPhone: whatsAppPhone,
+        whatsappName: whatsAppName,
         recipientName: forSomeoneElse && recipientName ? recipientName : undefined,
       }
       if (!user) {
-        orderBody.guestPhone = guestPhone
-        orderBody.guestName = guestName
+        orderBody.guestPhone = whatsAppPhone
+        orderBody.guestName = whatsAppName
       }
 
       const orderRes = await fetch('/api/orders', {
@@ -518,27 +523,26 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                         </div>
                       )}
 
-                      {/* Guest fields (not logged in) */}
-                      {!user && (
-                        <div className="space-y-3 bg-[#111] rounded-xl p-4 border border-[#2a2a2a]">
-                          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Your Details</p>
-                          <input
-                            type="text"
-                            placeholder="Full name *"
-                            value={guestName}
-                            onChange={e => setGuestName(e.target.value)}
-                            className="w-full"
-                          />
-                          <input
-                            type="tel"
-                            placeholder="Phone number *"
-                            value={guestPhone}
-                            onChange={e => setGuestPhone(e.target.value)}
-                            className="w-full"
-                          />
+                      <div className="space-y-3 bg-[#111] rounded-xl p-4 border border-[#2a2a2a]">
+                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Ticket Delivery (WhatsApp)</p>
+                        <input
+                          type="text"
+                          placeholder="WhatsApp full name *"
+                          value={whatsAppName}
+                          onChange={e => setWhatsAppName(e.target.value)}
+                          className="w-full"
+                        />
+                        <input
+                          type="tel"
+                          placeholder="WhatsApp number (e.g. +263771234567) *"
+                          value={whatsAppPhone}
+                          onChange={e => setWhatsAppPhone(e.target.value)}
+                          className="w-full"
+                        />
+                        {!user && (
                           <p className="text-xs text-gray-600"><a href="/register" className="text-purple-400 hover:text-purple-300">Create an account</a> to manage your tickets and earn rewards.</p>
-                        </div>
-                      )}
+                        )}
+                      </div>
 
                       {/* Buying for someone else */}
                       <button
@@ -579,7 +583,7 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                         !selectedType ||
                         available <= 0 ||
                         (isMobile && !phone.trim()) ||
-                        (!user && (!guestPhone.trim() || !guestName.trim()))
+                        (!whatsAppPhone.trim() || !whatsAppName.trim())
                       }
                       className="w-full btn-primary flex items-center justify-center gap-2 text-base"
                     >

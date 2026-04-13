@@ -1,8 +1,10 @@
 import { prisma } from './db'
 import { generateTicketNumber } from './qr'
+import { sendOrderTicketsWhatsApp } from './whatsapp'
 import crypto from 'crypto'
 
 export async function fulfillOrder(orderId: string, paymentMethod: string, paymentRef?: string) {
+  let ticketsMinted = false
   await prisma.$transaction(async (tx) => {
     // Serialize fulfillment for this order (pending payment vs paid-without-tickets repair).
     const locked = await tx.$queryRaw<{ id: string }[]>`
@@ -105,6 +107,7 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
         where: { id: ticketType.id },
         data: { sold: { increment: item.quantity } },
       })
+      ticketsMinted = true
     }
 
     if (order.referralCode) {
@@ -163,4 +166,10 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
   }, {
     timeout: 15000,
   })
+
+  if (ticketsMinted) {
+    sendOrderTicketsWhatsApp(orderId).catch((err) => {
+      console.error(`WhatsApp delivery failed for order ${orderId}`, err)
+    })
+  }
 }

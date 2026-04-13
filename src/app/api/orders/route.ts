@@ -3,6 +3,7 @@ import { requireAuth, signToken } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { generateOrderNumber } from '@/lib/qr'
 import { checkOrderLimit } from '@/lib/rateLimit'
+import { normalizeWhatsAppPhone } from '@/lib/phone'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
@@ -18,6 +19,8 @@ const CreateOrderSchema = z.object({
   quantity:     z.number().int().min(1).max(20).default(1),
   referralCode: z.string().optional(),
   partnerId:    z.string().optional(),
+  whatsappPhone: z.string().min(7).max(30),
+  whatsappName: z.string().min(1).max(100),
   guestPhone:   z.string().min(7).max(20).optional(),
   guestName:    z.string().min(1).max(100).optional(),
   recipientName: z.string().max(100).optional(),
@@ -37,7 +40,12 @@ export async function POST(req: Request) {
     if (!parsed.success) {
       return error(parsed.error.issues.map((i: { message: string }) => i.message).join('; '))
     }
-    const { eventId, ticketTypeId, quantity, referralCode, partnerId, guestPhone, guestName, recipientName } = parsed.data
+    const { eventId, ticketTypeId, quantity, referralCode, partnerId, guestPhone, guestName, recipientName, whatsappPhone, whatsappName } = parsed.data
+
+    const normalizedWhatsappPhone = normalizeWhatsAppPhone(whatsappPhone ?? guestPhone ?? '')
+    if (!normalizedWhatsappPhone) return error('Enter a valid WhatsApp number in international format')
+    const normalizedWhatsappName = (whatsappName ?? guestName ?? '').trim()
+    if (!normalizedWhatsappName) return error('WhatsApp name is required')
 
     // Resolve user — either from session or guest checkout
     let userId: string
@@ -47,11 +55,11 @@ export async function POST(req: Request) {
     if (session) {
       userId = session.id
     } else {
-      if (!guestPhone) return error('Phone number is required to purchase tickets')
-      if (!guestName)  return error('Name is required to purchase tickets')
+      if (!guestPhone && !whatsappPhone) return error('Phone number is required to purchase tickets')
+      if (!guestName && !whatsappName)  return error('Name is required to purchase tickets')
 
       // Check if a user with a real password already exists — require them to log in
-      const existingUser = await prisma.user.findUnique({ where: { phone: guestPhone.trim() } })
+      const existingUser = await prisma.user.findUnique({ where: { phone: normalizedWhatsappPhone } })
       if (existingUser) {
         return error('This phone number is already registered. Please log in to purchase tickets.', 401)
       }
@@ -59,8 +67,8 @@ export async function POST(req: Request) {
       const fakeHash = await bcrypt.hash(crypto.randomUUID(), 6)
       const guestUser = await prisma.user.create({
         data: {
-          phone: guestPhone.trim(),
-          name: guestName,
+          phone: normalizedWhatsappPhone,
+          name: normalizedWhatsappName,
           passwordHash: fakeHash,
           role: 'customer',
         },
@@ -135,8 +143,10 @@ export async function POST(req: Request) {
           partnerId: resolvedPartnerId ?? null,
           referralCode: referralCode ?? null,
           guestToken: guestToken ?? null,
-          guestPhone: guestPhone ?? null,
-          guestName: guestName ?? null,
+          guestPhone: session ? null : normalizedWhatsappPhone,
+          guestName: session ? null : normalizedWhatsappName,
+          whatsappPhone: normalizedWhatsappPhone,
+          whatsappName: normalizedWhatsappName,
           recipientName: recipientName ?? null,
           items: {
             create: {

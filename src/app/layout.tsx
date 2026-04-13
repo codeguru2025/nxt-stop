@@ -11,6 +11,11 @@ export const metadata: Metadata = {
   title: { default: 'NXT STOP', template: '%s | NXT STOP' },
   description: "Zimbabwe's premium nightlife events. The artists. The energy. The culture.",
   keywords: ['events', 'nightlife', 'DJ', 'tickets', 'Zimbabwe', 'NXT STOP', 'Bulawayo', 'Harare'],
+  verification: {
+    other: {
+      'facebook-domain-verification': 'mryx0l0dbixq7ik0sf0fxsek5o97lt',
+    },
+  },
   icons: {
     icon: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo.jpeg',
     apple: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo.jpeg',
