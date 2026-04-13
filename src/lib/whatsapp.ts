@@ -10,7 +10,8 @@ type GraphError = {
 }
 
 function baseUrl(phoneNumberId: string): string {
-  return `https://graph.facebook.com/v22.0/${phoneNumberId}`
+  // Keep aligned with current Meta Cloud API version used in docs.
+  return `https://graph.facebook.com/v23.0/${phoneNumberId}`
 }
 
 async function uploadTicketMedia(
@@ -55,6 +56,7 @@ async function sendDocumentMessage(
     },
     body: JSON.stringify({
       messaging_product: 'whatsapp',
+      recipient_type: 'individual',
       to,
       type: 'document',
       document: {
@@ -88,6 +90,7 @@ async function sendTemplateDocumentMessage(
     },
     body: JSON.stringify({
       messaging_product: 'whatsapp',
+      recipient_type: 'individual',
       to,
       type: 'template',
       template: {

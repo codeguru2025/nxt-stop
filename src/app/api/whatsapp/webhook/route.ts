@@ -37,6 +37,7 @@ type WhatsAppWebhookPayload = {
     changes?: Array<{
       field?: string
       value?: {
+        messaging_product?: string
         metadata?: { display_phone_number?: string; phone_number_id?: string }
         contacts?: Array<{ wa_id?: string; profile?: { name?: string } }>
         messages?: Array<{ id?: string; from?: string; type?: string; timestamp?: string }>
@@ -70,7 +71,9 @@ export async function POST(req: Request) {
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
+      if (change.field !== 'messages') continue
       const value = change.value
+      if (value?.messaging_product && value.messaging_product !== 'whatsapp') continue
       for (const status of value?.statuses ?? []) {
         console.log('[whatsapp:webhook:status]', {
           wabaId: entry.id,
