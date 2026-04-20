@@ -1,6 +1,7 @@
 import QRCode from 'qrcode'
 import crypto from 'crypto'
 import { redis } from './redis'
+import { uploadFile } from './storage'
 
 const QR_TTL = 60 * 60 * 24 * 30 // 30 days — QR codes are immutable once created
 
@@ -54,4 +55,21 @@ export function generateOrderNumber(): string {
   const timestamp = Date.now().toString(36).toUpperCase()
   const random = crypto.randomBytes(4).toString('hex').toUpperCase()
   return `ORD-${timestamp}-${random}`
+}
+
+// Generates a QR code PNG pointing to the event's public ticket-purchase page,
+// uploads it to DO Spaces, and returns the CDN URL.
+export async function generateEventQrCode(eventId: string, slug: string): Promise<string> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const ticketUrl = `${appUrl}/events/${slug}`
+
+  const buffer = await QRCode.toBuffer(ticketUrl, {
+    type: 'png',
+    width: 512,
+    margin: 2,
+    color: { dark: '#000000', light: '#ffffff' },
+    errorCorrectionLevel: 'H',
+  })
+
+  return uploadFile(Buffer.from(buffer), `qr-${eventId}.png`, 'events', 'image/png')
 }

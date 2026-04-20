@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import { slugify } from '@/lib/utils'
+import { generateEventQrCode } from '@/lib/qr'
 import crypto from 'crypto'
 
 export async function GET() {
@@ -84,6 +85,15 @@ export async function POST(req: Request) {
       },
       include: { ticketTypes: true },
     })
+
+    // Generate QR code pointing to the ticket-purchase page; fire-and-forget on error
+    try {
+      const qrCodeUrl = await generateEventQrCode(event.id, event.slug)
+      await prisma.event.update({ where: { id: event.id }, data: { qrCodeUrl } })
+      return ok({ ...event, qrCodeUrl }, 201)
+    } catch {
+      // QR generation is non-critical — return event without it
+    }
 
     return ok(event, 201)
   } catch (e) {

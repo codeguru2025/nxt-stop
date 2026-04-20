@@ -109,6 +109,9 @@ export async function POST(req: Request) {
 
       if (!ticketType) throw Object.assign(new Error('Ticket type not found'), { status: 404 })
       if (!ticketType.active) throw Object.assign(new Error('Ticket type is no longer available'), { status: 409 })
+      if (['ended', 'cancelled'].includes(ticketType.event.status)) {
+        throw Object.assign(new Error('Ticket sales for this event are closed'), { status: 409 })
+      }
 
       // Count pending (unpaid) orders that have already reserved this ticket type
       // so concurrent checkouts don't jointly exceed capacity

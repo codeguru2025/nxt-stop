@@ -8,7 +8,8 @@ import AdminLayout from './AdminLayout'
 const LocationPicker = dynamic(() => import('./LocationPicker'), { ssr: false })
 import {
   Plus, Calendar, MapPin, Ticket, Edit, Trash2,
-  Loader2, Check, X, ImagePlus, UserPlus, Mic2, Music2
+  Loader2, Check, X, ImagePlus, UserPlus, Mic2, Music2,
+  QrCode, Download, RefreshCw,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -21,6 +22,7 @@ type LineupArtist = {
 type Event = {
   id: string; name: string; slug: string; date: string; venue: string
   status: string; ticketTypes: any[]; _count: { tickets: number }
+  qrCodeUrl?: string | null
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -60,6 +62,8 @@ export default function AdminEventsClient() {
   const [artistUploading, setArtistUploading] = useState<Record<number, boolean>>({})
   const posterInputRef = useRef<HTMLInputElement>(null)
   const artistInputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const [qrModal, setQrModal] = useState<{ id: string; name: string; qrCodeUrl: string } | null>(null)
+  const [qrRegenerating, setQrRegenerating] = useState<string | null>(null)
 
   const load = () => {
     fetch('/api/admin/events').then(r => r.json()).then(d => {
@@ -218,6 +222,33 @@ export default function AdminEventsClient() {
     }))
   }
 
+  const regenerateQr = async (id: string) => {
+    setQrRegenerating(id)
+    try {
+      const res = await fetch(`/api/admin/events/${id}/qr`, { method: 'POST' }).then(r => r.json())
+      if (res.success) {
+        setEvents(evs => evs.map(ev => ev.id === id ? { ...ev, qrCodeUrl: res.data.qrCodeUrl } : ev))
+        if (qrModal?.id === id) setQrModal(m => m ? { ...m, qrCodeUrl: res.data.qrCodeUrl } : m)
+      } else {
+        alert(res.error ?? 'Failed to generate QR code')
+      }
+    } catch {
+      alert('Network error')
+    } finally {
+      setQrRegenerating(null)
+    }
+  }
+
+  const downloadQr = async (url: string, name: string) => {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `qr-${name.toLowerCase().replace(/\s+/g, '-')}.png`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   const anyUploading = posterUploading || Object.values(artistUploading).some(Boolean)
 
   return (
@@ -316,6 +347,52 @@ export default function AdminEventsClient() {
                   </button>
                 )}
               </div>
+              {editing && (
+                <div>
+                  <label className="flex items-center gap-1.5"><QrCode size={13} /> QR Code</label>
+                  {(() => {
+                    const ev = events.find(e => e.id === editing)
+                    const qrUrl = ev?.qrCodeUrl
+                    return qrUrl ? (
+                      <div className="flex items-start gap-3 p-3 bg-[#0a0a0a] rounded-xl border border-[#2a2a2a]">
+                        <div className="bg-white rounded-lg p-1.5 shrink-0">
+                          <img src={qrUrl} alt="QR Code" className="w-20 h-20 object-contain" />
+                        </div>
+                        <div className="flex flex-col gap-2 justify-center">
+                          <p className="text-xs text-gray-400">Share with your graphic designer to print on the poster.</p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => downloadQr(qrUrl, form.name)}
+                              className="text-xs btn-primary flex items-center gap-1.5"
+                            >
+                              <Download size={11} /> Download PNG
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => regenerateQr(editing)}
+                              disabled={qrRegenerating === editing}
+                              className="text-xs text-gray-500 hover:text-white border border-[#2a2a2a] rounded-lg px-2 py-1.5 flex items-center gap-1 transition-colors"
+                            >
+                              {qrRegenerating === editing ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} Regenerate
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => regenerateQr(editing)}
+                        disabled={qrRegenerating === editing}
+                        className="flex items-center gap-2 text-sm text-gray-500 hover:text-purple-400 border border-dashed border-[#2a2a2a] hover:border-purple-500/40 rounded-xl px-4 py-3 transition-colors w-full justify-center"
+                      >
+                        {qrRegenerating === editing ? <Loader2 size={14} className="animate-spin" /> : <QrCode size={14} />}
+                        Generate QR Code
+                      </button>
+                    )
+                  })()}
+                </div>
+              )}
               <div className="sm:col-span-2">
                 <label>Venue Location</label>
                 <LocationPicker
@@ -497,6 +574,24 @@ export default function AdminEventsClient() {
                     <option value="live">Live</option>
                     <option value="ended">Ended</option>
                   </select>
+                  {ev.qrCodeUrl ? (
+                    <button
+                      onClick={() => setQrModal({ id: ev.id, name: ev.name, qrCodeUrl: ev.qrCodeUrl! })}
+                      className="text-gray-500 hover:text-purple-400 transition-colors"
+                      title="View QR code"
+                    >
+                      <QrCode size={14} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => regenerateQr(ev.id)}
+                      disabled={qrRegenerating === ev.id}
+                      className="text-gray-600 hover:text-purple-400 transition-colors"
+                      title="Generate QR code"
+                    >
+                      {qrRegenerating === ev.id ? <Loader2 size={14} className="animate-spin" /> : <QrCode size={14} />}
+                    </button>
+                  )}
                   <button onClick={() => startEdit(ev.id)} className="text-gray-500 hover:text-blue-400 transition-colors">
                     <Edit size={14} />
                   </button>
@@ -509,6 +604,40 @@ export default function AdminEventsClient() {
           </div>
         )}
       </div>
+        {/* QR Code Modal */}
+        {qrModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setQrModal(null)}>
+            <div className="bg-[#111] border border-[#2a2a2a] rounded-2xl p-6 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-white text-sm">Event QR Code</h3>
+                  <p className="text-xs text-gray-500 mt-0.5 truncate max-w-[220px]">{qrModal.name}</p>
+                </div>
+                <button onClick={() => setQrModal(null)} className="text-gray-600 hover:text-white transition-colors"><X size={16} /></button>
+              </div>
+              <div className="bg-white rounded-xl p-3 mb-4">
+                <img src={qrModal.qrCodeUrl} alt="QR Code" className="w-full aspect-square object-contain" />
+              </div>
+              <p className="text-xs text-gray-500 text-center mb-4">Scan to go straight to ticket purchase</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => downloadQr(qrModal.qrCodeUrl, qrModal.name)}
+                  className="flex-1 btn-primary text-sm flex items-center justify-center gap-2"
+                >
+                  <Download size={14} /> Download PNG
+                </button>
+                <button
+                  onClick={() => regenerateQr(qrModal.id)}
+                  disabled={qrRegenerating === qrModal.id}
+                  className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-white border border-[#2a2a2a] rounded-lg px-3 py-2 transition-colors"
+                  title="Regenerate"
+                >
+                  {qrRegenerating === qrModal.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </AdminLayout>
   )
 }
