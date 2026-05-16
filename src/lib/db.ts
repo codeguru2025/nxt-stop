@@ -7,6 +7,8 @@ declare global {
 }
 
 function create(): PrismaClient {
+  const masked = (process.env.DATABASE_URL ?? '(unset)').replace(/:([^:@]+)@/, ':***@')
+  console.log('[db] DATABASE_URL =', masked)
   // Strip sslmode from the connection string so pg-connection-string (v8.13+)
   // does not re-interpret it as sslmode=verify-full and override our ssl option.
   // SSL is controlled entirely by the ssl: {} option below.

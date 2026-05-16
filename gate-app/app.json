@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "NXT STOP Gate",
+    "slug": "nxtstop-gate-scanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0a0a0a",
+      "resizeMode": "contain"
+    },
+    "android": {
+      "package": "com.nxtstop.gate",
+      "versionCode": 3,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-splash-screen",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "NXT STOP Gate needs your camera to scan QR tickets."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e42f8ae4-c35f-4e93-90cc-0c6b046f8b3f"
+      }
+    }
+  }
+}

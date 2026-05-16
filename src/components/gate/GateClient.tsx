@@ -268,13 +268,24 @@ export default function GateClient() {
             <div className="text-xs text-gray-500 leading-none mt-0.5">Entry Validation</div>
           </div>
         </div>
-        <Link
-          href="/gate/activate"
-          className="flex items-center gap-1.5 text-sm btn-primary px-3 py-2"
-        >
-          <DollarSign size={14} />
-          Sell Ticket
-        </Link>
+        <div className="flex items-center gap-2">
+          {process.env.NEXT_PUBLIC_GATE_APP_URL && (
+            <a
+              href={process.env.NEXT_PUBLIC_GATE_APP_URL}
+              className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-[#3a3a3a] text-gray-300 hover:text-white hover:border-purple-500/50 transition-colors"
+              download
+            >
+              📲 Get App
+            </a>
+          )}
+          <Link
+            href="/gate/activate"
+            className="flex items-center gap-1.5 text-sm btn-primary px-3 py-2"
+          >
+            <DollarSign size={14} />
+            Sell Ticket
+          </Link>
+        </div>
       </div>
 
       {/* Stats bar */}
