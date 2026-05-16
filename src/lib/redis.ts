@@ -11,17 +11,15 @@ function createRedisClient(): Redis | null {
     return null
   }
   const client = new Redis(url, {
-    connectTimeout: 5_000, // Give up connecting after 5s
-    maxRetriesPerRequest: 1, // Fail fast on individual commands
-    retryStrategy: (times) => {
-      if (times > 5) return null // Stop retrying after 5 attempts
-      return Math.min(times * 200, 5_000)
-    },
+    connectTimeout: 5_000,
+    maxRetriesPerRequest: 1,
+    retryStrategy: (times) => Math.min(times * 500, 30_000), // keep retrying, cap at 30s
     enableReadyCheck: true,
-    lazyConnect: true, // Don't block module load
+    lazyConnect: true,
     tls: url.startsWith('rediss://') ? {} : undefined,
   })
   client.on('error', (err) => console.error('[redis]', err.message))
+  client.on('end', () => console.warn('[redis] connection closed'))
   // Attempt connection but don't block
   client.connect().catch(() => {})
   return client
