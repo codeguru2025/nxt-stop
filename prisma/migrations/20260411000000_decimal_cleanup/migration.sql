@@ -22,7 +22,6 @@ ALTER TABLE "OrderItem" ALTER COLUMN "price" TYPE DECIMAL(10,2);
 
 -- Partner
 ALTER TABLE "Partner" ALTER COLUMN "commissionRate" TYPE DECIMAL(5,2);
-ALTER TABLE "Partner" ALTER COLUMN "commissionPerTicket" TYPE DECIMAL(10,2);
 ALTER TABLE "Partner" ALTER COLUMN "totalEarned" TYPE DECIMAL(12,2);
 
 -- EventPartner
