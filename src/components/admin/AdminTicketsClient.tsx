@@ -5,7 +5,7 @@ import AdminLayout from './AdminLayout'
 import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer, Calendar, MapPin, QrCode } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
-const LOGO_URL = 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
+const LOGO_URL = 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20new.png'
 
 function money(v: unknown): number {
   if (v == null) return 0

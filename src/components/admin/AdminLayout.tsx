@@ -53,7 +53,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-5 border-b border-[#2a2a2a] flex items-center justify-between gap-2 min-h-[64px]">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <img
-              src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
+              src="https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20new.png"
               alt="NXT STOP"
               className="h-6 w-auto object-contain invert shrink-0"
             />
@@ -125,7 +125,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Menu size={22} />
           </button>
           <img
-            src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
+            src="https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20new.png"
             alt="NXT STOP"
             className="h-6 w-auto object-contain invert"
           />

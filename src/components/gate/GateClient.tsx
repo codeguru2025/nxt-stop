@@ -258,7 +258,7 @@ export default function GateClient() {
       <div className="bg-[#111] border-b border-[#2a2a2a] px-4 h-14 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <img
-            src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
+            src="https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20new.png"
             alt="NXT STOP"
             className="h-7 w-auto object-contain invert"
           />

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, memo } from 'react'
 import Link from 'next/link'
-import { Calendar, MapPin, Search, ArrowRight } from 'lucide-react'
+import { Calendar, MapPin, Search, ArrowRight, Filter, X } from 'lucide-react'
 import { formatDate, formatCurrency, getEventTimePhase, type EventTimePhase } from '@/lib/utils'
 
 type Event = {
@@ -120,15 +120,24 @@ type EventsPageProps = { initialEvents: Event[]; referralRef?: string }
 export default function EventsClient({ initialEvents, referralRef = '' }: EventsPageProps) {
   const events = initialEvents
   const [search, setSearch] = useState('')
+  const [venueFilter, setVenueFilter] = useState('')
+  const [phaseFilter, setPhaseFilter] = useState<'' | 'upcoming' | 'live' | 'ended'>('')
   const ref = referralRef
+
+  const venues = useMemo(() => {
+    const seen = new Set<string>()
+    return events.map(e => e.venue).filter(v => { if (seen.has(v)) return false; seen.add(v); return true }).sort()
+  }, [events])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
-    return events.filter(e =>
-      e.name.toLowerCase().includes(q) ||
-      e.venue.toLowerCase().includes(q)
-    )
-  }, [events, search])
+    return events.filter(e => {
+      if (q && !e.name.toLowerCase().includes(q) && !e.venue.toLowerCase().includes(q)) return false
+      if (venueFilter && e.venue !== venueFilter) return false
+      if (phaseFilter && getEventTimePhase(e.date, e.endDate) !== phaseFilter) return false
+      return true
+    })
+  }, [events, search, venueFilter, phaseFilter])
 
   const sorted = useMemo(() => {
     const rank: Record<EventTimePhase, number> = { upcoming: 0, live: 1, ended: 2 }
@@ -148,16 +157,50 @@ export default function EventsClient({ initialEvents, referralRef = '' }: Events
         <p className="text-gray-500">Premium nightlife experiences — secured, scanned, and unforgettable.</p>
       </div>
 
-      {/* Search */}
-      <div className="flex gap-3 mb-8">
-        <div className="relative flex-1 max-w-md">
+      {/* Search + Filters */}
+      <div className="flex flex-wrap gap-3 mb-8 items-center">
+        <div className="relative flex-1 min-w-[180px] max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input
             placeholder="Search events or venues..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-9"
+            className="pl-9 w-full"
           />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Filter size={14} className="text-gray-500 shrink-0" />
+          <select
+            value={phaseFilter}
+            onChange={e => setPhaseFilter(e.target.value as typeof phaseFilter)}
+            className="text-sm py-2 px-3 min-w-[120px]"
+          >
+            <option value="">All dates</option>
+            <option value="upcoming">Upcoming</option>
+            <option value="live">Live now</option>
+            <option value="ended">Ended</option>
+          </select>
+
+          {venues.length > 1 && (
+            <select
+              value={venueFilter}
+              onChange={e => setVenueFilter(e.target.value)}
+              className="text-sm py-2 px-3 min-w-[140px]"
+            >
+              <option value="">All venues</option>
+              {venues.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          )}
+
+          {(phaseFilter || venueFilter || search) && (
+            <button
+              onClick={() => { setSearch(''); setVenueFilter(''); setPhaseFilter('') }}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-white border border-[#2a2a2a] rounded-lg px-2.5 py-2 transition-colors"
+            >
+              <X size={12} /> Clear
+            </button>
+          )}
         </div>
       </div>
 
@@ -167,7 +210,7 @@ export default function EventsClient({ initialEvents, referralRef = '' }: Events
           <div className="text-6xl mb-4">🎵</div>
           <h3 className="text-xl font-semibold text-white mb-2">No Events Found</h3>
           <p className="text-gray-500">
-            {search ? 'Try a different search term.' : 'Check back soon — events are being added.'}
+            {(search || venueFilter || phaseFilter) ? 'Try adjusting your filters.' : 'Check back soon — events are being added.'}
           </p>
         </div>
       ) : (

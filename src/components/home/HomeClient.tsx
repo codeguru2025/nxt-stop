@@ -100,7 +100,7 @@ export default function HomeClient({ initialEvents, initialTeasers }: HomeProps)
         {/* Background */}
         <div className="absolute inset-0">
           <Image
-            src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/BigQ%20on%20deck.jpeg"
+            src="https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/BigQ%20on%20deck.jpeg"
             alt=""
             fill
             priority
@@ -302,16 +302,16 @@ export default function HomeClient({ initialEvents, initialTeasers }: HomeProps)
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {[
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%202.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%203.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%206.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%205.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%207.jpeg',
-              'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/BigQ%20on%20deck.jpeg',
+              'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Corrason.jpeg',
+              'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Corrason%202.jpeg',
+              'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
+              'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Corrason%203.jpeg',
+              'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
+              'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Big%20Q%206.jpeg',
+              'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Corrason%205.jpeg',
+              'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',
+              'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Big%20Q%207.jpeg',
+              'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/BigQ%20on%20deck.jpeg',
             ].map((url, i) => (
               <div
                 key={i}

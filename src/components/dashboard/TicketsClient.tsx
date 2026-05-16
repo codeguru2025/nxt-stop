@@ -20,7 +20,7 @@ type TicketData = {
   order?: { total: number; subtotal: number; recipientName?: string }
 }
 
-const LOGO_URL = 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
+const LOGO_URL = 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20new.png'
 
 async function fetchAsDataURL(url: string): Promise<string> {
   try {

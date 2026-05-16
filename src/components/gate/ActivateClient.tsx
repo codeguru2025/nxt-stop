@@ -136,7 +136,7 @@ export default function ActivateClient() {
         </Link>
         <div className="h-4 w-px bg-[#2a2a2a]" />
         <img
-          src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
+          src="https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20new.png"
           alt="NXT STOP"
           className="h-7 w-auto object-contain invert"
         />

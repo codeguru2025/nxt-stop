@@ -44,7 +44,7 @@ export default function RegisterClient() {
     <div className="w-full max-w-md">
       <div className="text-center mb-8">
         <img
-          src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png"
+          src="https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20new.png"
           alt="NXT STOP"
           className="h-10 w-auto object-contain invert mx-auto mb-4"
         />

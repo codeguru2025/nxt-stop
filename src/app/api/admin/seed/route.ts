@@ -107,7 +107,7 @@ export async function POST(req: Request) {
         date: new Date('2026-08-29T12:00:00'),
         endDate: new Date('2026-08-29T22:00:00'),
         status: 'published',
-        posterImage: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/DLALA%20THUKZIN.jpeg',
+        posterImage: 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/DLALA%20THUKZIN.jpeg',
         lineup: JSON.stringify(['Dlala Thukzin', 'Big Q', 'Corrason', 'Yugo']),
         hasVirtual: false,
         platformFee: 0.10,

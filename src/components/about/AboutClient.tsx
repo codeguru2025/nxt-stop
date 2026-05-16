@@ -55,29 +55,29 @@ export default function AboutClient() {
               {
                 name: 'Corason',
                 role: 'Dance Music DJ',
-                image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason.jpeg',
+                image: 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Corrason.jpeg',
                 gallery: [
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%202.jpeg',
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%203.jpeg',
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Corrason%205.jpeg',
+                  'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Corrason%202.jpeg',
+                  'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Corrason%203.jpeg',
+                  'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Corrason%205.jpeg',
                 ],
               },
               {
                 name: 'Big Q',
                 role: 'Dance Music DJ',
-                image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q.jpeg',
+                image: 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Big%20Q.jpeg',
                 gallery: [
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Big%20Q%206.jpeg',
+                  'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Big%20Q%202.jpeg',
+                  'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Big%20Q%206.jpeg',
                 ],
               },
               {
                 name: 'Yugoe',
                 role: 'Dance Music DJ',
-                image: 'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
+                image: 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
                 gallery: [
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',
+                  'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Yugoe%20main.JPEG',
+                  'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Yugo%203.jpeg',
                 ],
               },
             ].map(dj => (
@@ -126,7 +126,7 @@ export default function AboutClient() {
             <div className="group max-w-xs w-full">
               <div className="relative overflow-hidden rounded-2xl mb-4 aspect-[3/4]">
                 <Image
-                  src="https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Handy.jpeg"
+                  src="https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Handy.jpeg"
                   alt="Handy"
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -140,9 +140,9 @@ export default function AboutClient() {
               </div>
               <div className="grid grid-cols-3 gap-1.5">
                 {[
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Handy%202.jpeg',
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Handy%203.jpeg',
-                  'https://nxt-stop.lon1.cdn.digitaloceanspaces.com/Handy%204.jpeg',
+                  'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Handy%202.jpeg',
+                  'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Handy%203.jpeg',
+                  'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/Handy%204.jpeg',
                 ].map((img, i) => (
                   <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
                     <Image

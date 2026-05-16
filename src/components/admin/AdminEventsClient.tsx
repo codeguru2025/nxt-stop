@@ -9,7 +9,7 @@ const LocationPicker = dynamic(() => import('./LocationPicker'), { ssr: false })
 import {
   Plus, Calendar, MapPin, Ticket, Edit, Trash2,
   Loader2, Check, X, ImagePlus, UserPlus, Mic2, Music2,
-  QrCode, Download, RefreshCw,
+  QrCode, Download, RefreshCw, Images,
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -33,12 +33,20 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-red-900/20 text-red-700',
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft',
+  published: 'Published',
+  live: 'Live',
+  ended: 'Ended',
+  cancelled: 'Cancelled',
+}
+
 const BLANK_FORM = {
   name: '', venue: '', address: '', date: '', endDate: '', description: '',
-  posterImage: '', bannerImage: '', hasVirtual: false, virtualPrice: 5,
+  posterImage: '', bannerImage: '', videoUrl: '', hasVirtual: false, virtualPrice: 5,
   status: 'draft', lat: '', lng: '',
   ticketTypes: [
-    { name: 'General', price: 10, capacity: 500, color: '#E8174A' }
+    { name: 'General', price: 10, capacity: 500, color: '#E8174A', active: true }
   ],
   lineup: [] as LineupArtist[],
 }
@@ -64,6 +72,9 @@ export default function AdminEventsClient() {
   const artistInputRefs = useRef<(HTMLInputElement | null)[]>([])
   const [qrModal, setQrModal] = useState<{ id: string; name: string; qrCodeUrl: string } | null>(null)
   const [qrRegenerating, setQrRegenerating] = useState<string | null>(null)
+  const [eventMedia, setEventMedia] = useState<{ id: string; type: string; url: string; caption?: string }[]>([])
+  const [mediaUploading, setMediaUploading] = useState(false)
+  const mediaInputRef = useRef<HTMLInputElement>(null)
 
   const load = () => {
     fetch('/api/admin/events').then(r => r.json()).then(d => {
@@ -129,6 +140,7 @@ export default function AdminEventsClient() {
       description: ev.description ?? '',
       posterImage: ev.posterImage ?? '',
       bannerImage: ev.bannerImage ?? '',
+      videoUrl: ev.videoUrl ?? '',
       hasVirtual: ev.hasVirtual ?? false,
       virtualPrice: ev.virtualPrice ?? 5,
       status: ev.status ?? 'draft',
@@ -139,6 +151,7 @@ export default function AdminEventsClient() {
     })
     setEditing(id)
     setShowForm(true)
+    loadMedia(id)
   }
 
   const deleteEvent = async (id: string) => {
@@ -239,6 +252,37 @@ export default function AdminEventsClient() {
     }
   }
 
+  const loadMedia = async (id: string) => {
+    const res = await fetch(`/api/admin/events/${id}/media`).then(r => r.json())
+    if (res.success) setEventMedia(res.data)
+  }
+
+  const uploadMedia = async (file: File) => {
+    if (!editing) return
+    setMediaUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('type', file.type.startsWith('video/') ? 'teaser' : 'image')
+      const res = await fetch(`/api/admin/events/${editing}/media`, { method: 'POST', body: fd }).then(r => r.json())
+      if (res.success) { loadMedia(editing) }
+      else alert(res.error ?? 'Upload failed')
+    } finally {
+      setMediaUploading(false)
+    }
+  }
+
+  const deleteMedia = async (mediaId: string) => {
+    if (!editing) return
+    const res = await fetch(`/api/admin/events/${editing}/media`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mediaId }),
+    }).then(r => r.json())
+    if (res.success) setEventMedia(m => m.filter(x => x.id !== mediaId))
+    else alert(res.error ?? 'Failed to delete')
+  }
+
   const downloadQr = async (url: string, name: string) => {
     const res = await fetch(url)
     const blob = await res.blob()
@@ -293,6 +337,14 @@ export default function AdminEventsClient() {
               <div className="sm:col-span-2">
                 <label>Description</label>
                 <textarea rows={3} value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))} className="resize-none" placeholder="Event description..." />
+              </div>
+              <div>
+                <label>Video URL <span className="text-gray-600 font-normal">(YouTube / direct)</span></label>
+                <input value={form.videoUrl} onChange={e => setForm((f: any) => ({ ...f, videoUrl: e.target.value }))} placeholder="https://youtube.com/..." />
+              </div>
+              <div>
+                <label>Banner Image URL <span className="text-gray-600 font-normal">(wide hero, optional)</span></label>
+                <input value={form.bannerImage} onChange={e => setForm((f: any) => ({ ...f, bannerImage: e.target.value }))} placeholder="https://..." />
               </div>
               <div>
                 <label>Poster Image</label>
@@ -408,6 +460,7 @@ export default function AdminEventsClient() {
                   <option value="published">Published</option>
                   <option value="live">Live</option>
                   <option value="ended">Ended</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
               </div>
               <div className="sm:col-span-2 flex items-center gap-3">
@@ -514,12 +567,83 @@ export default function AdminEventsClient() {
                       )}
                     </div>
                   </div>
-                  {editing && t.id && typeof t.sold === 'number' && (
-                    <p className="text-xs text-gray-600 mt-0.5 ml-0.5">{t.sold} sold of {t.capacity}</p>
+                  {editing && t.id && (
+                    <div className="flex items-center justify-between mt-1 ml-0.5">
+                      {typeof t.sold === 'number' && <p className="text-xs text-gray-600">{t.sold} sold of {t.capacity}</p>}
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={t.active !== false}
+                          onChange={e => updateTicketType(i, 'active', e.target.checked)}
+                          className="w-auto"
+                        />
+                        <span className="text-xs text-gray-500">Active</span>
+                      </label>
+                    </div>
                   )}
                 </div>
               ))}
             </div>
+
+            {/* Event Media — only shown when editing */}
+            {editing && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="m-0 flex items-center gap-2"><Images size={14} /> Event Gallery / Media</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={mediaInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0]
+                        if (file) uploadMedia(file)
+                        e.target.value = ''
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => mediaInputRef.current?.click()}
+                      disabled={mediaUploading}
+                      className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 disabled:opacity-50"
+                    >
+                      {mediaUploading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                      {mediaUploading ? 'Uploading…' : 'Add Photo / Video'}
+                    </button>
+                  </div>
+                </div>
+                {eventMedia.length === 0 ? (
+                  <p className="text-xs text-gray-600">No media yet. Upload photos or short videos to show in the event gallery.</p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2">
+                    {eventMedia.map(m => (
+                      <div key={m.id} className="relative group aspect-square rounded-xl overflow-hidden bg-[#111] border border-[#2a2a2a]">
+                        {m.type === 'image' ? (
+                          <img src={m.url} alt={m.caption ?? ''} className="w-full h-full object-cover" />
+                        ) : (
+                          <video src={m.url} className="w-full h-full object-cover" muted />
+                        )}
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => deleteMedia(m.id)}
+                            className="text-red-400 hover:text-red-300 bg-black/40 rounded-full p-1.5"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                        {m.type !== 'image' && (
+                          <div className="absolute bottom-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded">
+                            VIDEO
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {saveError && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-red-400 text-sm mb-4">{saveError}</div>
@@ -573,6 +697,7 @@ export default function AdminEventsClient() {
                     <option value="published">Published</option>
                     <option value="live">Live</option>
                     <option value="ended">Ended</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                   {ev.qrCodeUrl ? (
                     <button
