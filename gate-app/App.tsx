@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { View, ActivityIndicator, StyleSheet } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import Constants from 'expo-constants'
 import LoginScreen from './src/LoginScreen'
 import ScannerScreen from './src/ScannerScreen'
@@ -46,36 +47,38 @@ export default function App() {
 
   if (screen === 'loading') {
     return (
-      <View style={styles.splash}>
-        <ActivityIndicator size="large" color="#8B5CF6" />
-        <StatusBar style="light" />
-      </View>
+      <SafeAreaProvider>
+        <View style={styles.splash}>
+          <ActivityIndicator size="large" color="#8B5CF6" />
+          <StatusBar style="light" />
+        </View>
+      </SafeAreaProvider>
     )
   }
 
   if (screen === 'update') {
     return (
-      <>
+      <SafeAreaProvider>
         <UpdateScreen downloadUrl={downloadUrl} />
         <StatusBar style="light" />
-      </>
+      </SafeAreaProvider>
     )
   }
 
   if (screen === 'login') {
     return (
-      <>
+      <SafeAreaProvider>
         <LoginScreen onLogin={() => setScreen('scanner')} />
         <StatusBar style="light" />
-      </>
+      </SafeAreaProvider>
     )
   }
 
   return (
-    <>
+    <SafeAreaProvider>
       <ScannerScreen onLogout={() => setScreen('login')} />
       <StatusBar style="light" />
-    </>
+    </SafeAreaProvider>
   )
 }
 

@@ -22,6 +22,12 @@ export default function GateStaffClient() {
   const [showPw, setShowPw] = useState(false)
   const [formError, setFormError] = useState('')
   const [form, setForm] = useState({ name: '', phone: '', password: '' })
+  const [resetTarget, setResetTarget] = useState<StaffMember | null>(null)
+  const [resetPw, setResetPw] = useState('')
+  const [resetPwShow, setResetPwShow] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetError, setResetError] = useState('')
+  const [resetSuccess, setResetSuccess] = useState(false)
 
   const load = () => {
     fetch('/api/admin/gate-staff').then(r => r.json()).then(d => {
@@ -55,6 +61,25 @@ export default function GateStaffClient() {
       load()
     } else {
       setFormError(res.error ?? 'Failed to create account')
+    }
+  }
+
+  const resetPassword = async () => {
+    if (!resetTarget) return
+    if (resetPw.length < 8) { setResetError('Password must be at least 8 characters'); return }
+    setResetting(true)
+    setResetError('')
+    const res = await fetch(`/api/admin/gate-staff/${resetTarget.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: resetPw }),
+    }).then(r => r.json())
+    setResetting(false)
+    if (res.success) {
+      setResetSuccess(true)
+      setTimeout(() => { setResetTarget(null); setResetPw(''); setResetSuccess(false) }, 1500)
+    } else {
+      setResetError(res.error ?? 'Failed to reset password')
     }
   }
 
@@ -198,21 +223,82 @@ export default function GateStaffClient() {
                         {new Date(s.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => revoke(s.id)}
-                          disabled={deletingId === s.id}
-                          className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 rounded-lg px-2.5 py-1.5 transition-colors ml-auto"
-                        >
-                          {deletingId === s.id
-                            ? <Loader2 size={12} className="animate-spin" />
-                            : <Trash2 size={12} />}
-                          Revoke
-                        </button>
+                        <div className="flex items-center gap-2 justify-end">
+                          <button
+                            onClick={() => { setResetTarget(s); setResetPw(''); setResetError(''); setResetSuccess(false) }}
+                            className="flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 border border-purple-500/20 hover:border-purple-500/40 rounded-lg px-2.5 py-1.5 transition-colors"
+                          >
+                            <Eye size={12} /> Reset PW
+                          </button>
+                          <button
+                            onClick={() => revoke(s.id)}
+                            disabled={deletingId === s.id}
+                            className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/40 rounded-lg px-2.5 py-1.5 transition-colors"
+                          >
+                            {deletingId === s.id
+                              ? <Loader2 size={12} className="animate-spin" />
+                              : <Trash2 size={12} />}
+                            Revoke
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Reset password modal */}
+        {resetTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+            <div className="card w-full max-w-sm p-6">
+              <h3 className="font-bold text-white mb-1">Reset Password</h3>
+              <p className="text-gray-500 text-sm mb-4">
+                Set a new password for <span className="text-white">{resetTarget.name}</span>
+              </p>
+              <div className="relative">
+                <input
+                  type={resetPwShow ? 'text' : 'password'}
+                  value={resetPw}
+                  onChange={e => setResetPw(e.target.value)}
+                  placeholder="New password (min 8 chars)"
+                  className="pr-10 w-full"
+                  onKeyDown={e => e.key === 'Enter' && resetPassword()}
+                />
+                <button
+                  type="button"
+                  onClick={() => setResetPwShow(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                >
+                  {resetPwShow ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              {resetError && (
+                <p className="mt-2 text-sm text-red-400">{resetError}</p>
+              )}
+              {resetSuccess && (
+                <p className="mt-2 text-sm text-green-400 flex items-center gap-1.5">
+                  <Check size={14} /> Password updated
+                </p>
+              )}
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={resetPassword}
+                  disabled={resetting || resetSuccess}
+                  className="btn-primary flex items-center gap-2 text-sm"
+                >
+                  {resetting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  Save Password
+                </button>
+                <button
+                  onClick={() => setResetTarget(null)}
+                  className="flex items-center gap-2 text-sm text-gray-500 hover:text-white border border-[#2a2a2a] rounded-lg px-3 py-2 transition-colors"
+                >
+                  <X size={14} /> Cancel
+                </button>
+              </div>
             </div>
           </div>
         )}

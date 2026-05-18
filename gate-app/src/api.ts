@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 const BASE = 'https://nxt-stop-lp27d.ondigitalocean.app'
 
 export type ScanResult = {
-  result: 'valid' | 'already_used' | 'invalid'
+  result: 'valid' | 'already_used' | 'invalid' | 'early_scan'
   message: string
   ticket?: {
     number: string
@@ -100,6 +100,18 @@ export async function scanTicket(qrCode: string): Promise<ScanResult> {
   const data = await res.json()
   if (!data.success) throw new Error(data.error ?? 'Scan failed')
   return data.data as ScanResult
+}
+
+export async function getScanStats(): Promise<{ scanned: number; valid: number; invalid: number; early: number; used: number }> {
+  try {
+    const session = await AsyncStorage.getItem('nxt_session')
+    const res = await fetch(`${BASE}/api/scan/stats`, {
+      headers: session ? { Cookie: `nxt-session=${session}` } : {},
+    })
+    const data = await res.json()
+    if (data.success) return data.data
+  } catch {}
+  return { scanned: 0, valid: 0, invalid: 0, early: 0, used: 0 }
 }
 
 export async function logout(): Promise<void> {

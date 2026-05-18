@@ -112,6 +112,11 @@ export async function POST(req: Request) {
       if (['ended', 'cancelled'].includes(ticketType.event.status)) {
         throw Object.assign(new Error('Ticket sales for this event are closed'), { status: 409 })
       }
+      const eventCutoff = ticketType.event.endDate ?? new Date(ticketType.event.date.getTime() + 24 * 60 * 60 * 1000)
+      if (new Date() > eventCutoff) {
+        // Tag the error so we can auto-flag the event AFTER the tx rolls back
+        throw Object.assign(new Error('This event has ended — ticket sales are closed'), { status: 409, autoEndEventId: eventId })
+      }
 
       // Count pending (unpaid) orders that have already reserved this ticket type
       // so concurrent checkouts don't jointly exceed capacity
@@ -185,6 +190,13 @@ export async function POST(req: Request) {
       autoSessionToken: autoSessionToken ?? null,
     }, 201)
   } catch (e: any) {
+    // Auto-flag event as ended outside the rolled-back transaction
+    if (e?.autoEndEventId) {
+      prisma.event.updateMany({
+        where: { id: e.autoEndEventId, status: { in: ['published', 'live'] } },
+        data: { status: 'ended' },
+      }).catch(() => {})
+    }
     if (e?.status === 404 || e?.status === 409) return error(e.message, e.status)
     return serverError(e)
   }

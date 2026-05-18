@@ -6,32 +6,36 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
   Alert,
   Vibration,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import * as Haptics from 'expo-haptics'
-import { scanTicket, logout, type ScanResult } from './api'
+import { scanTicket, logout, getScanStats, type ScanResult } from './api'
 
 type Props = { onLogout: () => void }
 
-type Stats = { scanned: number; valid: number; invalid: number }
+type Stats = { scanned: number; valid: number; invalid: number; early: number }
 
 export default function ScannerScreen({ onLogout }: Props) {
   const [permission, requestPermission] = useCameraPermissions()
   const [result, setResult] = useState<ScanResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [manualCode, setManualCode] = useState('')
-  const [stats, setStats] = useState<Stats>({ scanned: 0, valid: 0, invalid: 0 })
+  const [stats, setStats] = useState<Stats>({ scanned: 0, valid: 0, invalid: 0, early: 0 })
   const [cameraActive, setCameraActive] = useState(true)
   const scanningRef = useRef(false)
   const autoResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (!permission?.granted) {
-      requestPermission()
-    }
+    if (!permission?.granted) requestPermission()
+    getScanStats().then(s => setStats({
+      scanned: s.scanned,
+      valid: s.valid,
+      invalid: s.invalid,
+      early: s.early,
+    }))
   }, [])
 
   useEffect(() => {
@@ -44,7 +48,8 @@ export default function ScannerScreen({ onLogout }: Props) {
     setStats(prev => ({
       scanned: prev.scanned + 1,
       valid: prev.valid + (r.result === 'valid' ? 1 : 0),
-      invalid: prev.invalid + (r.result !== 'valid' ? 1 : 0),
+      invalid: prev.invalid + (r.result === 'invalid' ? 1 : 0),
+      early: prev.early + (r.result === 'early_scan' ? 1 : 0),
     }))
   }
 
@@ -52,7 +57,7 @@ export default function ScannerScreen({ onLogout }: Props) {
     try {
       if (r === 'valid') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-      } else if (r === 'already_used') {
+      } else if (r === 'already_used' || r === 'early_scan') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)
@@ -123,25 +128,22 @@ export default function ScannerScreen({ onLogout }: Props) {
   }
 
   const resultColor =
-    result?.result === 'valid'
-      ? '#22c55e'
-      : result?.result === 'already_used'
-      ? '#f59e0b'
-      : '#ef4444'
+    result?.result === 'valid'      ? '#22c55e'
+    : result?.result === 'early_scan' ? '#06b6d4'
+    : result?.result === 'already_used' ? '#f59e0b'
+    : '#ef4444'
 
   const resultBg =
-    result?.result === 'valid'
-      ? '#22c55e18'
-      : result?.result === 'already_used'
-      ? '#f59e0b18'
-      : '#ef444418'
+    result?.result === 'valid'      ? '#22c55e18'
+    : result?.result === 'early_scan' ? '#06b6d418'
+    : result?.result === 'already_used' ? '#f59e0b18'
+    : '#ef444418'
 
   const resultLabel =
-    result?.result === 'valid'
-      ? 'ENTRY GRANTED'
-      : result?.result === 'already_used'
-      ? 'ALREADY USED'
-      : 'INVALID TICKET'
+    result?.result === 'valid'      ? 'ENTRY GRANTED'
+    : result?.result === 'early_scan' ? 'VERIFIED — NOT TODAY'
+    : result?.result === 'already_used' ? 'ALREADY USED'
+    : 'INVALID TICKET'
 
   return (
     <SafeAreaView style={styles.root}>
@@ -160,8 +162,9 @@ export default function ScannerScreen({ onLogout }: Props) {
       <View style={styles.statsRow}>
         {[
           { label: 'Scanned', value: stats.scanned, color: '#fff' },
-          { label: 'Valid', value: stats.valid, color: '#22c55e' },
-          { label: 'Rejected', value: stats.invalid, color: '#ef4444' },
+          { label: 'Admitted', value: stats.valid, color: '#22c55e' },
+          { label: 'Early', value: stats.early, color: '#06b6d4' },
+          { label: 'Invalid', value: stats.invalid, color: '#ef4444' },
         ].map(s => (
           <View key={s.label} style={styles.statBox}>
             <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>

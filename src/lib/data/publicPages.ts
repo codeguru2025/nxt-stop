@@ -153,6 +153,7 @@ export function getPublicEventDetailForPage(slug: string) {
           id: m.id,
           type: m.type,
           url: m.url,
+          youtubeUrl: m.youtubeUrl ?? undefined,
           caption: m.caption ?? undefined,
         })),
         _count: row._count,

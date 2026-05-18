@@ -8,7 +8,7 @@ const CSRF_COOKIE = 'csrf-token'
 const CSRF_HEADER = 'x-csrf-token'
 const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS']
 
-const CSRF_EXEMPT = ['/api/paynow/webhook', '/api/health', '/api/admin/seed', '/api/auth/login', '/api/scan']
+const CSRF_EXEMPT = ['/api/paynow/webhook', '/api/health', '/api/admin/seed', '/api/auth/login', '/api/scan', '/api/auth/change-password']
 
 // Middleware runs in Edge Runtime — must use static process.env access
 // (dynamic process.env[name] doesn't work in Edge; Next.js inlines static refs at build)

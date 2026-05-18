@@ -24,7 +24,7 @@ type Event = {
   posterImage?: string; bannerImage?: string; videoUrl?: string
   lineup?: string; hasVirtual: boolean; virtualPrice: number
   platformFee: number; status: string; ticketTypes: TicketType[]
-  media: { id: string; type: string; url: string; caption?: string }[]
+  media: { id: string; type: string; url: string; youtubeUrl?: string; caption?: string }[]
   _count: { tickets: number; socialPosts: number }
   lat?: number | null; lng?: number | null
 }
@@ -350,16 +350,49 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
               </div>
             )}
 
-            {event.media.length > 0 && (
+            {event.media.filter(m => m.type === 'image').length > 0 && (
               <div className="mb-8">
                 <h2 className="text-xl font-bold text-white mb-4">Gallery</h2>
                 <div className="grid grid-cols-3 gap-2">
-                  {event.media.map(m => (
+                  {event.media.filter(m => m.type === 'image').map(m => (
                     <div key={m.id} className="aspect-square rounded-xl overflow-hidden bg-[#1a1a1a]">
-                      {m.type === 'image' ? (
-                        <img src={m.url} alt={m.caption ?? ''} className="w-full h-full object-cover" />
-                      ) : (
-                        <video src={m.url} className="w-full h-full object-cover" muted />
+                      <img src={m.url} alt={m.caption ?? ''} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {event.media.filter(m => m.type !== 'image').length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Video size={20} className="text-purple-400" /> Videos
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {event.media.filter(m => m.type !== 'image').map(m => (
+                    <div key={m.id} className="group relative rounded-xl overflow-hidden bg-[#1a1a1a] border border-[#2a2a2a]">
+                      <div className="relative aspect-video">
+                        <video
+                          src={m.url}
+                          className="w-full h-full object-cover"
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                        />
+                        {m.youtubeUrl && (
+                          <a
+                            href={m.youtubeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="absolute top-2 right-2 flex items-center gap-1 bg-black/70 hover:bg-red-600 text-white text-xs font-semibold px-2 py-1 rounded-md transition-colors"
+                          >
+                            <ExternalLink size={11} /> YouTube
+                          </a>
+                        )}
+                      </div>
+                      {m.caption && (
+                        <p className="px-3 py-2 text-sm text-gray-400">{m.caption}</p>
                       )}
                     </div>
                   ))}

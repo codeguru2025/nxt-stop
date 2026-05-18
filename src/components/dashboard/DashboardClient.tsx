@@ -86,13 +86,45 @@ export default function DashboardClient() {
         </Link>
       </div>
 
+      {/* Merch milestone progress */}
+      {(() => {
+        const MERCH_THRESHOLD = 300
+        const pts = user.points
+        const pct = Math.min(Math.round((pts / MERCH_THRESHOLD) * 100), 100)
+        const remaining = Math.max(MERCH_THRESHOLD - pts, 0)
+        return (
+          <div className="card p-5 mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">👕</span>
+                <span className="text-sm font-bold text-white">Merch Milestone</span>
+              </div>
+              <span className="text-xs text-yellow-400 font-bold">{pts} / {MERCH_THRESHOLD} pts</span>
+            </div>
+            <div className="h-2 bg-[#2a2a2a] rounded-full overflow-hidden mb-2">
+              <div
+                className="h-full rounded-full transition-all"
+                style={{ width: `${pct}%`, background: pct >= 100 ? '#22c55e' : 'linear-gradient(to right, #a855f7, #f59e0b)' }}
+              />
+            </div>
+            {remaining > 0 ? (
+              <p className="text-xs text-gray-500">
+                <span className="text-yellow-400 font-semibold">{remaining} more pts</span> to unlock merchandise rewards — earn 10 pts per referral ticket sale
+              </p>
+            ) : (
+              <p className="text-xs text-green-400 font-semibold">🎉 You can redeem merch! Head to the Rewards Shop.</p>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Referral link */}
       <div className="card p-5 mb-6">
         <h3 className="font-bold text-white mb-1 flex items-center gap-2">
           <QrCode size={18} className="text-purple-400" />
           Your Referral Link
         </h3>
-        <p className="text-gray-500 text-sm mb-4">Share this — earn 10 points for every friend who buys a ticket</p>
+        <p className="text-gray-500 text-sm mb-4">Share this — earn <span className="text-yellow-400 font-semibold">10 points</span> for every friend who buys a ticket</p>
 
         <div className="flex gap-2">
           <div className="flex-1 bg-[#111] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm text-gray-400 truncate font-mono">

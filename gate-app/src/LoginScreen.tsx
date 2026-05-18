@@ -11,11 +11,13 @@ import {
   ScrollView,
   Image,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { login } from './api'
 
 type Props = { onLogin: () => void }
 
 export default function LoginScreen({ onLogin }: Props) {
+  const insets = useSafeAreaInsets()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -44,7 +46,7 @@ export default function LoginScreen({ onLogin }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top, 48), paddingBottom: Math.max(insets.bottom, 24) }]}
         keyboardShouldPersistTaps="handled"
       >
         {/* Logo */}

@@ -6,17 +6,19 @@ import {
   StyleSheet,
   Linking,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 type Props = { downloadUrl: string | null }
 
 export default function UpdateScreen({ downloadUrl }: Props) {
+  const insets = useSafeAreaInsets()
   const openDownload = () => {
     const url = downloadUrl ?? 'https://nxt-stop-lp27d.ondigitalocean.app/gate'
     Linking.openURL(url)
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <Text style={styles.icon}>🔄</Text>
       <Text style={styles.title}>Update Required</Text>
       <Text style={styles.body}>

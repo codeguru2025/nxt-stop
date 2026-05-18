@@ -1,4 +1,4 @@
--- Migration: decimal_cleanup
+sted sources-- Migration: decimal_cleanup
 -- 1. Convert Float currency fields to DECIMAL(10,2) for financial precision
 -- 2. Make Product.eventId optional (brand merchandise not tied to events)
 -- 3. Drop unused Session table

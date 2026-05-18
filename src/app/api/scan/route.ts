@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     scanLockKey = qrCode
 
     const ticketInclude = {
-      event: { select: { id: true, name: true, date: true, venue: true, posterImage: true } },
+      event: { select: { id: true, name: true, date: true, endDate: true, venue: true, posterImage: true } },
       ticketType: { select: { name: true, color: true, price: true } },
       user: { select: { name: true, phone: true } },
       order: { select: { recipientName: true, guestName: true } },
@@ -109,6 +109,35 @@ export async function POST(req: Request) {
         refunded:  'This ticket has been refunded',
       }
       const payload = { result: 'invalid', message: statusMessages[ticket.status] ?? `Ticket cannot be used (status: ${ticket.status})` }
+      emitScanEvent(ticket.eventId, payload)
+      return ok(payload)
+    }
+
+    // --- Early-scan gate: no ticket (digital or hard/activated) admits entry before event day.
+    // Scanning before the day only verifies the ticket is genuine — no admission.
+    // Compare in Africa/Harare local time so early-morning scans on event day still admit.
+    const now = new Date()
+    const TZ = 'Africa/Harare'
+    const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' })
+    const eventDateStr = dayFmt.format(new Date(ticket.event.date)) // YYYY-MM-DD in Harare
+    const todayStr = dayFmt.format(now)
+    if (todayStr < eventDateStr) {
+      await logScan(ticket.id, ticket.eventId, session.id, 'early_scan', deviceId)
+      const holderName = (ticket.order as any)?.recipientName || (ticket.order as any)?.guestName || ticket.user?.name || 'Unknown'
+      const eventDay = new Date(ticket.event.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Africa/Harare' })
+      const payload = {
+        result: 'early_scan',
+        message: `Ticket is genuine — doors open ${eventDay}`,
+        ticket: {
+          number: ticket.ticketNumber,
+          holder: holderName,
+          phone: ticket.user?.phone,
+          type: ticket.ticketType.name,
+          color: (ticket.ticketType as any).color,
+          event: ticket.event.name,
+          venue: (ticket.event as any).venue,
+        },
+      }
       emitScanEvent(ticket.eventId, payload)
       return ok(payload)
     }
