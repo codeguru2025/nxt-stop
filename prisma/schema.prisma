@@ -30,6 +30,25 @@ model User {
   socialPosts       SocialPost[]
   redemptions       Redemption[]
   scanLogs          ScanLog[]
+  passwordResetRequests PasswordResetRequest[]
+}
+
+// ─── PASSWORD RESETS ─────────────────────────────────────────────────────────
+
+model PasswordResetRequest {
+  id          String    @id @default(cuid())
+  userId      String
+  status      String    @default("pending") // pending | processed | rejected
+  reason      String?   // optional note from user
+  ip          String?
+  processedAt DateTime?
+  processedBy String?   // admin user id who handled it
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId])
 }
 
 // ─── FOUNDERS ────────────────────────────────────────────────────────────────

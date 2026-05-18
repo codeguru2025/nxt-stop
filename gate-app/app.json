@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.nxtstop.gate",
-      "versionCode": 4,
+      "versionCode": 5,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"

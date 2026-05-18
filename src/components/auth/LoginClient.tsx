@@ -96,6 +96,11 @@ export default function LoginClient() {
                 {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            <div className="text-right mt-1">
+              <Link href="/forgot-password" className="text-xs text-gray-500 hover:text-purple-400 transition-colors">
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           {error && (

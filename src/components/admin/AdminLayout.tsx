@@ -2,11 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, CalendarDays, Users, Package,
   Gift, UserCircle2, QrCode, LogOut, Shield,
-  ImageIcon, Video, Ticket, Menu, X
+  ImageIcon, Video, Ticket, Menu, X, KeyRound
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,13 +20,22 @@ const NAV = [
   { href: '/admin/tickets',    icon: Ticket,          label: 'Tickets & Orders' },
   { href: '/admin/gallery',    icon: ImageIcon,       label: 'Gallery' },
   { href: '/admin/videos',     icon: Video,           label: 'Past Videos' },
-  { href: '/admin/gate-staff', icon: Users,           label: 'Gate Staff' },
-  { href: '/gate',             icon: QrCode,          label: 'Gate Scanner' },
+  { href: '/admin/gate-staff',       icon: Users,     label: 'Gate Staff' },
+  { href: '/admin/password-resets',   icon: KeyRound,  label: 'Password Resets' },
+  { href: '/gate',                    icon: QrCode,    label: 'Gate Scanner' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const [pendingResets, setPendingResets] = useState(0)
+
+  useEffect(() => {
+    fetch('/api/admin/password-resets')
+      .then(r => r.json())
+      .then(d => { if (d.success) setPendingResets(d.data.length) })
+      .catch(() => {})
+  }, [])
 
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -86,7 +95,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 )}
               >
                 <item.icon size={16} className="shrink-0" />
-                <span className="truncate">{item.label}</span>
+                <span className="truncate flex-1">{item.label}</span>
+                {item.href === '/admin/password-resets' && pendingResets > 0 && (
+                  <span className="ml-auto bg-yellow-500 text-black text-xs font-black rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+                    {pendingResets}
+                  </span>
+                )}
               </Link>
             )
           })}
