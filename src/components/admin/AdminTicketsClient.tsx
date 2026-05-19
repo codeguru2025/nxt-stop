@@ -65,7 +65,7 @@ type EventOption = {
 }
 
 type GeneratedBatch = {
-  event: { name: string; date: string; venue: string }
+  event: { name: string; date: string; venue: string; posterImage?: string | null }
   ticketType: { name: string; color: string; price: number }
   tickets: { ticketNumber: string; qrCode: string; qrDataUrl: string; activationCode: string }[]
 }
@@ -73,7 +73,7 @@ type GeneratedBatch = {
 type BatchSummary = {
   eventId: string
   ticketTypeId: string
-  event: { id: string; name: string; date: string; venue: string } | null
+  event: { id: string; name: string; date: string; venue: string; posterImage?: string | null } | null
   ticketType: { id: string; name: string; color: string; price: number } | null
   unsold: number
   activated: number
@@ -131,7 +131,7 @@ export default function AdminTicketsClient() {
   const [orderDetailLoading, setOrderDetailLoading] = useState(false)
 
   const [physicalPreview, setPhysicalPreview] = useState<{
-    event: GeneratedBatch['event']
+    event: GeneratedBatch['event'] & { posterImage?: string | null }
     ticketType: GeneratedBatch['ticketType']
     ticket: { ticketNumber: string; qrDataUrl: string; activationCode: string }
   } | null>(null)
@@ -257,7 +257,7 @@ export default function AdminTicketsClient() {
     const d = new Date(hcBatch.event.date)
     const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-    const priceStr = `$${hcBatch.ticketType.price.toFixed(2)}`
+    const priceStr = `$${money(hcBatch.ticketType.price).toFixed(2)}`
 
     const ticketHtml = hcBatch.tickets.map(t => `
       <div class="ticket">
@@ -598,7 +598,7 @@ export default function AdminTicketsClient() {
                                     onClick={() => {
                                       if (!b.event || !b.ticketType) return
                                       setHcBatch({
-                                        event: { name: b.event.name, date: b.event.date, venue: b.event.venue },
+                                        event: { name: b.event.name, date: b.event.date, venue: b.event.venue, posterImage: b.event.posterImage },
                                         ticketType: { name: b.ticketType.name, color: b.ticketType.color, price: b.ticketType.price },
                                         tickets: expandedTickets,
                                       })
@@ -616,7 +616,7 @@ export default function AdminTicketsClient() {
                                       onClick={() => {
                                         if (!b.event || !b.ticketType) return
                                         setPhysicalPreview({
-                                          event: { name: b.event.name, date: b.event.date, venue: b.event.venue },
+                                          event: { name: b.event.name, date: b.event.date, venue: b.event.venue, posterImage: b.event.posterImage },
                                           ticketType: { name: b.ticketType.name, color: b.ticketType.color, price: b.ticketType.price },
                                           ticket: t,
                                         })
@@ -1031,7 +1031,10 @@ export default function AdminTicketsClient() {
             <button type="button" className="absolute top-3 right-3 z-10 text-gray-400 hover:text-white" onClick={() => setPhysicalPreview(null)} aria-label="Close">
               <X size={22} />
             </button>
-            <div className="p-6 pt-12">
+            {physicalPreview.event.posterImage && (
+              <img src={physicalPreview.event.posterImage} alt="" className="w-full h-36 object-cover" />
+            )}
+            <div className="p-6 pt-10">
               <div className="flex items-start gap-3 mb-4">
                 <img src={LOGO_URL} alt="" className="h-14 w-auto max-w-[200px] object-contain object-left invert shrink-0" />
                 <div className="min-w-0">

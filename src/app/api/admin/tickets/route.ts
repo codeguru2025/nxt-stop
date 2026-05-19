@@ -34,7 +34,7 @@ export async function GET(req: Request) {
       const ticketTypeIds = [...new Set(batches.map(b => b.ticketTypeId).filter(Boolean))] as string[]
 
       const [events, ticketTypes, activatedCounts] = await Promise.all([
-        prisma.event.findMany({ where: { id: { in: eventIds } }, select: { id: true, name: true, date: true, venue: true } }),
+        prisma.event.findMany({ where: { id: { in: eventIds } }, select: { id: true, name: true, date: true, venue: true, posterImage: true } }),
         prisma.ticketType.findMany({ where: { id: { in: ticketTypeIds } }, select: { id: true, name: true, color: true, price: true } }),
         prisma.ticket.groupBy({
           by: ['eventId', 'ticketTypeId'],
@@ -83,7 +83,7 @@ export async function GET(req: Request) {
           ticketNumber: true,
           qrCode: true,
           activationCode: true,
-          event: { select: { name: true, date: true, venue: true } },
+          event: { select: { name: true, date: true, venue: true, posterImage: true } },
           ticketType: { select: { name: true, color: true, price: true } },
         },
       })
@@ -146,7 +146,7 @@ export async function POST(req: Request) {
 
     const [ticketType, event] = await Promise.all([
       prisma.ticketType.findUnique({ where: { id: ticketTypeId } }),
-      prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, date: true, venue: true } }),
+      prisma.event.findUnique({ where: { id: eventId }, select: { id: true, name: true, date: true, venue: true, posterImage: true } }),
     ])
     if (!ticketType || !event) return error('Event or ticket type not found')
     if (ticketType.eventId !== eventId) return error('Ticket type does not belong to this event')
@@ -182,7 +182,7 @@ export async function POST(req: Request) {
     )
 
     return ok({
-      event: { name: event.name, date: event.date, venue: event.venue },
+      event: { name: event.name, date: event.date, venue: event.venue, posterImage: event.posterImage ?? null },
       ticketType: { name: ticketType.name, color: ticketType.color, price: ticketType.price },
       tickets: generated,
     }, 201)
