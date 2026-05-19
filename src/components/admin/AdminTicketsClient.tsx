@@ -258,8 +258,9 @@ export default function AdminTicketsClient() {
     const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
     const priceStr = `$${money(hcBatch.ticketType.price).toFixed(2)}`
+    const color = hcBatch.ticketType.color
 
-    const ticketHtml = hcBatch.tickets.map(t => `
+    const mkTicket = (t: typeof hcBatch.tickets[0]) => `
       <div class="ticket">
         <div class="t-head">
           <img src="${logoDataUrl}" class="t-logo" />
@@ -267,22 +268,25 @@ export default function AdminTicketsClient() {
             <div class="t-brand">NXT STOP</div>
             <div class="t-event">${hcBatch.event.name}</div>
           </div>
-          <div class="t-badge" style="background:${hcBatch.ticketType.color}">${hcBatch.ticketType.name}</div>
+          <div class="t-badge" style="background:${color}">${hcBatch.ticketType.name}</div>
         </div>
         <div class="t-body">
           <div class="t-details">
-            <div class="t-row"><span class="t-icon">&#128197;</span><span>${dateStr}</span></div>
-            <div class="t-row"><span class="t-icon">&#128336;</span><span>${timeStr}</span></div>
+            <div class="t-row"><span class="t-icon">&#128197;</span><span>${dateStr} &nbsp;&middot;&nbsp; ${timeStr}</span></div>
             <div class="t-row"><span class="t-icon">&#128205;</span><span>${hcBatch.event.venue}</span></div>
             <div class="t-price">${priceStr}</div>
-            <div class="t-num">${t.ticketNumber}</div>
           </div>
           <div class="t-qr-wrap">
             <img src="${t.qrDataUrl}" class="t-qr" />
             <div class="t-cash">CASH</div>
           </div>
         </div>
+        <div class="t-num-bar">
+          <span class="t-num-lbl">TICKET NO.</span>
+          <span class="t-num-val">${t.ticketNumber}</span>
+        </div>
         <div class="t-foot">NXT STOP &nbsp;·&nbsp; nxtstop.com &nbsp;·&nbsp; Present QR code at the gate</div>
+        <div class="stub-perf">&#9988;&ensp;tear here &ensp;&middot;&ensp; - &ensp;&middot;&ensp; - &ensp;&middot;&ensp; - &ensp;&middot;&ensp; - &ensp;&middot;&ensp; - &ensp;&middot;&ensp; - &ensp;&middot;&ensp; - &ensp;&middot;&ensp; - &ensp;&middot;&ensp; &#9988;</div>
         <div class="stub">
           <div class="stub-row">
             <div>
@@ -292,19 +296,32 @@ export default function AdminTicketsClient() {
             <div class="stub-right">
               <div class="stub-lbl">Ticket No.</div>
               <div class="stub-num">${t.ticketNumber}</div>
-              <div class="stub-lbl" style="margin-top:1.5mm">Price</div>
+              <div class="stub-lbl" style="margin-top:1mm">Price</div>
               <div class="stub-price">${priceStr}</div>
             </div>
           </div>
-          <div class="stub-note">&#9988; SELLER STUB &mdash; tear off &amp; keep when sold &nbsp;&middot;&nbsp; Enter code at /gate/activate to record cash sale</div>
+          <div class="stub-note">SELLER STUB &mdash; tear off &amp; keep when sold &nbsp;&middot;&nbsp; Enter code at /gate/activate to record cash sale</div>
         </div>
-      </div>
-    `).join('')
+      </div>`
+
+    // Build 2-column rows with horizontal cut lines between rows and vertical cut line between columns
+    const tickets = hcBatch.tickets
+    let rowsHtml = ''
+    for (let i = 0; i < tickets.length; i += 2) {
+      if (i > 0) {
+        rowsHtml += `<div class="cut-h"><span class="cut-sci">&#9988;</span><span class="cut-dots"> - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</span><span class="cut-sci">&#9988;</span></div>`
+      }
+      rowsHtml += `<div class="ticket-row">
+        <div class="ticket-cell ticket-cell-l">${mkTicket(tickets[i])}</div>
+        <div class="cut-v"><span class="cut-sci-v">&#9988;</span></div>
+        <div class="ticket-cell">${tickets[i + 1] ? mkTicket(tickets[i + 1]) : ''}</div>
+      </div>`
+    }
 
     printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>NXT STOP &mdash; ${hcBatch.event.name}</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  @page{size:A4 portrait;margin:8mm}
+  @page{size:A4 portrait;margin:5mm}
   body{
     font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;
     background:#fff;
@@ -312,75 +329,102 @@ export default function AdminTicketsClient() {
     print-color-adjust:exact;
     color-adjust:exact;
   }
+  /* ── Page header ── */
   .page-hd{
     display:flex;justify-content:space-between;align-items:flex-end;
-    padding-bottom:3mm;margin-bottom:4mm;
+    padding-bottom:2.5mm;margin-bottom:0;
     border-bottom:.4mm solid #e5e7eb;
   }
-  .page-title{font-size:10pt;font-weight:900;color:#111}
-  .page-sub{font-size:7pt;color:#6b7280;margin-top:.5mm}
-  .page-meta{font-size:6.5pt;color:#9ca3af;text-align:right;line-height:1.5}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+  .page-title{font-size:9pt;font-weight:900;color:#111}
+  .page-sub{font-size:6.5pt;color:#6b7280;margin-top:.5mm}
+  .page-meta{font-size:6pt;color:#9ca3af;text-align:right;line-height:1.5}
+  /* ── Row / cut layout ── */
+  .ticket-row{display:flex;align-items:stretch;width:100%}
+  .ticket-cell{flex:1;min-width:0}
+  .cut-h{
+    display:flex;align-items:center;height:5mm;
+    color:#b0b8c1;font-size:6.5pt;letter-spacing:.5mm;
+    border-top:.6mm dotted #c0c8d0;
+    border-bottom:.6mm dotted #c0c8d0;
+    overflow:hidden;white-space:nowrap;
+  }
+  .cut-sci{flex-shrink:0;font-size:7pt;padding:0 1mm}
+  .cut-dots{flex:1;overflow:hidden;letter-spacing:1.5mm;color:#c0c8d0}
+  .cut-v{
+    width:5mm;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:2mm;
+    border-left:.6mm dotted #c0c8d0;
+    border-right:.6mm dotted #c0c8d0;
+  }
+  .cut-sci-v{font-size:6pt;color:#b0b8c1;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg)}
+  /* ── Ticket ── */
   .ticket{
-    border:.4mm solid #d1d5db;border-radius:2.5mm;
+    border:.3mm solid #d1d5db;
     overflow:hidden;background:#fff;
     page-break-inside:avoid;break-inside:avoid;
+    height:100%;
   }
   /* ── Header ── */
   .t-head{
     background:linear-gradient(135deg,#7c3aed 0%,#9333ea 55%,#db2777 100%);
-    padding:2.5mm 3mm;display:flex;align-items:center;gap:2mm;
+    padding:2mm 2.5mm;display:flex;align-items:center;gap:2mm;
   }
-  .t-logo{height:10mm;width:auto;object-fit:contain;flex-shrink:0;filter:brightness(0) invert(1)}
+  .t-logo{height:7mm;width:auto;object-fit:contain;flex-shrink:0;filter:brightness(0) invert(1)}
   .t-head-text{flex:1;min-width:0}
-  .t-brand{font-size:5pt;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.1em;line-height:1;margin-bottom:.5mm}
-  .t-event{font-size:8.5pt;font-weight:900;color:#fff;line-height:1.15;
+  .t-brand{font-size:4.5pt;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.1em;line-height:1;margin-bottom:.4mm}
+  .t-event{font-size:7.5pt;font-weight:900;color:#fff;line-height:1.15;
     overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .t-badge{
-    font-size:5.5pt;font-weight:700;color:#fff;
-    padding:.8mm 2.5mm;border-radius:10mm;
+    font-size:5pt;font-weight:700;color:#fff;
+    padding:.6mm 2mm;border-radius:10mm;
     background:rgba(0,0,0,.28);white-space:nowrap;flex-shrink:0
   }
   /* ── Body ── */
-  .t-body{display:flex;padding:2.5mm 3mm;gap:2.5mm;align-items:center}
+  .t-body{display:flex;padding:2mm 2.5mm;gap:2mm;align-items:center}
   .t-details{flex:1;min-width:0}
-  .t-row{
-    font-size:6.5pt;color:#4b5563;
-    margin-bottom:1mm;display:flex;align-items:flex-start;gap:1.5mm;line-height:1.3
-  }
+  .t-row{font-size:6pt;color:#4b5563;margin-bottom:.8mm;display:flex;align-items:flex-start;gap:1.2mm;line-height:1.3}
   .t-icon{flex-shrink:0}
-  .t-price{font-size:14pt;font-weight:900;color:#7c3aed;margin-top:2.5mm;line-height:1}
-  .t-num{font-family:'Courier New',monospace;font-size:5.5pt;color:#9ca3af;margin-top:1.5mm;letter-spacing:.02em}
+  .t-price{font-size:13pt;font-weight:900;color:#7c3aed;margin-top:2mm;line-height:1}
   .t-qr-wrap{flex-shrink:0;text-align:center}
-  .t-qr{width:21mm;height:21mm;display:block;border:.3mm solid #e5e7eb;padding:.5mm;border-radius:1mm}
-  .t-cash{font-size:5.5pt;font-weight:700;color:#6b7280;text-align:center;margin-top:1mm;text-transform:uppercase;letter-spacing:.05em}
+  .t-qr{width:18mm;height:18mm;display:block;border:.3mm solid #e5e7eb;padding:.4mm;border-radius:1mm}
+  .t-cash{font-size:5pt;font-weight:700;color:#6b7280;text-align:center;margin-top:.8mm;text-transform:uppercase;letter-spacing:.05em}
+  /* ── Ticket number bar (prominent) ── */
+  .t-num-bar{
+    background:#f3e8ff;border-top:.3mm solid #e9d5ff;border-bottom:.3mm solid #e9d5ff;
+    padding:1.5mm 2.5mm;display:flex;align-items:center;gap:2.5mm;
+  }
+  .t-num-lbl{font-size:5pt;text-transform:uppercase;letter-spacing:.12em;color:#7c3aed;font-weight:800;white-space:nowrap;flex-shrink:0}
+  .t-num-val{font-family:'Courier New',monospace;font-size:8.5pt;font-weight:900;color:#1e1040;letter-spacing:.03em}
   /* ── Footer ── */
   .t-foot{
     background:#f9fafb;border-top:.3mm solid #f3f4f6;
-    padding:1.2mm 3mm;font-size:5pt;color:#9ca3af;text-align:center;letter-spacing:.02em
+    padding:1mm 2.5mm;font-size:4.5pt;color:#9ca3af;text-align:center;letter-spacing:.02em
   }
-  /* ── Stub ── */
-  .stub{border-top:.5mm dashed #f97316;background:#fff7ed;padding:2mm 3mm 1.5mm}
+  /* ── Perforation + Stub ── */
+  .stub-perf{
+    background:#fff7ed;border-top:.7mm dotted #fb923c;border-bottom:.4mm dotted #fed7aa;
+    padding:.6mm 2.5mm;font-size:5pt;color:#fdba74;letter-spacing:.8mm;text-align:center;
+  }
+  .stub{background:#fff7ed;padding:1.5mm 2.5mm 1.2mm}
   .stub-row{display:flex;justify-content:space-between;align-items:flex-start}
-  .stub-lbl{font-size:5pt;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:.5mm;line-height:1}
-  .stub-code{font-size:15pt;font-weight:900;font-family:'Courier New',monospace;color:#ea580c;letter-spacing:2mm;line-height:1}
+  .stub-lbl{font-size:4.5pt;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:.4mm;line-height:1}
+  .stub-code{font-size:13pt;font-weight:900;font-family:'Courier New',monospace;color:#ea580c;letter-spacing:1.5mm;line-height:1}
   .stub-right{text-align:right}
   .stub-num{font-size:5.5pt;font-family:'Courier New',monospace;color:#374151;font-weight:700}
-  .stub-price{font-size:10pt;font-weight:900;color:#7c3aed;margin-top:1mm}
-  .stub-note{font-size:5pt;color:#9ca3af;margin-top:1.5mm;border-top:.3mm solid #fed7aa;padding-top:1mm}
+  .stub-price{font-size:9pt;font-weight:900;color:#7c3aed}
+  .stub-note{font-size:4.5pt;color:#9ca3af;margin-top:1mm;border-top:.3mm solid #fed7aa;padding-top:.8mm}
   @media print{body{background:#fff}}
 </style></head><body>
 <div class="page-hd">
   <div>
     <div class="page-title">NXT STOP &mdash; Physical Tickets</div>
-    <div class="page-sub">${hcBatch.event.name} &nbsp;&middot;&nbsp; ${hcBatch.ticketType.name} &nbsp;&middot;&nbsp; ${hcBatch.tickets.length} tickets</div>
+    <div class="page-sub">${hcBatch.event.name} &nbsp;&middot;&nbsp; ${hcBatch.ticketType.name} &nbsp;&middot;&nbsp; ${hcBatch.tickets.length} ticket${hcBatch.tickets.length !== 1 ? 's' : ''}</div>
   </div>
   <div class="page-meta">
     Printed ${new Date().toLocaleString()}<br>
     &#9888; NOT YET SOLD &mdash; activate each ticket when cash is collected
   </div>
 </div>
-<div class="grid">${ticketHtml}</div>
+${rowsHtml}
 <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),1200)}</script>
 </body></html>`)
     printWin.document.close()
