@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Calendar, MapPin, Printer, X, ExternalLink, Ticket } from 'lucide-react'
+import { Calendar, MapPin, Printer, X, ExternalLink, Ticket, Download, Share2, Check } from 'lucide-react'
+import html2canvas from 'html2canvas'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 type TicketData = {
@@ -37,6 +38,56 @@ async function fetchAsDataURL(url: string): Promise<string> {
 }
 
 function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => void }) {
+  const ticketRef = useRef<HTMLDivElement>(null)
+  const [saving, setSaving] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const saveImage = async () => {
+    if (!ticketRef.current || saving) return
+    setSaving(true)
+    try {
+      const canvas = await html2canvas(ticketRef.current, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        logging: false,
+      })
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = `nxtstop-ticket-${ticket.ticketNumber}.png`
+      a.click()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const shareTicket = async () => {
+    const dateStr = new Date(ticket.event.date).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    const timeStr = new Date(ticket.event.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    const text = `🎟️ NXT STOP Ticket\n${ticket.event.name}\n📅 ${dateStr} · ${timeStr}\n📍 ${ticket.event.venue}\nTicket No: ${ticket.ticketNumber}`
+    try {
+      if (ticketRef.current && navigator.share) {
+        const canvas = await html2canvas(ticketRef.current, { scale: 2, useCORS: true, allowTaint: false, backgroundColor: '#ffffff', logging: false })
+        canvas.toBlob(async (blob) => {
+          if (!blob) return
+          const file = new File([blob], `ticket-${ticket.ticketNumber}.png`, { type: 'image/png' })
+          if (navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ title: `NXT STOP – ${ticket.event.name}`, text, files: [file] })
+            return
+          }
+          await navigator.share({ title: `NXT STOP – ${ticket.event.name}`, text })
+        })
+        return
+      }
+    } catch {}
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {}
+  }
+
   const handlePrint = async () => {
     const printWin = window.open('', '_blank', 'width=700,height=1000')
     if (!printWin) return
@@ -153,7 +204,7 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
         <img src="${ticket.qrDataUrl}" class="qr-img" alt="QR Code" />
         <div class="qr-info">
           ${holderName ? `<div class="lbl">Ticket For</div><div class="val">${holderName}</div>` : ''}
-          <div class="price">$${ticket.ticketType.price.toFixed(2)}</div>
+          <div class="price">$${Number(ticket.ticketType.price).toFixed(2)}</div>
           <div class="mono">${ticket.ticketNumber}</div>
           <span class="${statusClass}">${ticket.status.toUpperCase()}</span>
         </div>
@@ -185,9 +236,15 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
       <div className="relative w-full max-w-md my-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button onClick={handlePrint} className="flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg px-3 py-2 transition-colors font-medium">
-              <Printer size={13} /> Print / Save
+              <Printer size={13} /> Print
+            </button>
+            <button onClick={saveImage} disabled={saving} className="flex items-center gap-1.5 text-xs bg-purple-600/80 hover:bg-purple-600 text-white rounded-lg px-3 py-2 transition-colors font-medium disabled:opacity-60">
+              <Download size={13} /> {saving ? 'Saving…' : 'Save Image'}
+            </button>
+            <button onClick={shareTicket} className="flex items-center gap-1.5 text-xs bg-green-600/80 hover:bg-green-600 text-white rounded-lg px-3 py-2 transition-colors font-medium">
+              {copied ? <><Check size={13} /> Copied!</> : <><Share2 size={13} /> Share</>}
             </button>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
@@ -196,7 +253,7 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
         </div>
 
         {/* In-app ticket preview */}
-        <div>
+        <div ref={ticketRef}>
           <div className="ticket bg-white rounded-2xl overflow-hidden shadow-2xl">
             {ticket.event.posterImage ? (
               <img src={ticket.event.posterImage} alt={ticket.event.name} className="poster w-full h-44 object-cover" />
