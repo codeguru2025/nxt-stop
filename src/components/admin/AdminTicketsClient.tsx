@@ -304,11 +304,14 @@ export default function AdminTicketsClient() {
         </div>
       </div>`
 
-    // Build 2-column rows with horizontal cut lines between rows and vertical cut line between columns
+    // Build 2-column rows — 5 rows per page (10 tickets), page-break after every 5 rows
     const tickets = hcBatch.tickets
     let rowsHtml = ''
     for (let i = 0; i < tickets.length; i += 2) {
-      if (i > 0) {
+      const rowIdx = i / 2
+      if (rowIdx > 0 && rowIdx % 5 === 0) {
+        rowsHtml += `<div class="page-break"></div>`
+      } else if (rowIdx > 0) {
         rowsHtml += `<div class="cut-h"><span class="cut-sci">&#9988;</span><span class="cut-dots"> - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</span><span class="cut-sci">&#9988;</span></div>`
       }
       rowsHtml += `<div class="ticket-row">
@@ -332,86 +335,88 @@ export default function AdminTicketsClient() {
   /* ── Page header ── */
   .page-hd{
     display:flex;justify-content:space-between;align-items:flex-end;
-    padding-bottom:2.5mm;margin-bottom:0;
+    padding-bottom:2mm;margin-bottom:0;
     border-bottom:.4mm solid #e5e7eb;
   }
-  .page-title{font-size:9pt;font-weight:900;color:#111}
-  .page-sub{font-size:6.5pt;color:#6b7280;margin-top:.5mm}
-  .page-meta{font-size:6pt;color:#9ca3af;text-align:right;line-height:1.5}
+  .page-title{font-size:8.5pt;font-weight:900;color:#111}
+  .page-sub{font-size:6pt;color:#6b7280;margin-top:.4mm}
+  .page-meta{font-size:5.5pt;color:#9ca3af;text-align:right;line-height:1.5}
+  /* ── Page break ── */
+  .page-break{page-break-after:always;break-after:page;height:0}
   /* ── Row / cut layout ── */
   .ticket-row{display:flex;align-items:stretch;width:100%}
   .ticket-cell{flex:1;min-width:0}
   .cut-h{
-    display:flex;align-items:center;height:5mm;
-    color:#b0b8c1;font-size:6.5pt;letter-spacing:.5mm;
-    border-top:.6mm dotted #c0c8d0;
-    border-bottom:.6mm dotted #c0c8d0;
+    display:flex;align-items:center;height:4mm;
+    color:#b0b8c1;font-size:6pt;letter-spacing:.5mm;
+    border-top:.5mm dotted #c0c8d0;
+    border-bottom:.5mm dotted #c0c8d0;
     overflow:hidden;white-space:nowrap;
   }
-  .cut-sci{flex-shrink:0;font-size:7pt;padding:0 1mm}
+  .cut-sci{flex-shrink:0;font-size:6.5pt;padding:0 1mm}
   .cut-dots{flex:1;overflow:hidden;letter-spacing:1.5mm;color:#c0c8d0}
   .cut-v{
-    width:5mm;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:2mm;
-    border-left:.6mm dotted #c0c8d0;
-    border-right:.6mm dotted #c0c8d0;
+    width:4mm;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:1.5mm;
+    border-left:.5mm dotted #c0c8d0;
+    border-right:.5mm dotted #c0c8d0;
   }
-  .cut-sci-v{font-size:6pt;color:#b0b8c1;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg)}
-  /* ── Ticket ── */
+  .cut-sci-v{font-size:5.5pt;color:#b0b8c1;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg)}
+  /* ── Ticket: fixed height so 5 rows fill A4 ── */
   .ticket{
-    border:.3mm solid #d1d5db;
+    border:.35mm solid #7c3aed;
     overflow:hidden;background:#fff;
     page-break-inside:avoid;break-inside:avoid;
     height:100%;
   }
   /* ── Header ── */
   .t-head{
-    background:linear-gradient(135deg,#7c3aed 0%,#9333ea 55%,#db2777 100%);
-    padding:2mm 2.5mm;display:flex;align-items:center;gap:2mm;
+    background:linear-gradient(135deg,#6d28d9 0%,#7c3aed 40%,#9333ea 70%,#db2777 100%);
+    padding:1.5mm 2mm;display:flex;align-items:center;gap:1.5mm;
   }
-  .t-logo{height:7mm;width:auto;object-fit:contain;flex-shrink:0;filter:brightness(0) invert(1)}
+  .t-logo{height:6mm;width:auto;object-fit:contain;flex-shrink:0;filter:brightness(0) invert(1)}
   .t-head-text{flex:1;min-width:0}
-  .t-brand{font-size:4.5pt;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.1em;line-height:1;margin-bottom:.4mm}
-  .t-event{font-size:7.5pt;font-weight:900;color:#fff;line-height:1.15;
-    overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .t-brand{font-size:4pt;color:rgba(255,255,255,.8);text-transform:uppercase;letter-spacing:.12em;line-height:1;margin-bottom:.3mm}
+  .t-event{font-size:7pt;font-weight:900;color:#fff;line-height:1.15;
+    overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
   .t-badge{
-    font-size:5pt;font-weight:700;color:#fff;
-    padding:.6mm 2mm;border-radius:10mm;
-    background:rgba(0,0,0,.28);white-space:nowrap;flex-shrink:0
+    font-size:5pt;font-weight:800;color:#fff;
+    padding:.5mm 1.8mm;border-radius:10mm;
+    background:rgba(0,0,0,.32);white-space:nowrap;flex-shrink:0;border:.2mm solid rgba(255,255,255,.3)
   }
   /* ── Body ── */
-  .t-body{display:flex;padding:2mm 2.5mm;gap:2mm;align-items:center}
+  .t-body{display:flex;padding:1.5mm 2mm;gap:1.5mm;align-items:center}
   .t-details{flex:1;min-width:0}
-  .t-row{font-size:6pt;color:#4b5563;margin-bottom:.8mm;display:flex;align-items:flex-start;gap:1.2mm;line-height:1.3}
+  .t-row{font-size:5.5pt;color:#374151;margin-bottom:.6mm;display:flex;align-items:flex-start;gap:1mm;line-height:1.3;font-weight:500}
   .t-icon{flex-shrink:0}
-  .t-price{font-size:13pt;font-weight:900;color:#7c3aed;margin-top:2mm;line-height:1}
+  .t-price{font-size:12pt;font-weight:900;color:#6d28d9;margin-top:1.5mm;line-height:1}
   .t-qr-wrap{flex-shrink:0;text-align:center}
-  .t-qr{width:18mm;height:18mm;display:block;border:.3mm solid #e5e7eb;padding:.4mm;border-radius:1mm}
-  .t-cash{font-size:5pt;font-weight:700;color:#6b7280;text-align:center;margin-top:.8mm;text-transform:uppercase;letter-spacing:.05em}
+  .t-qr{width:16mm;height:16mm;display:block;border:.4mm solid #7c3aed;padding:.3mm;border-radius:.8mm}
+  .t-cash{font-size:4.5pt;font-weight:800;color:#6d28d9;text-align:center;margin-top:.6mm;text-transform:uppercase;letter-spacing:.05em}
   /* ── Ticket number bar (prominent) ── */
   .t-num-bar{
-    background:#f3e8ff;border-top:.3mm solid #e9d5ff;border-bottom:.3mm solid #e9d5ff;
-    padding:1.5mm 2.5mm;display:flex;align-items:center;gap:2.5mm;
+    background:#ede9fe;border-top:.3mm solid #c4b5fd;border-bottom:.3mm solid #c4b5fd;
+    padding:1mm 2mm;display:flex;align-items:center;gap:2mm;
   }
-  .t-num-lbl{font-size:5pt;text-transform:uppercase;letter-spacing:.12em;color:#7c3aed;font-weight:800;white-space:nowrap;flex-shrink:0}
-  .t-num-val{font-family:'Courier New',monospace;font-size:8.5pt;font-weight:900;color:#1e1040;letter-spacing:.03em}
+  .t-num-lbl{font-size:4.5pt;text-transform:uppercase;letter-spacing:.14em;color:#6d28d9;font-weight:900;white-space:nowrap;flex-shrink:0}
+  .t-num-val{font-family:'Courier New',monospace;font-size:8pt;font-weight:900;color:#1e1040;letter-spacing:.04em}
   /* ── Footer ── */
   .t-foot{
-    background:#f9fafb;border-top:.3mm solid #f3f4f6;
-    padding:1mm 2.5mm;font-size:4.5pt;color:#9ca3af;text-align:center;letter-spacing:.02em
+    background:#f5f3ff;border-top:.3mm solid #ede9fe;
+    padding:.8mm 2mm;font-size:4pt;color:#7c3aed;text-align:center;letter-spacing:.02em;font-weight:600
   }
   /* ── Perforation + Stub ── */
   .stub-perf{
-    background:#fff7ed;border-top:.7mm dotted #fb923c;border-bottom:.4mm dotted #fed7aa;
-    padding:.6mm 2.5mm;font-size:5pt;color:#fdba74;letter-spacing:.8mm;text-align:center;
+    background:#fff7ed;border-top:.6mm dotted #f97316;border-bottom:.3mm dotted #fdba74;
+    padding:.4mm 2mm;font-size:4.5pt;color:#ea580c;letter-spacing:.7mm;text-align:center;font-weight:700;
   }
-  .stub{background:#fff7ed;padding:1.5mm 2.5mm 1.2mm}
+  .stub{background:#fff7ed;padding:1mm 2mm .8mm}
   .stub-row{display:flex;justify-content:space-between;align-items:flex-start}
-  .stub-lbl{font-size:4.5pt;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:.4mm;line-height:1}
-  .stub-code{font-size:13pt;font-weight:900;font-family:'Courier New',monospace;color:#ea580c;letter-spacing:1.5mm;line-height:1}
+  .stub-lbl{font-size:4pt;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:.3mm;line-height:1}
+  .stub-code{font-size:11pt;font-weight:900;font-family:'Courier New',monospace;color:#ea580c;letter-spacing:1.2mm;line-height:1}
   .stub-right{text-align:right}
-  .stub-num{font-size:5.5pt;font-family:'Courier New',monospace;color:#374151;font-weight:700}
-  .stub-price{font-size:9pt;font-weight:900;color:#7c3aed}
-  .stub-note{font-size:4.5pt;color:#9ca3af;margin-top:1mm;border-top:.3mm solid #fed7aa;padding-top:.8mm}
+  .stub-num{font-size:5pt;font-family:'Courier New',monospace;color:#374151;font-weight:700}
+  .stub-price{font-size:8pt;font-weight:900;color:#6d28d9}
+  .stub-note{font-size:4pt;color:#9ca3af;margin-top:.8mm;border-top:.3mm solid #fdba74;padding-top:.6mm}
   @media print{body{background:#fff}}
 </style></head><body>
 <div class="page-hd">

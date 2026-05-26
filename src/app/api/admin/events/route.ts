@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       name, description, venue, address, date, endDate,
       posterImage, bannerImage, videoUrl, lineup, hasVirtual,
       virtualPrice, virtualStreamUrl, platformFee, ticketTypes,
-      status, lat, lng,
+      status, lat, lng, slug: slugOverride,
     } = body
 
     if (!name || !venue || !date) return error('name, venue, and date are required')
@@ -49,7 +49,16 @@ export async function POST(req: Request) {
       return error('Longitude must be between -180 and 180')
     }
 
-    const slug = slugify(name) + '-' + crypto.randomBytes(4).toString('hex')
+    let slug: string
+    if (slugOverride && typeof slugOverride === 'string' && slugOverride.trim()) {
+      const cleaned = slugOverride.trim().toLowerCase()
+      if (!/^[a-z0-9-]+$/.test(cleaned)) return error('Slug may only contain lowercase letters, numbers, and hyphens')
+      const existing = await prisma.event.findUnique({ where: { slug: cleaned } })
+      if (existing) return error(`Slug "${cleaned}" is already in use by another event`)
+      slug = cleaned
+    } else {
+      slug = slugify(name) + '-' + crypto.randomBytes(4).toString('hex')
+    }
 
     const event = await prisma.event.create({
       data: {
