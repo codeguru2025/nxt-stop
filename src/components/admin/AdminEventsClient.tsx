@@ -338,18 +338,7 @@ export default function AdminEventsClient() {
                 <label>Description</label>
                 <textarea rows={3} value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))} className="resize-none" placeholder="Event description..." />
               </div>
-              {!editing && (
-                <div className="sm:col-span-2">
-                  <label className="flex items-center gap-1.5 text-amber-400"><QrCode size={13} /> Restore Slug <span className="text-gray-600 font-normal text-xs">(only needed when recreating a deleted event)</span></label>
-                  <input
-                    value={form.slug}
-                    onChange={e => setForm((f: any) => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                    placeholder="my-event-name-a3b4c5d6  — leave blank to auto-generate"
-                    className="font-mono text-amber-300 placeholder:text-gray-600"
-                  />
-                  <p className="text-xs text-gray-600 mt-1">Scan the existing QR code to get the URL, then paste the part after <code className="text-gray-500">/events/</code> here.</p>
-                </div>
-              )}
+
               <div>
                 <label>Video URL <span className="text-gray-600 font-normal">(YouTube / direct)</span></label>
                 <input value={form.videoUrl} onChange={e => setForm((f: any) => ({ ...f, videoUrl: e.target.value }))} placeholder="https://youtube.com/..." />
