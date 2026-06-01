@@ -7,7 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Calendar, MapPin, Clock, Users, Ticket, Share2,
   Check, AlertCircle, Loader2, Music, Video, Star, Phone, ExternalLink,
-  ChevronDown, ChevronUp, User
+  ChevronDown, ChevronUp, User, Play, X
 } from 'lucide-react'
 import { formatDate, formatCurrency, buildReferralUrl, getEventTimePhase } from '@/lib/utils'
 
@@ -68,6 +68,8 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
   const [whatsAppPhone, setWhatsAppPhone]   = useState('')
   const [forSomeoneElse, setForSomeoneElse] = useState(false)
   const [recipientName, setRecipientName]   = useState('')
+
+  const [playingMedia, setPlayingMedia] = useState<{ url: string; youtubeUrl?: string | null; caption?: string | null } | null>(null)
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollCountRef = useRef(0)
@@ -370,32 +372,68 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {event.media.filter(m => m.type !== 'image').map(m => (
-                    <div key={m.id} className="group relative rounded-xl overflow-hidden bg-[#1a1a1a] border border-[#2a2a2a]">
+                    <button
+                      key={m.id}
+                      onClick={() => setPlayingMedia(m)}
+                      className="group relative rounded-xl overflow-hidden bg-[#1a1a1a] border border-[#2a2a2a] hover:border-purple-500/40 transition-all text-left w-full"
+                    >
                       <div className="relative aspect-video">
                         <video
                           src={m.url}
                           className="w-full h-full object-cover"
-                          autoPlay
                           muted
-                          loop
                           playsInline
+                          onMouseEnter={e => (e.target as HTMLVideoElement).play()}
+                          onMouseLeave={e => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
                         />
-                        {m.youtubeUrl && (
-                          <a
-                            href={m.youtubeUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="absolute top-2 right-2 flex items-center gap-1 bg-black/70 hover:bg-red-600 text-white text-xs font-semibold px-2 py-1 rounded-md transition-colors"
-                          >
-                            <ExternalLink size={11} /> YouTube
-                          </a>
-                        )}
+                        <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Play size={20} className="text-white ml-1" fill="white" />
+                          </div>
+                        </div>
                       </div>
                       {m.caption && (
                         <p className="px-3 py-2 text-sm text-gray-400">{m.caption}</p>
                       )}
-                    </div>
+                    </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {playingMedia && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+                onClick={() => setPlayingMedia(null)}
+              >
+                <button
+                  onClick={() => setPlayingMedia(null)}
+                  className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors z-10"
+                >
+                  <X size={28} />
+                </button>
+                <div className="w-full max-w-4xl" onClick={e => e.stopPropagation()}>
+                  {playingMedia.youtubeUrl ? (
+                    <div className="relative aspect-video w-full rounded-xl overflow-hidden">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${playingMedia.youtubeUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/)?.[1]}?autoplay=1`}
+                        className="absolute inset-0 w-full h-full"
+                        allow="autoplay; fullscreen"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <video
+                      src={playingMedia.url}
+                      className="w-full rounded-xl max-h-[80vh]"
+                      controls
+                      autoPlay
+                      playsInline
+                    />
+                  )}
+                  {playingMedia.caption && (
+                    <p className="text-gray-400 text-sm mt-3 px-1">{playingMedia.caption}</p>
+                  )}
                 </div>
               </div>
             )}
