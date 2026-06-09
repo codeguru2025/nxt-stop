@@ -11,11 +11,11 @@ import {
   Loader2, Check, X, ImagePlus, UserPlus, Mic2, Music2,
   QrCode, Download, RefreshCw, Images,
 } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { formatDate, utcToEventLocalInput } from '@/lib/utils'
 
 type LineupArtist = {
   name: string
-  role: 'headline' | 'mc' | 'support_dj' | 'special_guest'
+  role: 'main_act' | 'headline' | 'mc' | 'resident_dj' | 'support_dj' | 'guest_dj' | 'special_guest'
   image: string
 }
 
@@ -52,9 +52,12 @@ const BLANK_FORM = {
 }
 
 const ROLE_LABELS: Record<string, string> = {
+  main_act: 'Main Act',
   headline: 'Headline Act',
   mc: 'MC',
+  resident_dj: 'Resident DJ',
   support_dj: 'Support DJ',
+  guest_dj: 'Guest DJ',
   special_guest: 'Special Guest',
 }
 
@@ -128,15 +131,14 @@ export default function AdminEventsClient() {
     const res = await fetch(`/api/admin/events/${id}`).then(r => r.json())
     if (!res.success) return
     const ev = res.data
-    const toLocal = (iso: string | null) => iso ? iso.slice(0, 16) : ''
     let lineup: LineupArtist[] = []
     try { lineup = ev.lineup ? JSON.parse(ev.lineup) : [] } catch {}
     setForm({
       name: ev.name ?? '',
       venue: ev.venue ?? '',
       address: ev.address ?? '',
-      date: toLocal(ev.date),
-      endDate: toLocal(ev.endDate),
+      date: utcToEventLocalInput(ev.date),
+      endDate: utcToEventLocalInput(ev.endDate),
       description: ev.description ?? '',
       posterImage: ev.posterImage ?? '',
       bannerImage: ev.bannerImage ?? '',

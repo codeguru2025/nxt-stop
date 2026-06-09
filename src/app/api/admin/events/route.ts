@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
-import { slugify } from '@/lib/utils'
+import { slugify, eventLocalInputToUtc } from '@/lib/utils'
 import { generateEventQrCode } from '@/lib/qr'
 import crypto from 'crypto'
 
@@ -40,6 +40,15 @@ export async function POST(req: Request) {
 
     if (!name || !venue || !date) return error('name, venue, and date are required')
 
+    const startAt = eventLocalInputToUtc(date)
+    if (isNaN(startAt.getTime())) return error('Invalid start date/time')
+    let endAt: Date | null = null
+    if (endDate) {
+      endAt = eventLocalInputToUtc(endDate)
+      if (isNaN(endAt.getTime())) return error('Invalid end date/time')
+      if (endAt <= startAt) return error('End time must be after the start time')
+    }
+
     const parsedLat = lat != null ? parseFloat(lat) : null
     const parsedLng = lng != null ? parseFloat(lng) : null
     if (parsedLat != null && (isNaN(parsedLat) || parsedLat < -90 || parsedLat > 90)) {
@@ -67,8 +76,8 @@ export async function POST(req: Request) {
         description,
         venue,
         address,
-        date: new Date(date),
-        endDate: endDate ? new Date(endDate) : null,
+        date: startAt,
+        endDate: endAt,
         posterImage,
         bannerImage,
         videoUrl,

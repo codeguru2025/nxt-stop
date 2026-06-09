@@ -9,7 +9,7 @@ import PastVideosClient, { type TeaserItem } from '@/components/videos/PastVideo
 
 type LineupArtist = {
   name: string
-  role: 'headline' | 'mc' | 'support_dj' | 'special_guest'
+  role: 'main_act' | 'headline' | 'mc' | 'resident_dj' | 'support_dj' | 'guest_dj' | 'special_guest'
   image?: string
 }
 
@@ -369,7 +369,9 @@ function SpotlightSection({ event }: { event: Event }) {
     try { return event.lineup ? JSON.parse(event.lineup) : [] } catch { return [] }
   })()
 
-  const headline = lineup.find(a => a.role === 'headline')
+  // The large feature slot bills the Main Act first, then falls back to the Headline Act.
+  const headline = lineup.find(a => a.role === 'main_act') ?? lineup.find(a => a.role === 'headline')
+  const headlineLabel = headline?.role === 'main_act' ? 'Main Act' : 'Headline Act'
   const mc = lineup.find(a => a.role === 'mc')
   const allArtists = lineup.map(a => a.name)
 
@@ -411,8 +413,13 @@ function SpotlightSection({ event }: { event: Event }) {
                       <div className="w-full h-full flex items-center justify-center text-5xl">🎵</div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                    {headline.role === 'main_act' && (
+                      <div className="absolute top-3 left-3 bg-amber-400 text-black text-xs font-black px-2.5 py-1 rounded-md shadow">
+                        ★ MAIN ACT
+                      </div>
+                    )}
                     <div className="absolute bottom-4 left-4">
-                      <p className="text-white/60 text-xs uppercase tracking-widest mb-1">Headline Act</p>
+                      <p className={`text-xs uppercase tracking-widest mb-1 ${headline.role === 'main_act' ? 'text-amber-400 font-semibold' : 'text-white/60'}`}>{headlineLabel}</p>
                       <p className="text-white font-black text-xl leading-tight">{headline.name}</p>
                     </div>
                   </div>
@@ -442,12 +449,14 @@ function SpotlightSection({ event }: { event: Event }) {
               </div>
             ) : event.posterImage && !posterErr ? (
               <div className="relative rounded-2xl overflow-hidden aspect-[3/4] bg-[#1a1a1a]">
+                {/* Blurred fill behind the fully-visible (uncropped) poster */}
+                <Image src={event.posterImage} alt="" fill aria-hidden className="object-cover scale-110 blur-2xl opacity-50" />
                 <Image
                   src={event.posterImage}
                   alt={event.name}
                   fill
                   priority
-                  className="object-cover"
+                  className="object-contain"
                   onError={() => setPosterErr(true)}
                 />
               </div>

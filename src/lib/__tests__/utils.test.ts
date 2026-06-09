@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl, getEventTimePhase } from '../utils'
+import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl, getEventTimePhase, eventLocalInputToUtc, utcToEventLocalInput, formatDate } from '../utils'
 
 describe('slugify', () => {
   it('lowercases and hyphenates', () => {
@@ -92,6 +92,38 @@ describe('buildReferralUrl', () => {
   it('builds URL with code', () => {
     const url = buildReferralUrl('ABC123')
     expect(url).toContain('/r/ABC123')
+  })
+})
+
+describe('event timezone (CAT, UTC+2) handling', () => {
+  it('parses a datetime-local input as CAT and stores the correct UTC instant', () => {
+    // Admin enters 20:00 venue time → must persist as 18:00 UTC.
+    expect(eventLocalInputToUtc('2026-06-15T20:00').toISOString()).toBe('2026-06-15T18:00:00.000Z')
+  })
+
+  it('round-trips datetime-local → UTC → datetime-local without drift', () => {
+    const local = '2026-06-15T20:00'
+    expect(utcToEventLocalInput(eventLocalInputToUtc(local))).toBe(local)
+  })
+
+  it('renders a stored UTC instant in CAT wall-clock, not runtime-local', () => {
+    // 18:00 UTC is 20:00 in Harare regardless of where this runs.
+    expect(formatDate('2026-06-15T18:00:00Z', 'h:mm a')).toBe('8:00 PM')
+  })
+
+  it('returns empty string for a missing edit value', () => {
+    expect(utcToEventLocalInput(null)).toBe('')
+    expect(utcToEventLocalInput(undefined)).toBe('')
+  })
+
+  it('returns an Invalid Date for malformed input (so callers can reject it)', () => {
+    expect(isNaN(eventLocalInputToUtc('').getTime())).toBe(true)
+    expect(isNaN(eventLocalInputToUtc('not-a-date').getTime())).toBe(true)
+    expect(isNaN(eventLocalInputToUtc('2026-13-40T99:99').getTime())).toBe(true)
+  })
+
+  it('tolerates a seconds component in the input', () => {
+    expect(eventLocalInputToUtc('2026-06-15T20:00:30').toISOString()).toBe('2026-06-15T18:00:00.000Z')
   })
 })
 

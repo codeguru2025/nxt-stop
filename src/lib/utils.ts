@@ -1,6 +1,38 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { format } from 'date-fns'
+import { TZDate } from '@date-fns/tz'
+
+/**
+ * All event times belong to the venue's timezone — Central Africa Time (UTC+2, no DST).
+ * Dates are stored as true UTC instants in the DB; we always parse and render them in this
+ * zone so the result is identical whether the code runs on the server (UTC) or in the browser.
+ */
+export const EVENT_TIME_ZONE = 'Africa/Harare'
+
+/** View an instant in the event timezone (so date-fns renders CAT wall-clock, not runtime-local). */
+function inEventZone(date: Date | string): TZDate {
+  return new TZDate(new Date(date), EVENT_TIME_ZONE)
+}
+
+/**
+ * Convert a wall-clock value from an `<input type="datetime-local">` — which has no timezone and
+ * is meant as CAT venue time — into the true UTC instant to persist. CAT is a fixed +02:00 offset.
+ */
+export function eventLocalInputToUtc(local: string): Date {
+  // `local` comes from <input type="datetime-local"> as "YYYY-MM-DDTHH:MM" (optionally with seconds).
+  // CAT is a fixed +02:00 offset (Zimbabwe observes no DST), so tagging it makes parsing deterministic.
+  // Returns an Invalid Date for malformed input so callers can reject it with a clean error.
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2})?$/.exec(local?.trim() ?? '')
+  if (!m) return new Date(NaN)
+  return new Date(`${m[1]}T${m[2]}:00+02:00`)
+}
+
+/** Convert a stored UTC instant back into a datetime-local string in CAT for editing. */
+export function utcToEventLocalInput(date: Date | string | null | undefined): string {
+  if (!date) return ''
+  return format(inEventZone(date), "yyyy-MM-dd'T'HH:mm")
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -15,11 +47,11 @@ export function formatCurrency(amount: number | string, currency = 'USD'): strin
 }
 
 export function formatDate(date: Date | string, pattern = 'PPP'): string {
-  return format(new Date(date), pattern)
+  return format(inEventZone(date), pattern)
 }
 
 export function formatDateTime(date: Date | string): string {
-  return format(new Date(date), 'PPP p')
+  return format(inEventZone(date), 'PPP p')
 }
 
 export function slugify(text: string): string {

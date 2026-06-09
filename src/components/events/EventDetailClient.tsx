@@ -255,14 +255,24 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
   return (
     <div>
       {/* Hero Banner */}
-      <div className="relative h-[50vh] min-h-[300px] overflow-hidden">
+      <div className="relative h-[50vh] min-h-[300px] overflow-hidden bg-black">
         {(event.bannerImage || event.posterImage) && !imgError ? (
-          <img
-            src={event.bannerImage || event.posterImage!}
-            alt={event.name}
-            className="w-full h-full object-cover"
-            onError={() => setImgError(true)}
-          />
+          <>
+            {/* Blurred fill so the full poster (object-contain) on mobile doesn't sit on bare bars */}
+            <img
+              src={event.bannerImage || event.posterImage!}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-50 sm:hidden"
+            />
+            {/* Mobile: contain so the whole poster is visible (nobody cropped); larger screens: full-bleed cover */}
+            <img
+              src={event.bannerImage || event.posterImage!}
+              alt={event.name}
+              className="relative w-full h-full object-contain sm:object-cover"
+              onError={() => setImgError(true)}
+            />
+          </>
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-purple-900/60 via-[#0a0a0a] to-[#1A6B5A]/20 flex items-center justify-center">
             <div className="text-8xl">🎧</div>
@@ -333,9 +343,11 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                   <Music size={20} className="text-purple-400" />Lineup
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {lineup.map((artist, idx) => (
-                    <ArtistCard key={idx} artist={artist} />
-                  ))}
+                  {[...lineup]
+                    .sort((a, b) => (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9))
+                    .map((artist, idx) => (
+                      <ArtistCard key={idx} artist={artist} featured={artist.role === 'main_act'} />
+                    ))}
                 </div>
               </div>
             )}
@@ -682,19 +694,32 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
 }
 
 const ROLE_LABELS: Record<string, string> = {
+  main_act: 'Main Act',
   headline: 'Headline Act',
   mc: 'MC',
+  resident_dj: 'Resident DJ',
   support_dj: 'Support DJ',
+  guest_dj: 'Guest DJ',
   special_guest: 'Special Guest',
 }
 
-function ArtistCard({ artist }: { artist: { name: string; role: string; image?: string } }) {
+// Lineup display order — Main Act is billed first and gets the featured treatment.
+const ROLE_ORDER: Record<string, number> = {
+  main_act: 0, headline: 1, mc: 2, resident_dj: 3, support_dj: 4, guest_dj: 5, special_guest: 6,
+}
+
+function ArtistCard({ artist, featured = false }: { artist: { name: string; role: string; image?: string }; featured?: boolean }) {
   const [imgErr, setImgErr] = useState(false)
   const isHeadline = artist.role === 'headline'
   const isMC = artist.role === 'mc'
 
+  // The Main Act gets a full-width, larger "headliner" card so it stands apart from the rest.
+  const containerCls = featured
+    ? 'col-span-2 sm:col-span-3 aspect-[16/10] border-2 border-amber-400/70 shadow-lg shadow-amber-500/10'
+    : `aspect-[3/4] border ${isHeadline ? 'border-purple-500/40' : isMC ? 'border-pink-500/30' : 'border-[#2a2a2a]'}`
+
   return (
-    <div className={`relative rounded-xl overflow-hidden aspect-[3/4] bg-[#1a1a1a] border ${isHeadline ? 'border-purple-500/40' : isMC ? 'border-pink-500/30' : 'border-[#2a2a2a]'}`}>
+    <div className={`relative rounded-xl overflow-hidden bg-[#1a1a1a] ${containerCls}`}>
       {artist.image && !imgErr ? (
         <img
           src={artist.image}
@@ -703,22 +728,26 @@ function ArtistCard({ artist }: { artist: { name: string; role: string; image?: 
           onError={() => setImgErr(true)}
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center text-4xl">
+        <div className={`w-full h-full flex items-center justify-center ${featured ? 'text-6xl' : 'text-4xl'}`}>
           {isMC ? '🎤' : '🎵'}
         </div>
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-      <div className="absolute bottom-3 left-3 right-3">
-        <p className={`text-xs font-medium uppercase tracking-wider mb-0.5 ${isHeadline ? 'text-purple-400' : isMC ? 'text-pink-400' : 'text-gray-400'}`}>
+      <div className={`absolute left-3 right-3 ${featured ? 'bottom-4' : 'bottom-3'}`}>
+        <p className={`font-medium uppercase tracking-wider mb-0.5 ${featured ? 'text-amber-400 text-sm' : isHeadline ? 'text-purple-400 text-xs' : isMC ? 'text-pink-400 text-xs' : 'text-gray-400 text-xs'}`}>
           {ROLE_LABELS[artist.role] ?? artist.role}
         </p>
-        <p className="text-white font-black text-sm leading-tight">{artist.name}</p>
+        <p className={`text-white font-black leading-tight ${featured ? 'text-2xl sm:text-3xl' : 'text-sm'}`}>{artist.name}</p>
       </div>
-      {isHeadline && (
+      {featured ? (
+        <div className="absolute top-2 left-2 bg-amber-400 text-black text-xs font-black px-2.5 py-1 rounded-md shadow">
+          ★ MAIN ACT
+        </div>
+      ) : isHeadline ? (
         <div className="absolute top-2 right-2 bg-purple-600/80 text-white text-xs font-bold px-2 py-0.5 rounded-md">
           ★ HEADLINER
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

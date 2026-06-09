@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { requireAdmin } from '@/lib/auth'
 import { ok, error, forbidden, notFound, serverError } from '@/lib/api'
+import { eventLocalInputToUtc } from '@/lib/utils'
 
 export async function GET(
   _req: Request,
@@ -59,6 +60,15 @@ export async function PATCH(
       if (isNaN(v) || v < -180 || v > 180) return error('Longitude must be between -180 and 180')
     }
 
+    const startAt = date ? eventLocalInputToUtc(date) : undefined
+    if (startAt && isNaN(startAt.getTime())) return error('Invalid start date/time')
+    let endAt: Date | null | undefined
+    if (endDate !== undefined) {
+      endAt = endDate ? eventLocalInputToUtc(endDate) : null
+      if (endAt && isNaN(endAt.getTime())) return error('Invalid end date/time')
+    }
+    if (startAt && endAt && endAt <= startAt) return error('End time must be after the start time')
+
     const event = await prisma.event.update({
       where: { id },
       data: {
@@ -66,8 +76,8 @@ export async function PATCH(
         ...(description !== undefined && { description }),
         ...(venue && { venue }),
         ...(address !== undefined && { address }),
-        ...(date && { date: new Date(date) }),
-        ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
+        ...(startAt && { date: startAt }),
+        ...(endDate !== undefined && { endDate: endAt }),
         ...(status && { status }),
         ...(posterImage !== undefined && { posterImage }),
         ...(bannerImage !== undefined && { bannerImage }),
