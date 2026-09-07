@@ -52,7 +52,7 @@ export default function LoginScreen({ onLogin }: Props) {
         {/* Logo */}
         <View style={styles.logoWrap}>
           <Image
-            source={{ uri: 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20new.png' }}
+            source={{ uri: 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png' }}
             style={styles.logo}
             resizeMode="contain"
           />

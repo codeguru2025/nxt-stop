@@ -17,14 +17,14 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20new.png',
-    apple: 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20new.png',
+    icon: 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png',
+    apple: 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png',
   },
   openGraph: {
     title: 'NXT STOP',
     description: "Zimbabwe's premium nightlife events.",
     type: 'website',
-    images: ['https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20new.png'],
+    images: ['https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'],
   },
 }
 
