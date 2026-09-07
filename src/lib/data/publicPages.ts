@@ -174,6 +174,7 @@ export const getPublicTeasers = unstable_cache(
         event: { status: { in: ['published', 'live', 'ended'] } },
       },
       orderBy: { createdAt: 'desc' },
+      take: 200,
       include: {
         event: { select: { name: true, date: true, slug: true } },
       },

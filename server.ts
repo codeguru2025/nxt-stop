@@ -34,6 +34,8 @@ app.prepare().then(() => {
     const tlsOpts = redisUrl.startsWith('rediss://') ? { tls: {} } : {}
     const pubClient = new Redis(redisUrl, tlsOpts)
     const subClient = pubClient.duplicate()
+    pubClient.on('error', (err) => console.error('[socket.io] Redis pubClient error:', err.message))
+    subClient.on('error', (err) => console.error('[socket.io] Redis subClient error:', err.message))
 
     Promise.all([
       new Promise<void>((res) => pubClient.once('ready', res)),

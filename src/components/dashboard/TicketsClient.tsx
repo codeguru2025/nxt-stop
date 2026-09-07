@@ -63,8 +63,8 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
   }
 
   const shareTicket = async () => {
-    const dateStr = new Date(ticket.event.date).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-    const timeStr = new Date(ticket.event.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    const dateStr = formatDate(ticket.event.date, 'EEEE, d MMMM yyyy')
+    const timeStr = formatDate(ticket.event.date, 'h:mm a')
     const text = `🎟️ NXT STOP Ticket\n${ticket.event.name}\n📅 ${dateStr} · ${timeStr}\n📍 ${ticket.event.venue}\nTicket No: ${ticket.ticketNumber}`
     try {
       if (ticketRef.current && navigator.share) {
@@ -95,11 +95,10 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
     const logoDataUrl = await fetchAsDataURL(LOGO_URL)
     const posterDataUrl = ticket.event.posterImage ? await fetchAsDataURL(ticket.event.posterImage) : null
 
-    const d = new Date(ticket.event.date)
-    const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-    const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    const dateStr = formatDate(ticket.event.date, 'EEEE, d MMMM yyyy')
+    const timeStr = formatDate(ticket.event.date, 'h:mm a')
     const endTimeStr = ticket.event.endDate
-      ? ` \u2013 ${new Date(ticket.event.endDate).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+      ? ` \u2013 ${formatDate(ticket.event.endDate, 'h:mm a')}`
       : ''
 
     const holderName = ticket.order?.recipientName || ''

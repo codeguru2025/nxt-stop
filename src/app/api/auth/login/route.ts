@@ -5,6 +5,10 @@ import { checkAuthLimit } from '@/lib/rateLimit'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 
+// Bcrypt hash of a random, unused string — compared against when no user is found so
+// login always takes the same time whether or not the phone number is registered.
+const DUMMY_HASH = '$2a$10$CwTycUXWue0Thq9StjUM0uJ8zM/rP03tG3z3v/AQZ1c1M99gJcuVe'
+
 export async function POST(req: Request) {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
@@ -15,10 +19,8 @@ export async function POST(req: Request) {
     if (!phone || !password) return error('Phone number and password required')
 
     const user = await prisma.user.findUnique({ where: { phone: phone.trim() } })
-    if (!user) return error('Invalid credentials', 401)
-
-    const valid = await bcrypt.compare(password, user.passwordHash)
-    if (!valid) return error('Invalid credentials', 401)
+    const valid = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH)
+    if (!user || !valid) return error('Invalid credentials', 401)
 
     const token = await signToken({
       id: user.id,

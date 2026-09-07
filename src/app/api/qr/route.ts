@@ -1,8 +1,17 @@
 import { generateQRDataURL } from '@/lib/qr'
-import { error, serverError } from '@/lib/api'
+import { error, unauthorized, serverError } from '@/lib/api'
+import { requireAuth } from '@/lib/auth'
+import { checkScanLimit } from '@/lib/rateLimit'
 
 export async function GET(req: Request) {
   try {
+    const session = await requireAuth().catch(() => null)
+    if (!session) return unauthorized()
+
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
+    const { limited } = await checkScanLimit(ip)
+    if (limited) return error('Too many requests', 429)
+
     const url = new URL(req.url)
     const data = url.searchParams.get('data')
     if (!data) return error('data param required')

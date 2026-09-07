@@ -254,9 +254,8 @@ export default function AdminTicketsClient() {
     if (!printWin) return
 
     const logoDataUrl = await fetchAsDataURL(LOGO_URL)
-    const d = new Date(hcBatch.event.date)
-    const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-    const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    const dateStr = formatDate(hcBatch.event.date, 'EEEE, d MMMM yyyy')
+    const timeStr = formatDate(hcBatch.event.date, 'h:mm a')
     const priceStr = `$${money(hcBatch.ticketType.price).toFixed(2)}`
     const color = hcBatch.ticketType.color
 

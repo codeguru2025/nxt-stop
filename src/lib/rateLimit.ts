@@ -11,35 +11,30 @@ function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
   ])
 }
 
-// Lazily create limiters only when Redis is available
-let authLimiter: RateLimiterRedis | null = null
-let scanLimiter: RateLimiterRedis | null = null
+// Lazily create limiters. Falls back to in-memory (per-instance) limiting when Redis is
+// unavailable, so auth/scan throttling still applies in the sanctioned no-Redis deployment
+// (see .do/app.yaml — REDIS_URL is optional) instead of silently disabling.
+let authLimiter: RateLimiterRedis | RateLimiterMemory | null = null
+let scanLimiter: RateLimiterRedis | RateLimiterMemory | null = null
 let orderLimiter: RateLimiterRedis | RateLimiterMemory | null = null
 let pollLimiter: RateLimiterRedis | RateLimiterMemory | null = null
 
-function getAuthLimiter(): RateLimiterRedis | null {
-  if (!redis) return null
+function getAuthLimiter(): RateLimiterRedis | RateLimiterMemory {
   if (!authLimiter) {
-    authLimiter = new RateLimiterRedis({
-      storeClient: redis,
-      keyPrefix: 'rl:auth',
-      points: 10,
-      duration: 900,
-      blockDuration: 900,
-    })
+    const opts = { keyPrefix: 'rl:auth', points: 10, duration: 900, blockDuration: 900 }
+    authLimiter = redis
+      ? new RateLimiterRedis({ storeClient: redis, ...opts })
+      : new RateLimiterMemory(opts)
   }
   return authLimiter
 }
 
-function getScanLimiter(): RateLimiterRedis | null {
-  if (!redis) return null
+function getScanLimiter(): RateLimiterRedis | RateLimiterMemory {
   if (!scanLimiter) {
-    scanLimiter = new RateLimiterRedis({
-      storeClient: redis,
-      keyPrefix: 'rl:scan',
-      points: 120,
-      duration: 60,
-    })
+    const opts = { keyPrefix: 'rl:scan', points: 120, duration: 60 }
+    scanLimiter = redis
+      ? new RateLimiterRedis({ storeClient: redis, ...opts })
+      : new RateLimiterMemory(opts)
   }
   return scanLimiter
 }
@@ -50,12 +45,10 @@ function isRateLimited(e: any): boolean {
 }
 
 export async function checkAuthLimit(ip: string): Promise<{ limited: boolean; retryAfter?: number }> {
-  const limiter = getAuthLimiter()
-  if (!limiter) return { limited: false }
   return withTimeout(
     (async () => {
       try {
-        await limiter.consume(ip)
+        await getAuthLimiter().consume(ip)
         return { limited: false }
       } catch (e: any) {
         if (isRateLimited(e)) return { limited: true, retryAfter: Math.ceil(e.msBeforeNextReset / 1000) }
@@ -67,12 +60,10 @@ export async function checkAuthLimit(ip: string): Promise<{ limited: boolean; re
 }
 
 export async function checkScanLimit(ip: string): Promise<{ limited: boolean }> {
-  const limiter = getScanLimiter()
-  if (!limiter) return { limited: false }
   return withTimeout(
     (async () => {
       try {
-        await limiter.consume(ip)
+        await getScanLimiter().consume(ip)
         return { limited: false }
       } catch (e: any) {
         if (isRateLimited(e)) return { limited: true }

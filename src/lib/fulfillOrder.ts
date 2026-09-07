@@ -21,13 +21,16 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
       select: { status: true },
     })
     if (!orderRow) return
-    if (orderRow.status !== 'pending' && orderRow.status !== 'paid') {
+    // 'failed' is included so a late/out-of-order payment confirmation (webhook, poll,
+    // or manual admin fulfill) can still recover an order that was prematurely marked
+    // failed — every caller only reaches fulfillOrder after confirming payment succeeded.
+    if (!['pending', 'paid', 'failed'].includes(orderRow.status)) {
       return
     }
 
-    if (orderRow.status === 'pending') {
+    if (orderRow.status === 'pending' || orderRow.status === 'failed') {
       const { count } = await tx.order.updateMany({
-        where: { id: orderId, status: 'pending' },
+        where: { id: orderId, status: orderRow.status },
         data: {
           status: 'paid',
           paymentMethod,

@@ -2,9 +2,14 @@ import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { initiatePaynowPayment, type PaynowMethod } from '@/lib/paynow'
+import { checkPollLimit } from '@/lib/rateLimit'
 import { z } from 'zod'
 
 import { env } from '@/lib/env'
+
+function getIp(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
+}
 
 const InitiateSchema = z.object({
   orderId:    z.string().min(1),
@@ -22,6 +27,11 @@ export async function POST(req: Request) {
     if (!parsed.success) return error(parsed.error.issues.map((i: { message: string }) => i.message).join('; '))
 
     const { orderId, method, phone, guestToken } = parsed.data
+
+    // Rate limit: keyed by session userId for logged-in users, by IP for guests
+    const rlKey = session ? `user:${session.id}` : `ip:${getIp(req)}`
+    const { limited } = await checkPollLimit(rlKey)
+    if (limited) return error('Too many requests. Please wait a moment and try again.', 429)
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },

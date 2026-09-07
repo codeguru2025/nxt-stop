@@ -67,6 +67,15 @@ export async function POST(req: Request) {
     if (action === 'fulfill') {
       // Manually fulfill — used when webhook failed but user did pay
       await fulfillOrder(orderId, order.paymentMethod ?? 'manual', order.paymentRef ?? undefined)
+      const [updated, ticketCount] = await Promise.all([
+        prisma.order.findUnique({ where: { id: orderId }, select: { status: true } }),
+        prisma.ticket.count({ where: { orderId } }),
+      ])
+      if (updated?.status !== 'paid' || ticketCount === 0) {
+        return error(
+          `Fulfillment did not complete — order status is '${updated?.status}' with ${ticketCount} ticket(s). Check server logs for details.`
+        )
+      }
       return ok({ message: 'Order fulfilled — tickets generated' })
     }
 
