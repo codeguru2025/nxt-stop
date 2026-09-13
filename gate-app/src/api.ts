@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-const BASE = 'https://nxt-stop-lp27d.ondigitalocean.app'
+const BASE = 'https://www.nxt-stop.com'
 
 export type ScanResult = {
   result: 'valid' | 'already_used' | 'invalid' | 'early_scan'

@@ -45,13 +45,14 @@ export async function POST(req: Request) {
     const gatePhone = process.env.GATE_PHONE
     const gatePassword = process.env.GATE_PASSWORD
     if (gatePhone && gatePassword) {
+      const gateHash = await bcrypt.hash(gatePassword, 10)
       await prisma.user.upsert({
         where: { phone: gatePhone },
-        update: {},
+        update: { passwordHash: gateHash, role: 'gate_staff' },
         create: {
           name: 'Gate Staff',
           phone: gatePhone,
-          passwordHash: await bcrypt.hash(gatePassword, 10),
+          passwordHash: gateHash,
           role: 'gate_staff',
         },
       })
