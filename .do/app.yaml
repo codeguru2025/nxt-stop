@@ -1,13 +1,19 @@
 # DigitalOcean App Platform Spec
 # Docs: https://docs.digitalocean.com/products/app-platform/reference/app-spec/
 #
+# COST NOTE: Valkey/Redis was dropped from this setup on purpose. It was only used as an
+# optional Socket.IO multi-instance adapter and a QR-code cache — both degrade gracefully
+# without it (see src/server.ts and src/lib/qr.ts) — so it's pure monthly cost with no
+# functional loss at instance_count: 1.
+#
 # SETUP CHECKLIST:
 # 1. Create managed PostgreSQL database "nxt-stop" in LON1
-# 2. Create managed Valkey database "nxt-stopcaching" in LON1
-# 3. Create a Space "nxt-stop" in LON1 with CDN enabled
-# 4. Add this app's component as a trusted source on BOTH databases (Network Access tab)
-# 5. Set all environment variables in the App Platform dashboard
-# 6. After first deploy: run `npx prisma db push` using DIRECT_URL (non-pooled connection)
+# 2. Create a Space named exactly "nxtstop-uploads" in LON1 with CDN enabled
+#    (must match this name/region — the app has image URLs hardcoded to
+#    https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/<filename>)
+# 3. Add this app's component as a trusted source on the database (Network Access tab)
+# 4. Set all environment variables in the App Platform dashboard (REDIS_URL can be left unset)
+# 5. After first deploy: run `npx prisma db push` using DIRECT_URL (non-pooled connection)
 
 name: nxt-stop
 region: lon
@@ -50,10 +56,5 @@ services:
 #   - name: nxt-stop
 #     engine: PG
 #     version: "18"
-#     size: db-s-1vcpu-1gb
-#     num_nodes: 1
-#   - name: nxt-stopcaching
-#     engine: VALKEY
-#     version: "8"
 #     size: db-s-1vcpu-1gb
 #     num_nodes: 1

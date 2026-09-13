@@ -34,4 +34,7 @@ export const env = {
   get DO_SPACES_ENDPOINT() { return process.env.DO_SPACES_ENDPOINT },
   get DO_SPACES_BUCKET()   { return process.env.DO_SPACES_BUCKET },
   get DO_SPACES_REGION()   { return process.env.DO_SPACES_REGION },
+
+  get ECOCASH_MERCHANT_NUMBER() { return required('ECOCASH_MERCHANT_NUMBER') },
+  get ECOCASH_WEBHOOK_SECRET()  { return required('ECOCASH_WEBHOOK_SECRET') },
 } as const

@@ -220,6 +220,7 @@ model Order {
   whatsappName  String?
   whatsappSentAt DateTime?
   recipientName String?
+  ecocashPayerPhone String? // number the buyer says they'll dial *153*.../pay from — used to match the inbound EcoCash SMS
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -229,6 +230,22 @@ model Order {
 
   @@index([userId, status])
   @@index([status, createdAt])
+}
+
+// Audit trail of every SMS the merchant EcoCash line forwards in, matched or not.
+// Lets an admin diagnose/re-match a payment when the parser can't confidently link it to an order.
+model EcocashSmsLog {
+  id            String   @id @default(cuid())
+  rawText       String
+  fromNumber    String?
+  parsedAmount  Decimal? @db.Decimal(10, 2)
+  parsedPayer   String?
+  parsedTxRef   String?
+  matchedOrderId String?
+  matchStatus   String   @default("unmatched") // matched | unmatched | ambiguous
+  createdAt     DateTime @default(now())
+
+  @@index([matchStatus, createdAt])
 }
 
 model OrderItem {
