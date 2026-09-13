@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
     const admin = await prisma.user.upsert({
       where: { phone: adminPhone },
-      update: {},
+      update: { passwordHash: hash, role: 'admin' },
       create: {
         name: 'NXT STOP Admin',
         phone: adminPhone,
