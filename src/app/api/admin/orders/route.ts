@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import { fulfillOrder } from '@/lib/fulfillOrder'
 import { pollPaynowTransaction } from '@/lib/paynow'
@@ -7,7 +7,7 @@ import { pollPaynowTransaction } from '@/lib/paynow'
 // GET /api/admin/orders?search=&status=&page=
 export async function GET(req: Request) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('tickets').catch(() => null)
     if (!session) return forbidden()
 
     const { searchParams } = new URL(req.url)
@@ -55,7 +55,7 @@ export async function GET(req: Request) {
 // Body: { orderId, action: 'fulfill' | 'check' | 'cancel' }
 export async function POST(req: Request) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('tickets').catch(() => null)
     if (!session) return forbidden()
 
     const { orderId, action } = await req.json()

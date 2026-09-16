@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import { generateQRDataURL, generateTicketNumber } from '@/lib/qr'
 import crypto from 'crypto'
@@ -8,7 +8,7 @@ import crypto from 'crypto'
 // When includeQR=true is set alongside status=physical, returns tickets with regenerated qrDataUrl
 export async function GET(req: Request) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('tickets').catch(() => null)
     if (!session) return forbidden()
 
     const { searchParams } = new URL(req.url)
@@ -136,7 +136,7 @@ export async function GET(req: Request) {
 // Each ticket gets an activationCode that must be entered when the ticket is sold.
 export async function POST(req: Request) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('tickets').catch(() => null)
     if (!session) return forbidden()
 
     const { eventId, ticketTypeId, quantity } = await req.json()

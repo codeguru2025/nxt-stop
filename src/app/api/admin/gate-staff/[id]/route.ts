@@ -1,12 +1,12 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import bcrypt from 'bcryptjs'
 
 // PATCH /api/admin/gate-staff/[id] — reset gate staff password
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('gate_staff').catch(() => null)
     if (!session) return forbidden()
 
     const { id } = await params
@@ -30,7 +30,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 // DELETE /api/admin/gate-staff/[id] — revoke gate staff access
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('gate_staff').catch(() => null)
     if (!session) return forbidden()
 
     const { id } = await params

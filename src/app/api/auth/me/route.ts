@@ -14,6 +14,8 @@ export async function GET() {
         name: true,
         phone: true,
         role: true,
+        email: true,
+        capabilities: true,
         referralCode: true,
         points: true,
         totalEarned: true,

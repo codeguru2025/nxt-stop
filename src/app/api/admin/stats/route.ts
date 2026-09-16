@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth'
 import { ok, forbidden, serverError } from '@/lib/api'
 import { redis } from '@/lib/redis'
 
@@ -8,7 +8,7 @@ const CACHE_TTL = 30 // 30 seconds
 
 export async function GET() {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('stats').catch(() => null)
     if (!session) return forbidden()
 
     // Try Redis cache first

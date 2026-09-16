@@ -1,6 +1,7 @@
 import { prisma } from './db'
 import { generateTicketNumber } from './qr'
 import { sendOrderTicketsWhatsApp } from './whatsapp'
+import { sendOrderConfirmationEmail } from './email'
 import crypto from 'crypto'
 
 export async function fulfillOrder(orderId: string, paymentMethod: string, paymentRef?: string) {
@@ -173,6 +174,9 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
   if (ticketsMinted) {
     sendOrderTicketsWhatsApp(orderId).catch((err) => {
       console.error(`WhatsApp delivery failed for order ${orderId}`, err)
+    })
+    sendOrderConfirmationEmail(orderId).catch((err) => {
+      console.error(`Email delivery failed for order ${orderId}`, err)
     })
   }
 }

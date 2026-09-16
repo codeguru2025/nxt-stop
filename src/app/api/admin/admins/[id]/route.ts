@@ -1,0 +1,84 @@
+import { prisma } from '@/lib/db'
+import { requireCapability, isAdminCapability } from '@/lib/auth'
+import { ok, error, forbidden, notFound, serverError } from '@/lib/api'
+import bcrypt from 'bcryptjs'
+
+// PATCH /api/admin/admins/[id] — update name/email/capabilities, or reset password
+export async function PATCH(
+  req: Request,
+  ctx: RouteContext<'/api/admin/admins/[id]'>
+) {
+  try {
+    const session = await requireCapability('admins').catch(() => null)
+    if (!session) return forbidden()
+    const { id } = await ctx.params
+
+    const admin = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true, capabilities: true } })
+    if (!admin) return notFound('Admin')
+    if (admin.role !== 'admin') return error('User is not an admin', 400)
+
+    const { name, email, password, capabilities } = await req.json()
+    const data: { name?: string; email?: string | null; passwordHash?: string; capabilities?: string[] } = {}
+
+    if (name !== undefined) {
+      if (!name.trim()) return error('Name cannot be empty')
+      data.name = name.trim()
+    }
+    if (email !== undefined) {
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return error('Invalid email address')
+      data.email = email?.trim() || null
+    }
+    if (password !== undefined) {
+      if (password.length < 8) return error('Password must be at least 8 characters')
+      data.passwordHash = await bcrypt.hash(password, 10)
+    }
+    if (capabilities !== undefined) {
+      if (!Array.isArray(capabilities) || !capabilities.every(isAdminCapability)) {
+        return error('Invalid capabilities')
+      }
+      // Never let a change leave the whole system with no admin able to manage admins —
+      // that would be an unrecoverable lockout (nobody left who can grant it back).
+      if (admin.capabilities.includes('admins') && !capabilities.includes('admins')) {
+        const otherHolders = await prisma.user.count({
+          where: { role: 'admin', id: { not: id }, capabilities: { has: 'admins' } },
+        })
+        if (otherHolders === 0) return error('At least one admin must keep the "Admins" capability')
+      }
+      data.capabilities = capabilities
+    }
+
+    if (Object.keys(data).length === 0) return error('Nothing to update')
+
+    await prisma.user.update({ where: { id }, data })
+    return ok({ message: 'Admin updated' })
+  } catch (e) {
+    return serverError(e)
+  }
+}
+
+// DELETE /api/admin/admins/[id] — revoke admin access (demoted to customer, not deleted —
+// admins may have their own orders/tickets/scan history, unlike gate staff)
+export async function DELETE(
+  _req: Request,
+  ctx: RouteContext<'/api/admin/admins/[id]'>
+) {
+  try {
+    const session = await requireCapability('admins').catch(() => null)
+    if (!session) return forbidden()
+    const { id } = await ctx.params
+
+    if (id === session.id) return error('You cannot revoke your own admin access')
+
+    const admin = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } })
+    if (!admin) return notFound('Admin')
+    if (admin.role !== 'admin') return error('User is not an admin', 400)
+
+    const adminCount = await prisma.user.count({ where: { role: 'admin' } })
+    if (adminCount <= 1) return error('Cannot remove the last remaining admin')
+
+    await prisma.user.update({ where: { id }, data: { role: 'customer' } })
+    return ok({ message: 'Admin access revoked' })
+  } catch (e) {
+    return serverError(e)
+  }
+}

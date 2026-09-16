@@ -35,6 +35,8 @@ export const env = {
   get DO_SPACES_BUCKET()   { return process.env.DO_SPACES_BUCKET },
   get DO_SPACES_REGION()   { return process.env.DO_SPACES_REGION },
 
-  get ECOCASH_MERCHANT_NUMBER() { return required('ECOCASH_MERCHANT_NUMBER') },
-  get ECOCASH_WEBHOOK_SECRET()  { return required('ECOCASH_WEBHOOK_SECRET') },
+  get RESEND_API_KEY()        { return process.env.RESEND_API_KEY },
+  get EMAIL_FROM()            { return process.env.EMAIL_FROM },
+  get ADMIN_DIGEST_EMAILS()   { return process.env.ADMIN_DIGEST_EMAILS },
+  get ADMIN_DIGEST_HOUR_UTC() { return process.env.ADMIN_DIGEST_HOUR_UTC ?? '6' },
 } as const

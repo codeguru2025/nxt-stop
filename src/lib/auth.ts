@@ -72,3 +72,32 @@ export async function requireGateOrAdmin(): Promise<SessionUser> {
   }
   return session
 }
+
+export type { AdminCapability } from './adminCapabilities'
+export { ADMIN_CAPABILITIES, isAdminCapability } from './adminCapabilities'
+import type { AdminCapability } from './adminCapabilities'
+
+// Requires the caller to be an admin AND hold this specific capability.
+// Re-verifies both role and capabilities from the DB (never trusts the JWT for either).
+export async function requireCapability(capability: AdminCapability): Promise<SessionUser> {
+  const session = await requireAuth()
+  if (session.role !== 'admin') throw new Error('Forbidden')
+  const user = await prisma.user.findUnique({ where: { id: session.id }, select: { role: true, capabilities: true } })
+  if (!user || user.role !== 'admin' || !user.capabilities.includes(capability)) {
+    throw new Error('Forbidden')
+  }
+  return session
+}
+
+// Same as requireCapability, but passes if the admin holds ANY of the listed capabilities —
+// for routes shared by more than one admin-panel section (e.g. event media serves both
+// the Events editor and the Past Videos page).
+export async function requireAnyCapability(capabilities: AdminCapability[]): Promise<SessionUser> {
+  const session = await requireAuth()
+  if (session.role !== 'admin') throw new Error('Forbidden')
+  const user = await prisma.user.findUnique({ where: { id: session.id }, select: { role: true, capabilities: true } })
+  if (!user || user.role !== 'admin' || !capabilities.some((c) => user.capabilities.includes(c))) {
+    throw new Error('Forbidden')
+  }
+  return session
+}

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import { slugify, eventLocalInputToUtc } from '@/lib/utils'
 import { generateEventQrCode } from '@/lib/qr'
@@ -7,7 +7,7 @@ import crypto from 'crypto'
 
 export async function GET() {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('events').catch(() => null)
     if (!session) return forbidden()
 
     const events = await prisma.event.findMany({
@@ -27,7 +27,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('events').catch(() => null)
     if (!session) return forbidden()
 
     const body = await req.json()

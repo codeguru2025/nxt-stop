@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { generateQRDataURL } from '@/lib/qr'
 import { slugify } from '@/lib/utils'
+import { ADMIN_CAPABILITIES } from '@/lib/adminCapabilities'
 
 // POST /api/admin/seed — seeds initial data
 // Requires ?secret=SEED_SECRET or header x-seed-secret matching the SEED_SECRET env var
@@ -24,20 +25,30 @@ export async function POST(req: Request) {
   try {
     const adminPhone = process.env.ADMIN_PHONE_NUMBER ?? process.env.ADMIN_PHONE
     const adminPassword = process.env.ADMIN_PASSWORD
+    const adminEmail = process.env.ADMIN_EMAIL || null
     if (!adminPhone || !adminPassword) {
       return Response.json({ error: 'ADMIN_PHONE_NUMBER and ADMIN_PASSWORD must be set' }, { status: 500 })
     }
 
     const hash = await bcrypt.hash(adminPassword, 10)
 
+    // The bootstrap admin always gets every capability on (re)seed — this is the recovery
+    // path if a capability grant mistake ever locks every other admin out of the Admins page.
     const admin = await prisma.user.upsert({
       where: { phone: adminPhone },
-      update: { passwordHash: hash, role: 'admin' },
+      update: {
+        passwordHash: hash,
+        role: 'admin',
+        capabilities: [...ADMIN_CAPABILITIES],
+        ...(adminEmail && { email: adminEmail }),
+      },
       create: {
         name: 'NXT STOP Admin',
         phone: adminPhone,
         passwordHash: hash,
         role: 'admin',
+        email: adminEmail,
+        capabilities: [...ADMIN_CAPABILITIES],
       },
     })
 

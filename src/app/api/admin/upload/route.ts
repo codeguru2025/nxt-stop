@@ -1,4 +1,4 @@
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability, type AdminCapability } from '@/lib/auth'
 import { forbidden, ok, error, serverError } from '@/lib/api'
 import { uploadFile, type UploadFolder } from '@/lib/storage'
 
@@ -14,14 +14,26 @@ const FOLDER_MAP: Record<string, UploadFolder> = {
   artists:  'artists',
 }
 
+// Which admin capability a given upload folder falls under — 'artists' photos are
+// uploaded from within the Events editor (lineup management), so they gate on 'events' too.
+const FOLDER_CAPABILITY: Record<string, AdminCapability> = {
+  events:   'events',
+  artists:  'events',
+  founders: 'founders',
+  products: 'store',
+  rewards:  'rewards',
+  gallery:  'gallery',
+}
+
 export async function POST(req: Request) {
   try {
-    const session = await requireAdmin().catch(() => null)
-    if (!session) return forbidden()
-
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     const folderParam = (formData.get('folder') as string | null) ?? 'events'
+
+    const capability = FOLDER_CAPABILITY[folderParam] ?? 'events'
+    const session = await requireCapability(capability).catch(() => null)
+    if (!session) return forbidden()
 
     if (!file) return error('file is required')
     if (!ALLOWED_TYPES.includes(file.type)) {

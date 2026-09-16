@@ -1,12 +1,12 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 
 type Ctx = { params: Promise<{ id: string }> }
 
 export async function PATCH(req: Request, { params }: Ctx) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('store').catch(() => null)
     if (!session) return forbidden()
 
     const { id } = await params
@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
 export async function DELETE(req: Request, { params }: Ctx) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('store').catch(() => null)
     if (!session) return forbidden()
 
     const { id } = await params

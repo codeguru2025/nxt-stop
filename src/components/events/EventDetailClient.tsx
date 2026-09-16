@@ -30,7 +30,7 @@ type Event = {
 }
 
 const PAYMENT_METHODS = [
-  { id: 'ecocash',  label: 'EcoCash',     icon: '📱', mobile: true,  desc: 'Dial *153# on your phone' },
+  { id: 'ecocash',  label: 'EcoCash',     icon: '📱', mobile: true,  desc: 'USSD push to your phone' },
   { id: 'onemoney', label: 'OneMoney',    icon: '💰', mobile: true,  desc: 'NetOne mobile money' },
   { id: 'innbucks', label: 'InnBucks',    icon: '🔵', mobile: true,  desc: 'Auth code in app' },
   { id: 'omari',    label: "O'mari",      icon: '🏦', mobile: true,  desc: 'Steward Bank wallet' },
@@ -43,7 +43,6 @@ type Stage =
   | { name: 'processing' }
   | { name: 'mobile_pending'; instructions: string; orderId: string; guestToken?: string }
   | { name: 'innbucks_pending'; code: string; orderId: string; guestToken?: string }
-  | { name: 'ecocash_pending'; ussdCode: string; ussdLink: string; merchantNumber: string; orderId: string; guestToken?: string }
   | { name: 'redirect'; redirectUrl: string; orderId: string; guestToken?: string }
   | { name: 'paid'; guestToken?: string }
   | { name: 'payment_failed'; message: string; guestToken?: string }
@@ -67,6 +66,7 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
   // Buyer and delivery fields
   const [whatsAppName, setWhatsAppName]     = useState('')
   const [whatsAppPhone, setWhatsAppPhone]   = useState('')
+  const [email, setEmail]                   = useState('')
   const [forSomeoneElse, setForSomeoneElse] = useState(false)
   const [recipientName, setRecipientName]   = useState('')
 
@@ -100,7 +100,7 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
   const total = subtotal + fees
   const isMobile = PAYMENT_METHODS.find(m => m.id === paymentMethod)?.mobile ?? false
 
-  function startPolling(orderId: string, guestToken?: string, pollEndpoint: string = '/api/paynow/poll') {
+  function startPolling(orderId: string, guestToken?: string) {
     pollCountRef.current = 0
     pollRef.current = setInterval(async () => {
       pollCountRef.current += 1
@@ -118,7 +118,7 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
 
       try {
         const qs = guestToken ? `&guestToken=${guestToken}` : ''
-        const res = await fetch(`${pollEndpoint}?orderId=${orderId}${qs}`).then(r => r.json())
+        const res = await fetch(`/api/paynow/poll?orderId=${orderId}${qs}`).then(r => r.json())
         if (!res.success) return // network hiccup — keep polling
 
         const { status, message } = res.data
@@ -173,6 +173,7 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
         whatsappPhone: whatsAppPhone,
         whatsappName: whatsAppName,
         recipientName: forSomeoneElse && recipientName ? recipientName : undefined,
+        email: email.trim() || undefined,
       }
       if (!user) {
         orderBody.guestPhone = whatsAppPhone
@@ -193,31 +194,7 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
       const orderId = orderRes.data.order.id
       const guestToken = orderRes.data.guestToken ?? undefined
 
-      // 2. Initiate payment — EcoCash goes straight to a dial-to-pay USSD flow (no Paynow)
-      if (paymentMethod === 'ecocash') {
-        const ecoRes = await fetch('/api/ecocash/initiate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId, payerPhone: phone, guestToken }),
-        }).then(r => r.json())
-
-        if (!ecoRes.success) {
-          setStage({ name: 'error', message: ecoRes.error ?? 'Payment initiation failed.' })
-          return
-        }
-
-        setStage({
-          name: 'ecocash_pending',
-          ussdCode: ecoRes.data.ussdCode,
-          ussdLink: ecoRes.data.ussdLink,
-          merchantNumber: ecoRes.data.merchantNumber,
-          orderId,
-          guestToken,
-        })
-        startPolling(orderId, guestToken, '/api/ecocash/poll')
-        return
-      }
-
+      // 2. Initiate payment
       const payRes = await fetch('/api/paynow/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -275,7 +252,7 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
     timePhase === 'ended'
   const showEndedNotice =
     eventEnded &&
-    !['paid', 'mobile_pending', 'innbucks_pending', 'ecocash_pending', 'payment_failed'].includes(stage.name)
+    !['paid', 'mobile_pending', 'innbucks_pending', 'payment_failed'].includes(stage.name)
 
   return (
     <div>
@@ -496,8 +473,6 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                 <MobilePendingCard instructions={stage.instructions} method={paymentMethod} phone={phone} orderId={stage.orderId} guestToken={stage.guestToken} />
               ) : stage.name === 'innbucks_pending' ? (
                 <InnbucksCard code={stage.code} orderId={stage.orderId} guestToken={stage.guestToken} />
-              ) : stage.name === 'ecocash_pending' ? (
-                <EcocashPendingCard ussdCode={stage.ussdCode} ussdLink={stage.ussdLink} merchantNumber={stage.merchantNumber} guestToken={stage.guestToken} />
               ) : showEndedNotice ? (
                 <div className="card p-6 text-center">
                   <h3 className="text-xl font-bold text-white mb-2">Ticket sales closed</h3>
@@ -652,6 +627,16 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                         {!user && (
                           <p className="text-xs text-gray-600"><a href="/register" className="text-purple-400 hover:text-purple-300">Create an account</a> to manage your tickets and earn rewards.</p>
                         )}
+                      </div>
+
+                      <div>
+                        <input
+                          type="email"
+                          placeholder="Email (optional) — get a receipt + ticket copy"
+                          value={email}
+                          onChange={e => setEmail(e.target.value)}
+                          className="w-full"
+                        />
                       </div>
 
                       {/* Buying for someone else */}
@@ -830,32 +815,6 @@ function MobilePendingCard({ instructions, method, phone, orderId, guestToken }:
       <p className="text-gray-600 text-xs mb-3">This page updates automatically when confirmed.</p>
       <a href={ticketsUrl} className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
         Already approved? Check my tickets →
-      </a>
-    </div>
-  )
-}
-
-function EcocashPendingCard({ ussdCode, ussdLink, merchantNumber, guestToken }: {
-  ussdCode: string; ussdLink: string; merchantNumber: string; guestToken?: string
-}) {
-  const ticketsUrl = guestToken ? `/dashboard/tickets?guestToken=${guestToken}` : '/dashboard/tickets'
-  return (
-    <div className="card p-6 text-center border-green-500/30 bg-green-500/5">
-      <div className="text-4xl mb-3">📱</div>
-      <h3 className="text-lg font-bold text-white mb-2">Dial to Pay</h3>
-      <p className="text-gray-400 text-sm leading-relaxed mb-3">
-        Tap below to dial EcoCash on your phone, then enter your PIN to send payment to {merchantNumber}.
-      </p>
-      <a href={ussdLink} className="btn-primary inline-flex items-center justify-center gap-2 text-sm w-full mb-3">
-        <Phone size={15} /> Dial {ussdCode}
-      </a>
-      <div className="bg-[#111] rounded-xl p-3 text-sm mb-4">
-        <p className="text-gray-500 text-xs mb-0.5">On a computer? Dial this on your phone instead</p>
-        <p className="text-white font-mono font-bold">{ussdCode}</p>
-      </div>
-      <p className="text-gray-600 text-xs mb-3">This page updates automatically once your payment is confirmed.</p>
-      <a href={ticketsUrl} className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
-        Already paid? Check my tickets →
       </a>
     </div>
   )

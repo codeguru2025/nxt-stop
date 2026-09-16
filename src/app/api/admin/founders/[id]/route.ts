@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth'
 import { ok, forbidden, notFound, serverError } from '@/lib/api'
 
 export async function PATCH(
@@ -7,7 +7,7 @@ export async function PATCH(
   ctx: RouteContext<'/api/admin/founders/[id]'>
 ) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('founders').catch(() => null)
     if (!session) return forbidden()
     const { id } = await ctx.params
     const { name, role, bio, image, order, active } = await req.json()
@@ -35,7 +35,7 @@ export async function DELETE(
   ctx: RouteContext<'/api/admin/founders/[id]'>
 ) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('founders').catch(() => null)
     if (!session) return forbidden()
     const { id } = await ctx.params
 

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import bcrypt from 'bcryptjs'
 import { generateQRDataURL } from '@/lib/qr'
@@ -7,7 +7,7 @@ import crypto from 'crypto'
 
 export async function GET() {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('partners').catch(() => null)
     if (!session) return forbidden()
 
     const partners = await prisma.partner.findMany({
@@ -27,7 +27,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('partners').catch(() => null)
     if (!session) return forbidden()
 
     const {
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('partners').catch(() => null)
     if (!session) return forbidden()
 
     const { partnerId, commissionRate, commissionPerTicket, active } = await req.json()

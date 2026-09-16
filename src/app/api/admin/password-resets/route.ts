@@ -1,11 +1,11 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth'
 import { ok, forbidden, serverError } from '@/lib/api'
 
 // GET /api/admin/password-resets — pending password reset requests
 export async function GET() {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('password_resets').catch(() => null)
     if (!session) return forbidden()
 
     const requests = await prisma.passwordResetRequest.findMany({

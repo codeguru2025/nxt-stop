@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import bcrypt from 'bcryptjs'
 
@@ -9,7 +9,7 @@ import bcrypt from 'bcryptjs'
 // reject   → marks request rejected (no password change)
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('password_resets').catch(() => null)
     if (!session) return forbidden()
 
     const { id } = await params

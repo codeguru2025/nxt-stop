@@ -6,41 +6,58 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, CalendarDays, Users, Package,
   Gift, UserCircle2, QrCode, LogOut, Shield,
-  ImageIcon, Video, Ticket, Menu, X, KeyRound
+  ImageIcon, Video, Ticket, Menu, X, KeyRound, Lock
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { AdminCapability } from '@/lib/adminCapabilities'
 
-const NAV = [
-  { href: '/admin',           icon: LayoutDashboard, label: 'Overview',       exact: true },
-  { href: '/admin/events',    icon: CalendarDays,    label: 'Events' },
-  { href: '/admin/partners',  icon: Users,           label: 'Partners' },
-  { href: '/admin/store',     icon: Package,         label: 'Store' },
-  { href: '/admin/rewards',   icon: Gift,            label: 'Rewards' },
-  { href: '/admin/founders',  icon: UserCircle2,     label: 'Founders' },
-  { href: '/admin/tickets',    icon: Ticket,          label: 'Tickets & Orders' },
-  { href: '/admin/gallery',    icon: ImageIcon,       label: 'Gallery' },
-  { href: '/admin/videos',     icon: Video,           label: 'Past Videos' },
-  { href: '/admin/gate-staff',       icon: Users,     label: 'Gate Staff' },
-  { href: '/admin/password-resets',   icon: KeyRound,  label: 'Password Resets' },
-  { href: '/gate',                    icon: QrCode,    label: 'Gate Scanner' },
+const NAV: { href: string; icon: typeof LayoutDashboard; label: string; exact?: boolean; capability?: AdminCapability }[] = [
+  { href: '/admin',           icon: LayoutDashboard, label: 'Overview',       exact: true, capability: 'stats' },
+  { href: '/admin/events',    icon: CalendarDays,    label: 'Events',                      capability: 'events' },
+  { href: '/admin/partners',  icon: Users,           label: 'Partners',                    capability: 'partners' },
+  { href: '/admin/store',     icon: Package,         label: 'Store',                       capability: 'store' },
+  { href: '/admin/rewards',   icon: Gift,            label: 'Rewards',                     capability: 'rewards' },
+  { href: '/admin/founders',  icon: UserCircle2,     label: 'Founders',                    capability: 'founders' },
+  { href: '/admin/tickets',    icon: Ticket,          label: 'Tickets & Orders',           capability: 'tickets' },
+  { href: '/admin/gallery',    icon: ImageIcon,       label: 'Gallery',                    capability: 'gallery' },
+  { href: '/admin/videos',     icon: Video,           label: 'Past Videos',                capability: 'videos' },
+  { href: '/admin/gate-staff',       icon: Users,     label: 'Gate Staff',                 capability: 'gate_staff' },
+  { href: '/admin/admins',            icon: Shield,    label: 'Admins',                    capability: 'admins' },
+  { href: '/admin/password-resets',   icon: KeyRound,  label: 'Password Resets',           capability: 'password_resets' },
+  { href: '/gate',                    icon: QrCode,    label: 'Gate Scanner' }, // shared with gate_staff role, not capability-gated
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [pendingResets, setPendingResets] = useState(0)
+  const [capabilities, setCapabilities] = useState<AdminCapability[] | null>(null)
 
   useEffect(() => {
+    fetch('/api/auth/me').then(r => r.json()).then(d => {
+      if (d.success && d.data.role === 'admin') setCapabilities(d.data.capabilities ?? [])
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!capabilities?.includes('password_resets')) return
     fetch('/api/admin/password-resets')
       .then(r => r.json())
       .then(d => { if (d.success) setPendingResets(d.data.length) })
       .catch(() => {})
-  }, [])
+  }, [capabilities])
 
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     window.location.href = '/'
   }
+
+  const visibleNav = capabilities
+    ? NAV.filter(item => !item.capability || capabilities.includes(item.capability))
+    : NAV
+
+  const currentNavItem = NAV.find(item => item.exact ? pathname === item.href : pathname.startsWith(item.href))
+  const denied = !!capabilities && !!currentNavItem?.capability && !capabilities.includes(currentNavItem.capability)
 
   return (
     <div className="min-h-screen flex bg-[#0a0a0a]">
@@ -80,7 +97,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {NAV.map(item => {
+          {visibleNav.map(item => {
             const active = item.exact ? pathname === item.href : pathname.startsWith(item.href)
             return (
               <Link
@@ -146,7 +163,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         <main className="flex-1 w-full overflow-x-hidden">
-          {children}
+          {denied ? (
+            <div className="flex items-center justify-center min-h-[60vh] p-6">
+              <div className="card p-8 text-center max-w-sm">
+                <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+                  <Lock size={24} className="text-red-400" />
+                </div>
+                <h3 className="font-bold text-white mb-1">Access Restricted</h3>
+                <p className="text-gray-500 text-sm">
+                  Your admin account doesn&apos;t have access to this section. Ask another admin to grant it from the Admins page.
+                </p>
+              </div>
+            </div>
+          ) : children}
         </main>
       </div>
     </div>

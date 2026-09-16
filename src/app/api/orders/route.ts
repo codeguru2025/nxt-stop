@@ -24,6 +24,7 @@ const CreateOrderSchema = z.object({
   guestPhone:   z.string().min(7).max(20).optional(),
   guestName:    z.string().min(1).max(100).optional(),
   recipientName: z.string().max(100).optional(),
+  email:        z.string().trim().toLowerCase().email().max(200).optional(),
 })
 
 export async function POST(req: Request) {
@@ -40,7 +41,7 @@ export async function POST(req: Request) {
     if (!parsed.success) {
       return error(parsed.error.issues.map((i: { message: string }) => i.message).join('; '))
     }
-    const { eventId, ticketTypeId, quantity, referralCode, partnerId, guestPhone, guestName, recipientName, whatsappPhone, whatsappName } = parsed.data
+    const { eventId, ticketTypeId, quantity, referralCode, partnerId, guestPhone, guestName, recipientName, whatsappPhone, whatsappName, email } = parsed.data
 
     const normalizedWhatsappPhone = normalizeWhatsAppPhone(whatsappPhone ?? guestPhone ?? '')
     if (!normalizedWhatsappPhone) return error('Enter a valid WhatsApp number in international format')
@@ -156,6 +157,7 @@ export async function POST(req: Request) {
           whatsappPhone: normalizedWhatsappPhone,
           whatsappName: normalizedWhatsappName,
           recipientName: recipientName ?? null,
+          email: email ?? null,
           items: {
             create: {
               name: `${ticketType.name} - ${ticketType.event.name}`,

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireCapability } from '@/lib/auth'
 import { ok, forbidden, notFound, serverError } from '@/lib/api'
 import { generateQRDataURL } from '@/lib/qr'
 
@@ -8,7 +8,7 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireCapability('tickets').catch(() => null)
     if (!session) return forbidden()
     const { id } = await ctx.params
 

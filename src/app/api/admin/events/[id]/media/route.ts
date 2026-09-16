@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db'
-import { requireAdmin } from '@/lib/auth'
+import { requireAnyCapability } from '@/lib/auth'
 import { ok, forbidden, serverError, error } from '@/lib/api'
 import { uploadFile, deleteFile } from '@/lib/storage'
 
@@ -10,7 +10,7 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireAnyCapability(['events', 'videos']).catch(() => null)
     if (!session) return forbidden()
     const { id } = await ctx.params
 
@@ -29,7 +29,7 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireAnyCapability(['events', 'videos']).catch(() => null)
     if (!session) return forbidden()
     const { id } = await ctx.params
 
@@ -76,7 +76,7 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireAdmin().catch(() => null)
+    const session = await requireAnyCapability(['events', 'videos']).catch(() => null)
     if (!session) return forbidden()
 
     const { id: eventId } = await ctx.params
