@@ -224,6 +224,8 @@ model Order {
   recipientName String?
   email         String?
   emailSentAt   DateTime?
+  ecocashPayerPhone String? // orphaned since the EcoCash direct-pay revert — kept (not dropped) because
+                            // production has real historical values here; no code reads it anymore
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
