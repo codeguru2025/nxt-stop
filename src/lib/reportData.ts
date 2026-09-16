@@ -11,6 +11,8 @@ export type DailyReport = {
   merchRevenue: number
   liquorSold: number
   liquorRevenue: number
+  otherProductSold: number
+  otherProductRevenue: number
   attendance: number
   scanAnomalies: { invalid: number; alreadyUsed: number; earlyScan: number }
   perEvent: { id: string; name: string; ticketsSold: number; revenue: number; attendance: number }[]
@@ -46,6 +48,8 @@ export async function buildDailyReport(hoursBack = 24): Promise<DailyReport> {
   let merchRevenue = 0
   let liquorSold = 0
   let liquorRevenue = 0
+  let otherProductSold = 0
+  let otherProductRevenue = 0
   const perEventMap: Record<string, { name: string; ticketsSold: number; revenue: number }> = {}
 
   for (const order of paidOrders) {
@@ -66,6 +70,10 @@ export async function buildDailyReport(hoursBack = 24): Promise<DailyReport> {
       } else if (item.product?.category === 'drink') {
         liquorSold += item.quantity
         liquorRevenue += lineTotal
+      } else if (item.product) {
+        // food | other — no dedicated bucket, but still counted so revenue never silently vanishes
+        otherProductSold += item.quantity
+        otherProductRevenue += lineTotal
       }
     }
   }
@@ -86,9 +94,17 @@ export async function buildDailyReport(hoursBack = 24): Promise<DailyReport> {
   const attendanceMap = Object.fromEntries(attendanceByEvent.map((r) => [r.eventId, r._count.id]))
 
   const eventIds = new Set([...Object.keys(perEventMap), ...Object.keys(attendanceMap)])
+  // Events with scan activity but no ticket sales in this window (e.g. sold days earlier,
+  // scanned in today) have no name yet — look those up directly rather than showing "Unknown".
+  const missingNameIds = Array.from(eventIds).filter((id) => !perEventMap[id])
+  const missingNames = missingNameIds.length
+    ? await prisma.event.findMany({ where: { id: { in: missingNameIds } }, select: { id: true, name: true } })
+    : []
+  const nameById = Object.fromEntries(missingNames.map((e) => [e.id, e.name]))
+
   const perEvent = Array.from(eventIds).map((id) => ({
     id,
-    name: perEventMap[id]?.name ?? 'Unknown event',
+    name: perEventMap[id]?.name ?? nameById[id] ?? 'Unknown event',
     ticketsSold: perEventMap[id]?.ticketsSold ?? 0,
     revenue: perEventMap[id]?.revenue ?? 0,
     attendance: attendanceMap[id] ?? 0,
@@ -105,6 +121,8 @@ export async function buildDailyReport(hoursBack = 24): Promise<DailyReport> {
     merchRevenue,
     liquorSold,
     liquorRevenue,
+    otherProductSold,
+    otherProductRevenue,
     attendance: scanCounts.valid,
     scanAnomalies: {
       invalid: scanCounts.invalid,

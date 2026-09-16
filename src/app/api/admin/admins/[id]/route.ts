@@ -36,20 +36,30 @@ export async function PATCH(
       if (!Array.isArray(capabilities) || !capabilities.every(isAdminCapability)) {
         return error('Invalid capabilities')
       }
-      // Never let a change leave the whole system with no admin able to manage admins —
-      // that would be an unrecoverable lockout (nobody left who can grant it back).
-      if (admin.capabilities.includes('admins') && !capabilities.includes('admins')) {
-        const otherHolders = await prisma.user.count({
-          where: { role: 'admin', id: { not: id }, capabilities: { has: 'admins' } },
-        })
-        if (otherHolders === 0) return error('At least one admin must keep the "Admins" capability')
-      }
       data.capabilities = capabilities
     }
 
     if (Object.keys(data).length === 0) return error('Nothing to update')
 
-    await prisma.user.update({ where: { id }, data })
+    if (capabilities !== undefined && admin.capabilities.includes('admins') && !capabilities.includes('admins')) {
+      // Never let a change leave the whole system with no admin able to manage admins — that
+      // would be an unrecoverable lockout. Locks every admin row for the duration of the
+      // transaction so two concurrent "drop my own admins capability" requests can't both
+      // pass the check (each would otherwise see the other still holding it and proceed).
+      const result = await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT id FROM "User" WHERE role = 'admin' FOR UPDATE`
+        const otherHolders = await tx.user.count({
+          where: { role: 'admin', id: { not: id }, capabilities: { has: 'admins' } },
+        })
+        if (otherHolders === 0) return { blocked: true }
+        await tx.user.update({ where: { id }, data })
+        return { blocked: false }
+      })
+      if (result.blocked) return error('At least one admin must keep the "Admins" capability')
+    } else {
+      await prisma.user.update({ where: { id }, data })
+    }
+
     return ok({ message: 'Admin updated' })
   } catch (e) {
     return serverError(e)
@@ -73,10 +83,19 @@ export async function DELETE(
     if (!admin) return notFound('Admin')
     if (admin.role !== 'admin') return error('User is not an admin', 400)
 
-    const adminCount = await prisma.user.count({ where: { role: 'admin' } })
-    if (adminCount <= 1) return error('Cannot remove the last remaining admin')
+    // Locks every admin row for the duration of the transaction so two concurrent revokes
+    // (e.g. two admins revoking each other at once) can't both pass the count check and
+    // leave zero admins — the second request blocks until the first commits, then re-reads
+    // the now-reduced count.
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "User" WHERE role = 'admin' FOR UPDATE`
+      const adminCount = await tx.user.count({ where: { role: 'admin' } })
+      if (adminCount <= 1) return { blocked: true }
+      await tx.user.update({ where: { id }, data: { role: 'customer' } })
+      return { blocked: false }
+    })
+    if (result.blocked) return error('Cannot remove the last remaining admin')
 
-    await prisma.user.update({ where: { id }, data: { role: 'customer' } })
     return ok({ message: 'Admin access revoked' })
   } catch (e) {
     return serverError(e)

@@ -1,4 +1,4 @@
-import { requireCapability, type AdminCapability } from '@/lib/auth'
+import { requireAdmin, requireCapability, type AdminCapability } from '@/lib/auth'
 import { forbidden, ok, error, serverError } from '@/lib/api'
 import { uploadFile, type UploadFolder } from '@/lib/storage'
 
@@ -27,6 +27,12 @@ const FOLDER_CAPABILITY: Record<string, AdminCapability> = {
 
 export async function POST(req: Request) {
   try {
+    // Cheap reject before doing any body-parsing work — the specific folder (and therefore
+    // the exact capability required) only becomes known after parsing the multipart body,
+    // so this first check just rules out non-admins before we spend CPU/memory on that.
+    const adminSession = await requireAdmin().catch(() => null)
+    if (!adminSession) return forbidden()
+
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     const folderParam = (formData.get('folder') as string | null) ?? 'events'

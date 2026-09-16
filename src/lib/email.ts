@@ -127,6 +127,7 @@ export async function sendAdminDigestEmail(report: DailyReport): Promise<void> {
         ${row('Ticket revenue', `$${report.ticketRevenue.toFixed(2)}`)}
         ${row('Merch sold', `${report.merchSold} ($${report.merchRevenue.toFixed(2)})`)}
         ${row('Liquor/drinks sold', `${report.liquorSold} ($${report.liquorRevenue.toFixed(2)})`)}
+        ${report.otherProductSold > 0 ? row('Other product sales', `${report.otherProductSold} ($${report.otherProductRevenue.toFixed(2)})`) : ''}
         ${row('Attendance (valid scans)', report.attendance)}
         ${row('Scan issues — invalid', report.scanAnomalies.invalid)}
         ${row('Scan issues — already used', report.scanAnomalies.alreadyUsed)}
