@@ -1,5 +1,11 @@
 import { Pool } from 'pg'
 import { PrismaPg } from '@prisma/adapter-pg'
+// Uses the '@/*' alias on purpose — it only resolves under Next's own bundler (tsconfig.json),
+// not under tsconfig.server.json (no 'paths' entry, and TS 'paths' don't rewrite emitted
+// require() calls anyway). Do NOT import this file (or anything that imports it) from
+// server.ts or any other file compiled by `tsc -p tsconfig.server.json` — it will fail to
+// resolve at runtime. Server-side code that needs Prisma at boot belongs in
+// src/instrumentation.ts instead, which Next bundles normally.
 import { PrismaClient } from '@/generated/prisma/client'
 
 declare global {
