@@ -5,7 +5,6 @@ import Redis from 'ioredis'
 import next from 'next'
 import { jwtVerify } from 'jose'
 import { parse as parseCookie } from 'cookie'
-import { startDailyDigestScheduler } from './src/lib/scheduler'
 
 const port = parseInt(process.env.PORT ?? '3000', 10)
 const dev = process.env.NODE_ENV !== 'production'
@@ -83,8 +82,6 @@ app.prepare().then(() => {
   })
 
   ;(global as any).__io = io
-
-  startDailyDigestScheduler()
 
   httpServer.listen(port, () => {
     console.log(`> NXT STOP ready on http://localhost:${port} [${dev ? 'dev' : 'production'}]`)
