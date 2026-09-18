@@ -301,8 +301,9 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-8 -mt-16 relative">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main info */}
-          <div className="lg:col-span-2">
+          {/* Main info — shown after the ticket purchase card on mobile so buying
+              doesn't require scrolling past the description/lineup/gallery first */}
+          <div className="order-2 lg:order-1 lg:col-span-2">
             <h1 className="text-3xl sm:text-4xl font-black text-white mb-4">{event.name}</h1>
 
             <div className="flex flex-wrap gap-4 mb-6">
@@ -462,9 +463,10 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
             )}
           </div>
 
-          {/* Ticket purchase sidebar */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-24">
+          {/* Ticket purchase sidebar — first thing shown on mobile so "Buy Ticket" goes
+              straight to choosing a ticket type instead of past all the event details */}
+          <div className="order-1 lg:order-2 lg:col-span-1">
+            <div className="lg:sticky lg:top-24">
               {stage.name === 'paid' ? (
                 <PaidCard guestToken={stage.guestToken} />
               ) : stage.name === 'payment_failed' ? (

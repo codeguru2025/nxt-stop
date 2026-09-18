@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Calendar, MapPin, Printer, X, ExternalLink, Ticket, Download, Share2, Check } from 'lucide-react'
 import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 type TicketData = {
@@ -42,21 +43,115 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const saveImage = async () => {
-    if (!ticketRef.current || saving) return
+  const downloadPdf = async () => {
+    if (saving) return
     setSaving(true)
     try {
-      const canvas = await html2canvas(ticketRef.current, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: '#ffffff',
-        logging: false,
-      })
-      const a = document.createElement('a')
-      a.href = canvas.toDataURL('image/png')
-      a.download = `nxtstop-ticket-${ticket.ticketNumber}.png`
-      a.click()
+      // Fetch remote images as data URLs first so jsPDF never has to touch a
+      // cross-origin URL directly (that's what silently broke the old
+      // html2canvas export — a tainted/blocked canvas throws and the button
+      // just did nothing).
+      const [logoDataUrl, posterDataUrl] = await Promise.all([
+        fetchAsDataURL(LOGO_URL).catch(() => null),
+        ticket.event.posterImage ? fetchAsDataURL(ticket.event.posterImage).catch(() => null) : Promise.resolve(null),
+      ])
+
+      const pageW = 100
+      const pageH = 170
+      const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH] })
+      let y = 0
+
+      if (posterDataUrl) {
+        try {
+          const props = doc.getImageProperties(posterDataUrl)
+          const h = Math.min((pageW * props.height) / props.width, 55)
+          doc.addImage(posterDataUrl, 0, 0, pageW, h, undefined, 'FAST')
+          y = h + 8
+        } catch {
+          y = 8
+        }
+      } else {
+        doc.setFillColor(124, 58, 237)
+        doc.rect(0, 0, pageW, 8, 'F')
+        y = 16
+      }
+
+      if (logoDataUrl) {
+        try {
+          const props = doc.getImageProperties(logoDataUrl)
+          const logoH = 10
+          const logoW = (logoH * props.width) / props.height
+          doc.addImage(logoDataUrl, 8, y, logoW, logoH, undefined, 'FAST')
+        } catch {}
+      }
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(150, 150, 150)
+      doc.text('NXT STOP', pageW - 8, y + 4, { align: 'right' })
+
+      y += 16
+      doc.setFontSize(15)
+      doc.setTextColor(20, 20, 20)
+      doc.text(ticket.event.name, 8, y, { maxWidth: pageW - 16 })
+
+      y += 8
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(90, 90, 90)
+      doc.text(`${formatDate(ticket.event.date, 'EEEE, d MMMM yyyy')}`, 8, y)
+      y += 5
+      const timeStr = `${formatDate(ticket.event.date, 'h:mm a')}${ticket.event.endDate ? ` - ${formatDate(ticket.event.endDate, 'h:mm a')}` : ''}`
+      doc.text(timeStr, 8, y)
+      y += 5
+      doc.text(`${ticket.event.venue}${ticket.event.address ? `, ${ticket.event.address}` : ''}`, 8, y, { maxWidth: pageW - 16 })
+
+      y += 8
+      doc.setDrawColor(220, 220, 220)
+      doc.line(8, y, pageW - 8, y)
+      y += 8
+
+      const qrSize = 36
+      doc.addImage(ticket.qrDataUrl, 'PNG', 8, y, qrSize, qrSize)
+
+      const infoX = 8 + qrSize + 8
+      let infoY = y + 5
+      if (ticket.order?.recipientName) {
+        doc.setFontSize(8)
+        doc.setTextColor(150, 150, 150)
+        doc.text('TICKET FOR', infoX, infoY)
+        infoY += 5
+        doc.setFontSize(10)
+        doc.setTextColor(20, 20, 20)
+        doc.setFont('helvetica', 'bold')
+        doc.text(ticket.order.recipientName, infoX, infoY, { maxWidth: pageW - infoX - 8 })
+        infoY += 7
+      }
+      doc.setFontSize(8)
+      doc.setTextColor(150, 150, 150)
+      doc.setFont('helvetica', 'normal')
+      doc.text('TICKET NO', infoX, infoY)
+      infoY += 4.5
+      doc.setFontSize(8)
+      doc.setTextColor(90, 90, 90)
+      doc.text(ticket.ticketNumber, infoX, infoY, { maxWidth: pageW - infoX - 8 })
+      infoY += 7
+      doc.setFontSize(8)
+      doc.setTextColor(150, 150, 150)
+      doc.text('PRICE', infoX, infoY)
+      infoY += 5.5
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(124, 58, 237)
+      doc.text(formatCurrency(ticket.ticketType.price), infoX, infoY)
+
+      y += qrSize + 8
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(140, 140, 140)
+      doc.text('Present this QR code at the gate · nxtstop.com', pageW / 2, y, { align: 'center' })
+
+      doc.save(`nxtstop-ticket-${ticket.ticketNumber}.pdf`)
     } finally {
       setSaving(false)
     }
@@ -239,8 +334,8 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
             <button onClick={handlePrint} className="flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg px-3 py-2 transition-colors font-medium">
               <Printer size={13} /> Print
             </button>
-            <button onClick={saveImage} disabled={saving} className="flex items-center gap-1.5 text-xs bg-purple-600/80 hover:bg-purple-600 text-white rounded-lg px-3 py-2 transition-colors font-medium disabled:opacity-60">
-              <Download size={13} /> {saving ? 'Saving…' : 'Save Image'}
+            <button onClick={downloadPdf} disabled={saving} className="flex items-center gap-1.5 text-xs bg-purple-600/80 hover:bg-purple-600 text-white rounded-lg px-3 py-2 transition-colors font-medium disabled:opacity-60">
+              <Download size={13} /> {saving ? 'Saving…' : 'Download PDF'}
             </button>
             <button onClick={shareTicket} className="flex items-center gap-1.5 text-xs bg-green-600/80 hover:bg-green-600 text-white rounded-lg px-3 py-2 transition-colors font-medium">
               {copied ? <><Check size={13} /> Copied!</> : <><Share2 size={13} /> Share</>}
