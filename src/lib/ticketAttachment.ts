@@ -1,6 +1,7 @@
 import sharp from 'sharp'
 import { jsPDF } from 'jspdf'
 import { generateQRDataURL } from './qr'
+import { EVENT_TIME_ZONE } from './utils'
 
 const LOGO_URL = 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
 
@@ -71,7 +72,10 @@ async function prepareAssets(input: TicketAttachmentInput): Promise<TicketAssets
     generateQRDataURL(input.qrCode),
   ])
 
+  // Event times are wall-clock in the venue's timezone (CAT, fixed UTC+2) — must format
+  // in that zone explicitly, or a server running in UTC shifts every ticket by 2 hours.
   const when = new Intl.DateTimeFormat('en-US', {
+    timeZone: EVENT_TIME_ZONE,
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -80,7 +84,7 @@ async function prepareAssets(input: TicketAttachmentInput): Promise<TicketAssets
     minute: '2-digit',
   }).format(input.eventDate)
   const endTime = input.eventEndDate
-    ? new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(input.eventEndDate)
+    ? new Intl.DateTimeFormat('en-US', { timeZone: EVENT_TIME_ZONE, hour: 'numeric', minute: '2-digit' }).format(input.eventEndDate)
     : ''
   const venue = `${input.eventVenue}${input.eventAddress ? `, ${input.eventAddress}` : ''}`
   const safeColor = /^#[0-9a-fA-F]{6}$/.test(input.ticketTypeColor) ? input.ticketTypeColor : '#7C3AED'

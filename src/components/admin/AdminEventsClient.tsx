@@ -11,7 +11,17 @@ import {
   Loader2, Check, X, ImagePlus, UserPlus, Mic2, Music2,
   QrCode, Download, RefreshCw, Images,
 } from 'lucide-react'
-import { formatDate, utcToEventLocalInput } from '@/lib/utils'
+import { formatDate, formatDateTime, utcToEventLocalInput, eventLocalInputToUtc } from '@/lib/utils'
+
+// datetime-local inputs render 24-hour or 12-hour depending on the browser/OS locale, so
+// "12:00" is easy to misread as noon vs midnight when setting it. This spells out exactly
+// what will be saved, in the venue's actual timezone, so that ambiguity can't slip through.
+function eventTimePreview(local: string): string {
+  if (!local) return ''
+  const d = eventLocalInputToUtc(local)
+  if (isNaN(d.getTime())) return ''
+  return `${formatDateTime(d)} CAT`
+}
 
 type LineupArtist = {
   name: string
@@ -331,10 +341,16 @@ export default function AdminEventsClient() {
               <div>
                 <label>Date & Time *</label>
                 <input type="datetime-local" value={form.date} onChange={e => setForm((f: any) => ({ ...f, date: e.target.value }))} />
+                {form.date && (
+                  <p className="text-xs text-purple-300 mt-1">{eventTimePreview(form.date)}</p>
+                )}
               </div>
               <div>
                 <label>End Date & Time</label>
                 <input type="datetime-local" value={form.endDate} onChange={e => setForm((f: any) => ({ ...f, endDate: e.target.value }))} />
+                {form.endDate && (
+                  <p className="text-xs text-purple-300 mt-1">{eventTimePreview(form.endDate)}</p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <label>Description</label>
