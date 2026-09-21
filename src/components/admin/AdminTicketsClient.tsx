@@ -923,7 +923,7 @@ ${rowsHtml}
                   <img src={adminTicketData.event.posterImage} alt="" className="w-full h-36 object-cover rounded-xl mb-4 -mt-2" />
                 )}
                 <div className="flex items-start gap-3 mb-4">
-                  <img src={LOGO_URL} alt="NXT STOP" className="h-16 w-auto max-w-[220px] object-contain object-left shrink-0" />
+                  <img src={LOGO_URL} alt="NXT STOP" className="h-16 w-auto max-w-[220px] object-contain object-left invert shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">NXT STOP</p>
                     <h2 className="text-lg font-black text-white leading-tight">{adminTicketData.event.name}</h2>
