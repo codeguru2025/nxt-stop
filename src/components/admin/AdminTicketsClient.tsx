@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import AdminLayout from './AdminLayout'
-import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer, Calendar, MapPin, QrCode, Send, Mail, MessageCircle, Download } from 'lucide-react'
+import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer, Calendar, MapPin, QrCode, Send, Mail, MessageCircle, Download, FileText } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 const LOGO_URL = 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
@@ -975,12 +975,20 @@ ${rowsHtml}
                     {adminTicketData.activationCode && (
                       <p className="text-xs text-orange-400 font-mono">Activation: {adminTicketData.activationCode}</p>
                     )}
-                    <a
-                      href={`/api/admin/tickets/${adminTicketData.id}/download`}
-                      className="inline-flex items-center gap-1.5 text-xs bg-[#1a1a1a] border border-[#2a2a2a] text-gray-300 hover:border-purple-500/40 hover:text-white rounded-lg px-3 py-1.5 transition-colors mt-1"
-                    >
-                      <Download size={12} /> Download ticket image
-                    </a>
+                    <div className="flex gap-2 mt-1">
+                      <a
+                        href={`/api/admin/tickets/${adminTicketData.id}/download`}
+                        className="inline-flex items-center gap-1.5 text-xs bg-[#1a1a1a] border border-[#2a2a2a] text-gray-300 hover:border-purple-500/40 hover:text-white rounded-lg px-3 py-1.5 transition-colors"
+                      >
+                        <Download size={12} /> PNG
+                      </a>
+                      <a
+                        href={`/api/admin/tickets/${adminTicketData.id}/download?format=pdf`}
+                        className="inline-flex items-center gap-1.5 text-xs bg-[#1a1a1a] border border-[#2a2a2a] text-gray-300 hover:border-purple-500/40 hover:text-white rounded-lg px-3 py-1.5 transition-colors"
+                      >
+                        <FileText size={12} /> PDF
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1100,10 +1108,17 @@ ${rowsHtml}
                           </button>
                           <a
                             href={`/api/admin/tickets/${tk.id}/download`}
-                            title="Download ticket image"
+                            title="Download PNG"
                             className="flex items-center px-1.5 bg-[#151515] border-l border-[#2a2a2a] text-gray-500 hover:text-purple-400 transition-colors"
                           >
                             <Download size={12} />
+                          </a>
+                          <a
+                            href={`/api/admin/tickets/${tk.id}/download?format=pdf`}
+                            title="Download PDF"
+                            className="flex items-center px-1.5 bg-[#151515] border-l border-[#2a2a2a] text-gray-500 hover:text-purple-400 transition-colors"
+                          >
+                            <FileText size={12} />
                           </a>
                         </div>
                       ))}

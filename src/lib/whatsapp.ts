@@ -133,7 +133,7 @@ export async function sendOrderTicketsWhatsApp(orderId: string): Promise<void> {
       user: { select: { name: true } },
       tickets: {
         include: {
-          event: { select: { name: true, venue: true, address: true, date: true, endDate: true } },
+          event: { select: { name: true, venue: true, address: true, date: true, endDate: true, posterImage: true } },
           ticketType: { select: { name: true, color: true, price: true } },
         },
       },
@@ -157,6 +157,7 @@ export async function sendOrderTicketsWhatsApp(orderId: string): Promise<void> {
       eventAddress: ticket.event.address,
       eventDate: ticket.event.date,
       eventEndDate: ticket.event.endDate,
+      eventPosterImage: ticket.event.posterImage,
       ticketTypeName: ticket.ticketType.name,
       ticketTypeColor: ticket.ticketType.color,
       ticketPrice: Number(ticket.ticketType.price),
