@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import AdminLayout from './AdminLayout'
-import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer, Calendar, MapPin, QrCode } from 'lucide-react'
+import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer, Calendar, MapPin, QrCode, Send, Mail, MessageCircle, Download } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 const LOGO_URL = 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
@@ -54,6 +54,10 @@ type OrderRow = {
   tickets: { id: string; ticketNumber: string; status: string }[]
   guestPhone?: string
   guestName?: string
+  email?: string | null
+  whatsappPhone?: string | null
+  emailSentAt?: string | null
+  whatsappSentAt?: string | null
 }
 
 type EventOption = {
@@ -130,6 +134,11 @@ export default function AdminTicketsClient() {
   const [orderDetailData, setOrderDetailData] = useState<any>(null)
   const [orderDetailLoading, setOrderDetailLoading] = useState(false)
 
+  const [resendChannel, setResendChannel] = useState<'whatsapp' | 'email' | null>(null)
+  const [resendContact, setResendContact] = useState('')
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendMsg, setResendMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
   const [physicalPreview, setPhysicalPreview] = useState<{
     event: GeneratedBatch['event'] & { posterImage?: string | null }
     ticketType: GeneratedBatch['ticketType']
@@ -153,12 +162,36 @@ export default function AdminTicketsClient() {
       setOrderDetailData(null)
       return
     }
+    setResendChannel(null)
+    setResendContact('')
+    setResendMsg(null)
     setOrderDetailLoading(true)
     fetch(`/api/admin/orders/${orderDetailId}`)
       .then(r => r.json())
       .then(d => { if (d.success) setOrderDetailData(d.data) })
       .finally(() => setOrderDetailLoading(false))
   }, [orderDetailId])
+
+  const resendTickets = async (orderId: string, channel: 'whatsapp' | 'email', contact: string) => {
+    setResendLoading(true)
+    setResendMsg(null)
+    const res = await fetch('/api/admin/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId, action: 'resend', channel, contact: contact || undefined }),
+    }).then(r => r.json()).catch(() => null)
+    setResendLoading(false)
+    if (res?.success) {
+      setResendMsg({ ok: true, text: res.data.message })
+      setResendChannel(null)
+      setResendContact('')
+      // Refresh order detail + list so sent-at timestamps and status reflect the send.
+      fetch(`/api/admin/orders/${orderId}`).then(r => r.json()).then(d => { if (d.success) setOrderDetailData(d.data) })
+      load()
+    } else {
+      setResendMsg({ ok: false, text: res?.error ?? 'Send failed' })
+    }
+  }
 
   const load = useCallback(async () => {
     if (tab === 'hardcopy') return
@@ -782,6 +815,11 @@ ${rowsHtml}
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[o.status] ?? ''}`}>{o.status}</span>
+                              {o.status === 'paid' && !o.whatsappSentAt && !o.emailSentAt && (
+                                <span className="flex items-center gap-1 text-[10px] text-orange-400 font-medium">
+                                  <AlertTriangle size={10} /> Not delivered
+                                </span>
+                              )}
                               <span className="text-[10px] text-purple-400 font-medium">Open details</span>
                             </div>
                           </div>
@@ -937,6 +975,12 @@ ${rowsHtml}
                     {adminTicketData.activationCode && (
                       <p className="text-xs text-orange-400 font-mono">Activation: {adminTicketData.activationCode}</p>
                     )}
+                    <a
+                      href={`/api/admin/tickets/${adminTicketData.id}/download`}
+                      className="inline-flex items-center gap-1.5 text-xs bg-[#1a1a1a] border border-[#2a2a2a] text-gray-300 hover:border-purple-500/40 hover:text-white rounded-lg px-3 py-1.5 transition-colors mt-1"
+                    >
+                      <Download size={12} /> Download ticket image
+                    </a>
                   </div>
                 </div>
               </div>
@@ -1046,16 +1090,85 @@ ${rowsHtml}
                     <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Tickets</p>
                     <div className="flex flex-wrap gap-2">
                       {orderDetailData.tickets.map((tk: { id: string; ticketNumber: string; status: string }) => (
-                        <button
-                          type="button"
-                          key={tk.id}
-                          onClick={() => { setOrderDetailId(null); setOrderDetailData(null); setAdminTicketId(tk.id) }}
-                          className="text-xs font-mono bg-[#151515] border border-[#2a2a2a] px-2 py-1 rounded hover:border-purple-500/40"
-                        >
-                          {tk.ticketNumber} · {tk.status}
-                        </button>
+                        <div key={tk.id} className="flex items-stretch rounded overflow-hidden border border-[#2a2a2a]">
+                          <button
+                            type="button"
+                            onClick={() => { setOrderDetailId(null); setOrderDetailData(null); setAdminTicketId(tk.id) }}
+                            className="text-xs font-mono bg-[#151515] px-2 py-1 hover:border-purple-500/40"
+                          >
+                            {tk.ticketNumber} · {tk.status}
+                          </button>
+                          <a
+                            href={`/api/admin/tickets/${tk.id}/download`}
+                            title="Download ticket image"
+                            className="flex items-center px-1.5 bg-[#151515] border-l border-[#2a2a2a] text-gray-500 hover:text-purple-400 transition-colors"
+                          >
+                            <Download size={12} />
+                          </a>
+                        </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {orderDetailData.status === 'paid' && orderDetailData.tickets?.length > 0 && (
+                  <div className="border border-[#2a2a2a] rounded-xl p-3 bg-[#151515]">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Deliver tickets</p>
+                    <div className="space-y-1.5 text-xs text-gray-400 mb-3">
+                      <div className="flex items-center gap-1.5">
+                        <MessageCircle size={12} className={orderDetailData.whatsappSentAt ? 'text-green-400' : 'text-gray-600'} />
+                        {orderDetailData.whatsappSentAt
+                          ? <span>WhatsApp sent {formatDate(orderDetailData.whatsappSentAt, 'MMM d, h:mm a')}</span>
+                          : <span className="text-orange-400">WhatsApp not sent{orderDetailData.whatsappPhone ? '' : ' — no number on file'}</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Mail size={12} className={orderDetailData.emailSentAt ? 'text-green-400' : 'text-gray-600'} />
+                        {orderDetailData.emailSentAt
+                          ? <span>Email sent {formatDate(orderDetailData.emailSentAt, 'MMM d, h:mm a')}</span>
+                          : <span className="text-orange-400">Email not sent{orderDetailData.email ? '' : ' — no address on file'}</span>}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setResendChannel(c => c === 'whatsapp' ? null : 'whatsapp'); setResendContact(orderDetailData.whatsappPhone ?? ''); setResendMsg(null) }}
+                        className="flex items-center gap-1 text-xs bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 rounded-lg px-3 py-1.5 transition-colors"
+                      >
+                        <MessageCircle size={11} /> {orderDetailData.whatsappSentAt ? 'Resend' : 'Send'} via WhatsApp
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setResendChannel(c => c === 'email' ? null : 'email'); setResendContact(orderDetailData.email ?? ''); setResendMsg(null) }}
+                        className="flex items-center gap-1 text-xs bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded-lg px-3 py-1.5 transition-colors"
+                      >
+                        <Mail size={11} /> {orderDetailData.emailSentAt ? 'Resend' : 'Send'} via Email
+                      </button>
+                    </div>
+
+                    {resendChannel && (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <input
+                          value={resendContact}
+                          onChange={e => setResendContact(e.target.value)}
+                          placeholder={resendChannel === 'whatsapp' ? 'WhatsApp number (e.g. +263...)' : 'Email address'}
+                          className="flex-1 min-w-[180px] text-xs py-1.5 px-2"
+                        />
+                        <button
+                          type="button"
+                          disabled={resendLoading}
+                          onClick={() => resendTickets(orderDetailData.id, resendChannel, resendContact)}
+                          className="flex items-center gap-1.5 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                        >
+                          {resendLoading ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                          Send
+                        </button>
+                      </div>
+                    )}
+
+                    {resendMsg && (
+                      <p className={`mt-2 text-xs ${resendMsg.ok ? 'text-green-400' : 'text-red-400'}`}>{resendMsg.text}</p>
+                    )}
                   </div>
                 )}
               </div>
