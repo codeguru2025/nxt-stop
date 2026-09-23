@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { DEFAULT_EVENT_DURATION_MS } from '@/lib/utils'
 import { requireCapability } from '@/lib/auth'
 import { ok, forbidden, serverError } from '@/lib/api'
 import { redis } from '@/lib/redis'
@@ -19,15 +20,15 @@ export async function GET() {
       } catch { /* fall through to DB */ }
     }
 
-    // Auto-flag events whose end time has passed (matches orders cutoff logic)
+    // Auto-flag events whose end time has passed — same rule as eventEndTime() in lib/utils
     const now = new Date()
-    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const defaultEndCutoff = new Date(now.getTime() - DEFAULT_EVENT_DURATION_MS)
     await prisma.event.updateMany({
       where: {
         status: { in: ['published', 'live'] },
         OR: [
           { endDate: { lt: now } },
-          { endDate: null, date: { lt: dayAgo } },
+          { endDate: null, date: { lt: defaultEndCutoff } },
         ],
       },
       data: { status: 'ended' },

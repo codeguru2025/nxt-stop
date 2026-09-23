@@ -104,7 +104,7 @@ export function parseReferralCode(url: string): string | null {
 }
 
 /** When `endDate` is missing, treat the event as ending this many hours after doors (typical night show). */
-const DEFAULT_EVENT_DURATION_MS = 8 * 60 * 60 * 1000
+export const DEFAULT_EVENT_DURATION_MS = 8 * 60 * 60 * 1000
 
 export type EventTimePhase = 'upcoming' | 'live' | 'ended'
 

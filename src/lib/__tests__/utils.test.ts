@@ -216,3 +216,33 @@ describe('ticketSalesClosedReason (online checkout + cash sales at the desk)', (
     expect(ticketSalesClosedReason({ ...event, status: 'ended' }, 'gate', at('2026-06-15T19:00:00Z'))).toMatch(/closed/)
   })
 })
+
+describe('NXTSTOP SESSIONS (19 Dec 2026, 12:00 PM → 12:00 AM CAT) — sales run right up to the end time', () => {
+  const event = { date: '2026-12-19T12:00:00+02:00', endDate: '2026-12-20T00:00:00+02:00', status: 'published' }
+  const at = (iso: string) => new Date(iso)
+
+  it('tickets can be bought while the event is on', () => {
+    for (const time of ['2026-12-19T12:00:00+02:00', '2026-12-19T18:30:00+02:00', '2026-12-19T23:59:00+02:00']) {
+      expect(ticketSalesClosedReason(event, 'both', at(time))).toBeNull()
+      expect(ticketSalesClosedReason(event, 'gate', at(time))).toBeNull()
+    }
+  })
+
+  it('a "live" status does not stop sales', () => {
+    expect(ticketSalesClosedReason({ ...event, status: 'live' }, 'both', at('2026-12-19T20:00:00+02:00'))).toBeNull()
+  })
+
+  it('sales stop the moment midnight passes', () => {
+    expect(ticketSalesClosedReason(event, 'both', at('2026-12-20T00:00:01+02:00'))).toMatch(/event has ended/)
+    expect(ticketSalesClosedReason(event, 'gate', at('2026-12-20T00:00:01+02:00'))).toMatch(/event has ended/)
+  })
+
+  it('the event page shows it as live during the event and ended after midnight', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(at('2026-12-19T21:00:00+02:00'))
+    expect(getEventTimePhase(event.date, event.endDate)).toBe('live')
+    vi.setSystemTime(at('2026-12-20T00:00:01+02:00'))
+    expect(getEventTimePhase(event.date, event.endDate)).toBe('ended')
+    vi.useRealTimers()
+  })
+})
