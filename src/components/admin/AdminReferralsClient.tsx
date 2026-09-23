@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout'
+import ReferralLeaderboard from './ReferralLeaderboard'
 import { Share2, Check, X, Loader2 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
@@ -48,6 +49,8 @@ export default function AdminReferralsClient() {
   return (
     <AdminLayout>
       <div className="p-6 max-w-4xl mx-auto">
+        <ReferralLeaderboard />
+
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl font-black text-white flex items-center gap-2">
