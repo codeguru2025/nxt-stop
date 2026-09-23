@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl, getEventTimePhase, eventLocalInputToUtc, utcToEventLocalInput, formatDate, eventDayStartUtc, eventEndTime, ticketSalesClosedReason } from '../utils'
+import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl, getEventTimePhase, eventLocalInputToUtc, utcToEventLocalInput, formatDate, eventDayStartUtc, eventEndTime, ticketSalesClosedReason, ticketChannelWindow, lowestOnSalePrice } from '../utils'
 
 describe('slugify', () => {
   it('lowercases and hyphenates', () => {
@@ -244,5 +244,42 @@ describe('NXTSTOP SESSIONS (19 Dec 2026, 12:00 PM → 12:00 AM CAT) — sales ru
     vi.setSystemTime(at('2026-12-20T00:00:01+02:00'))
     expect(getEventTimePhase(event.date, event.endDate)).toBe('ended')
     vi.useRealTimers()
+  })
+})
+
+describe('ticket greying on the event page (NXTSTOP SESSIONS, 19 Dec 2026)', () => {
+  const date = '2026-12-19T12:00:00+02:00'
+  const before = new Date('2026-12-18T23:59:00+02:00') // day before, 11:59 PM CAT
+  const onDay = new Date('2026-12-19T00:00:00+02:00')  // midnight CAT, event day
+  const types = [
+    { name: 'General Advance', price: 10, sold: 5, capacity: 500, salesChannel: 'advance' },
+    { name: 'General Gate', price: 20, sold: 0, capacity: 1000, salesChannel: 'gate' },
+    { name: 'VIP Advance', price: 40, sold: 100, capacity: 100, salesChannel: 'advance' }, // sold out
+  ]
+
+  it('gate tickets are greyed out before event day and open at midnight', () => {
+    expect(ticketChannelWindow(date, 'gate', before)).toBe('gate_not_yet')
+    expect(ticketChannelWindow(date, 'gate', onDay)).toBe('open')
+  })
+
+  it('advance tickets are open before event day and greyed out from midnight', () => {
+    expect(ticketChannelWindow(date, 'advance', before)).toBe('open')
+    expect(ticketChannelWindow(date, 'advance', onDay)).toBe('advance_closed')
+  })
+
+  it('"both" tickets are never greyed out by the window', () => {
+    expect(ticketChannelWindow(date, 'both', before)).toBe('open')
+    expect(ticketChannelWindow(date, 'both', onDay)).toBe('open')
+  })
+
+  it('"From" price only counts tickets you can buy right now', () => {
+    expect(lowestOnSalePrice(date, types, before)).toBe(10) // advance, gate not yet on sale
+    expect(lowestOnSalePrice(date, types, onDay)).toBe(20)  // advance closed → gate price
+  })
+
+  it('"From" price skips sold-out tickets and falls back to the cheapest when nothing is on sale', () => {
+    expect(lowestOnSalePrice(date, [types[2], { ...types[1], price: 60 }], before)).toBe(40) // nothing buyable → cheapest
+    expect(lowestOnSalePrice(date, [types[2], { ...types[0], price: 45 }], before)).toBe(45) // sold-out $40 skipped
+    expect(lowestOnSalePrice(date, [], before)).toBe(0)
   })
 })

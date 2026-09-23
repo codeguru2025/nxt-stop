@@ -115,6 +115,42 @@ export function eventEndTime(start: string | Date, endDate?: string | Date | nul
     : new Date(new Date(start).getTime() + DEFAULT_EVENT_DURATION_MS)
 }
 
+export type TicketChannelWindow = 'open' | 'gate_not_yet' | 'advance_closed'
+
+/**
+ * Advance/gate sales window only (not end time or status): advance tickets stop at
+ * midnight (venue time) on event day; gate tickets start then; "both" is always open.
+ */
+export function ticketChannelWindow(
+  eventDate: string | Date,
+  salesChannel: string | undefined,
+  now: number | Date = Date.now()
+): TicketChannelWindow {
+  const t = typeof now === 'number' ? now : now.getTime()
+  const dayStart = eventDayStartUtc(eventDate).getTime()
+  if (salesChannel === 'gate' && t < dayStart) return 'gate_not_yet'
+  if (salesChannel === 'advance' && t >= dayStart) return 'advance_closed'
+  return 'open'
+}
+
+/**
+ * Lowest price among ticket types that can be bought right now (in stock and inside
+ * their sales window) — what "From $X" should show. Falls back to the lowest overall
+ * price when nothing is currently on sale, so the card never shows $0.
+ */
+export function lowestOnSalePrice(
+  eventDate: string | Date,
+  ticketTypes: { price: number; sold: number; capacity?: number; salesChannel?: string }[],
+  now: number | Date = Date.now()
+): number {
+  if (ticketTypes.length === 0) return 0
+  const onSale = ticketTypes.filter(t =>
+    (t.capacity === undefined || t.capacity - t.sold > 0) &&
+    ticketChannelWindow(eventDate, t.salesChannel, now) === 'open'
+  )
+  return Math.min(...(onSale.length ? onSale : ticketTypes).map(t => t.price))
+}
+
 /**
  * Why this ticket type can't be sold right now, or null if it can. Server-side source
  * of truth shared by online checkout and cash sales of printed tickets at the desk:
@@ -128,11 +164,9 @@ export function ticketSalesClosedReason(
 ): string | null {
   if (event.status === 'cancelled' || event.status === 'ended') return 'Ticket sales for this event are closed'
   if (now > eventEndTime(event.date, event.endDate)) return 'This event has ended — ticket sales are closed'
-  const dayStart = eventDayStartUtc(event.date)
-  if (salesChannel === 'advance' && now >= dayStart) {
-    return 'Advance sales have closed — this ticket is available at the gate on the day'
-  }
-  if (salesChannel === 'gate' && now < dayStart) return 'This ticket type goes on sale on the day of the event'
+  const window = ticketChannelWindow(event.date, salesChannel, now)
+  if (window === 'advance_closed') return 'Advance sales have closed — this ticket is available at the gate on the day'
+  if (window === 'gate_not_yet') return 'This ticket type goes on sale on the day of the event'
   return null
 }
 

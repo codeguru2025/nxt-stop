@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Calendar, MapPin, ArrowRight, Play } from 'lucide-react'
-import { formatDate, formatCurrency, getEventTimePhase } from '@/lib/utils'
+import { formatDate, formatCurrency, getEventTimePhase, lowestOnSalePrice } from '@/lib/utils'
 import PastVideosClient, { type TeaserItem } from '@/components/videos/PastVideosClient'
 
 type LineupArtist = {
@@ -25,7 +25,7 @@ type Event = {
   posterImage?: string
   status: string
   lineup?: string
-  ticketTypes: { name: string; price: number; sold: number; capacity?: number }[]
+  ticketTypes: { name: string; price: number; sold: number; capacity?: number; salesChannel?: string }[]
   _count: { tickets: number }
 }
 
@@ -235,7 +235,7 @@ export default function HomeClient({ initialEvents, initialTeasers }: HomeProps)
                       <div>
                         <div className="text-xs text-gray-500">From</div>
                         <div className="text-2xl font-black text-white">
-                          {formatCurrency(featured.ticketTypes.length > 0 ? Math.min(...featured.ticketTypes.map(t => t.price)) : 0)}
+                          {formatCurrency(lowestOnSalePrice(featured.date, featured.ticketTypes))}
                         </div>
                       </div>
                       <Link
@@ -515,8 +515,7 @@ function SpotlightSection({ event }: { event: Event }) {
 
 function EventCard({ event }: { event: Event }) {
   const [imgError, setImgError] = useState(false)
-  const prices = event.ticketTypes?.map(t => t.price) ?? []
-  const minPrice = prices.length > 0 ? Math.min(...prices) : 0
+  const minPrice = lowestOnSalePrice(event.date, event.ticketTypes ?? [])
   const phase = getEventTimePhase(event.date, event.endDate)
 
   return (

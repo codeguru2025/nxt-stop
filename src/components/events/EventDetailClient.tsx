@@ -9,7 +9,7 @@ import {
   Check, AlertCircle, Loader2, Music, Video, Star, Phone, ExternalLink,
   ChevronDown, ChevronUp, User, Play, X
 } from 'lucide-react'
-import { formatDate, formatCurrency, buildReferralUrl, getEventTimePhase, eventDayStartUtc } from '@/lib/utils'
+import { formatDate, formatCurrency, buildReferralUrl, getEventTimePhase, ticketChannelWindow } from '@/lib/utils'
 
 const VenueMap = dynamic(() => import('./VenueMap'), { ssr: false })
 
@@ -54,9 +54,21 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
 
   const event = initialEvent
   const [imgError, setImgError] = useState(false)
-  const [selectedType, setSelectedType] = useState<string>(
-    () => initialEvent?.ticketTypes[0]?.id ?? ''
-  )
+  // Re-evaluated every 30s so a page left open flips gate/advance tickets at midnight on
+  // event day without a refresh (the server enforces the same rule regardless).
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+  const isBuyable = (t: TicketType, at: number) =>
+    t.capacity - t.sold > 0 && !!event && ticketChannelWindow(event.date, t.salesChannel, at) === 'open'
+  // Pre-select the cheapest ticket that can actually be bought — never a greyed-out one
+  const [selectedType, setSelectedType] = useState<string>(() => {
+    const types = initialEvent?.ticketTypes ?? []
+    const start = Date.now()
+    return (types.find(t => t.capacity - t.sold > 0 && !!initialEvent && ticketChannelWindow(initialEvent.date, t.salesChannel, start) === 'open') ?? types[0])?.id ?? ''
+  })
   const [quantity, setQuantity] = useState(1)
   const [paymentMethod, setPaymentMethod] = useState('ecocash')
   const [phone, setPhone] = useState('')
@@ -97,15 +109,18 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
 
   const selectedTicket = event?.ticketTypes.find(t => t.id === selectedType)
   const available = selectedTicket ? selectedTicket.capacity - selectedTicket.sold : 0
-  const selectedTicketBlocked = (() => {
-    if (!selectedTicket || !event) return false
-    const dayStartMs = eventDayStartUtc(event.date).getTime()
-    const now = Date.now()
-    return (
-      (selectedTicket.salesChannel === 'gate' && now < dayStartMs) ||
-      (selectedTicket.salesChannel === 'advance' && now >= dayStartMs)
-    )
-  })()
+  const selectedTicketBlocked =
+    !!selectedTicket && !!event && ticketChannelWindow(event.date, selectedTicket.salesChannel, now) !== 'open'
+
+  // If the selected ticket stops being buyable (midnight on event day, sold out), move to
+  // one that is — but not mid-payment, where the order is already created.
+  useEffect(() => {
+    if (!event || !selectedTicket || isBuyable(selectedTicket, now)) return
+    if (stage.name !== 'idle' && stage.name !== 'checkout' && stage.name !== 'error') return
+    const next = event.ticketTypes.find(t => isBuyable(t, now))
+    if (next) setSelectedType(next.id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [now, selectedType])
   const subtotal = selectedTicket ? selectedTicket.price * quantity : 0
   const fees = quantity * (event?.platformFee ?? 0.10)
   const total = subtotal + fees
@@ -535,21 +550,21 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                   <div className="space-y-2 mb-5">
                     {event.ticketTypes.map(t => {
                       const avail = t.capacity - t.sold
-                      const isSelected = selectedType === t.id
-                      const dayStart = eventDayStartUtc(event.date).getTime()
-                      const now = Date.now()
-                      const notYetOnSale = t.salesChannel === 'gate' && now < dayStart
-                      const advanceClosed = t.salesChannel === 'advance' && now >= dayStart
+                      const channelWindow = ticketChannelWindow(event.date, t.salesChannel, now)
+                      const notYetOnSale = channelWindow === 'gate_not_yet'
+                      const advanceClosed = channelWindow === 'advance_closed'
                       const windowBlocked = notYetOnSale || advanceClosed
                       const disabled = avail <= 0 || windowBlocked
+                      const isSelected = selectedType === t.id && !disabled
                       return (
                         <button
                           key={t.id}
                           onClick={() => !disabled && setSelectedType(t.id)}
                           disabled={disabled}
+                          aria-disabled={disabled}
                           className={`w-full rounded-xl p-3.5 text-left transition-all border ${
-                            isSelected ? 'border-purple-500 bg-purple-500/10' :
                             disabled    ? 'border-[#2a2a2a] opacity-40 cursor-not-allowed' :
+                            isSelected ? 'border-purple-500 bg-purple-500/10' :
                             'border-[#2a2a2a] hover:border-[#3a3a3a]'
                           }`}
                         >
@@ -562,7 +577,7 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                           </div>
                           {t.description && <p className="text-xs text-gray-500 mt-1 ml-4">{t.description}</p>}
                           <div className="flex items-center justify-between mt-1.5 ml-4">
-                            <span className="text-xs text-gray-600">{avail} remaining</span>
+                            <span className="text-xs text-gray-600">{windowBlocked ? 'Not on sale online now' : `${avail} remaining`}</span>
                             {notYetOnSale && <span className="text-xs text-blue-400 font-medium">On sale at the gate</span>}
                             {advanceClosed && <span className="text-xs text-orange-400 font-medium">Advance sales closed — pay at the gate</span>}
                             {!windowBlocked && avail <= 20 && avail > 0 && <span className="text-xs text-orange-400 font-medium">Almost sold out!</span>}

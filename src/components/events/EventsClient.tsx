@@ -3,12 +3,12 @@
 import { useState, useMemo, memo } from 'react'
 import Link from 'next/link'
 import { Calendar, MapPin, Search, ArrowRight, Filter, X } from 'lucide-react'
-import { formatDate, formatCurrency, getEventTimePhase, type EventTimePhase } from '@/lib/utils'
+import { formatDate, formatCurrency, getEventTimePhase, lowestOnSalePrice, type EventTimePhase } from '@/lib/utils'
 
 type Event = {
   id: string; name: string; slug: string; date: string; endDate?: string; venue: string
   description?: string; posterImage?: string; status: string
-  ticketTypes: { name: string; price: number; capacity: number; sold: number }[]
+  ticketTypes: { name: string; price: number; capacity: number; sold: number; salesChannel?: string }[]
   _count: { tickets: number }
 }
 
@@ -27,7 +27,7 @@ const EventCard = memo(function EventCard({ event, referral }: { event: Event; r
   const eventUrl = referral ? `/events/${event.slug}?ref=${referral}` : `/events/${event.slug}`
   const timePhase = getEventTimePhase(event.date, event.endDate)
 
-  const minPrice = event.ticketTypes.length > 0 ? Math.min(...event.ticketTypes.map(t => t.price)) : 0
+  const minPrice = lowestOnSalePrice(event.date, event.ticketTypes)
   const totalCap = event.ticketTypes.reduce((s, t) => s + t.capacity, 0)
   const totalSold = event.ticketTypes.reduce((s, t) => s + t.sold, 0)
   const pct = totalCap > 0 ? (totalSold / totalCap) * 100 : 0
