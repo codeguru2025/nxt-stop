@@ -1,22 +1,25 @@
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import MerchClient from '@/components/merch/MerchClient'
-import { getMerchForPage } from '@/lib/data/publicPages'
+import { getMerchForPage, getPreEventExtrasForPage } from '@/lib/data/publicPages'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Merch | NXT STOP',
-  description: 'Official NXT STOP merchandise — T-shirts, hoodies, caps and more.',
+  description: 'Official NXT STOP merchandise, drink vouchers, and table bookings — buy ahead, collect at the event.',
 }
 
 export default async function MerchPage() {
-  const initialItems = await getMerchForPage()
+  const [initialItems, extras] = await Promise.all([
+    getMerchForPage(),
+    getPreEventExtrasForPage(),
+  ])
   return (
     <>
       <Navbar />
       <main className="flex-1 pt-16">
-        <MerchClient initialItems={initialItems} />
+        <MerchClient initialItems={initialItems} extras={extras} />
       </main>
       <Footer />
     </>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl, getEventTimePhase, eventLocalInputToUtc, utcToEventLocalInput, formatDate } from '../utils'
+import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl, getEventTimePhase, eventLocalInputToUtc, utcToEventLocalInput, formatDate, eventDayStartUtc } from '../utils'
 
 describe('slugify', () => {
   it('lowercases and hyphenates', () => {
@@ -124,6 +124,23 @@ describe('event timezone (CAT, UTC+2) handling', () => {
 
   it('tolerates a seconds component in the input', () => {
     expect(eventLocalInputToUtc('2026-06-15T20:00:30').toISOString()).toBe('2026-06-15T18:00:00.000Z')
+  })
+})
+
+describe('eventDayStartUtc (advance/gate ticket sales-window boundary)', () => {
+  it('resolves to CAT midnight (UTC-2) on the event date', () => {
+    // Event at 20:00 CAT on the 15th → local midnight that day is 22:00 UTC on the 14th.
+    expect(eventDayStartUtc('2026-06-15T18:00:00Z').toISOString()).toBe('2026-06-14T22:00:00.000Z')
+  })
+
+  it('is stable for any wall-clock time on the same CAT calendar day', () => {
+    const morning = eventDayStartUtc('2026-06-15T04:00:00Z') // 06:00 CAT on the 15th
+    const night = eventDayStartUtc('2026-06-15T21:00:00Z')   // 23:00 CAT on the 15th
+    expect(morning.toISOString()).toBe(night.toISOString())
+  })
+
+  it('accepts a Date instance as well as a string', () => {
+    expect(eventDayStartUtc(new Date('2026-06-15T18:00:00Z')).toISOString()).toBe('2026-06-14T22:00:00.000Z')
   })
 })
 

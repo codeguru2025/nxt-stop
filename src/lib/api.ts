@@ -4,8 +4,8 @@ export function ok<T>(data: T, status = 200): Response {
   return Response.json({ success: true, data }, { status })
 }
 
-export function error(message: string, status = 400): Response {
-  return Response.json({ success: false, error: message }, { status })
+export function error(message: string, status = 400, code?: string): Response {
+  return Response.json({ success: false, error: message, ...(code && { code }) }, { status })
 }
 
 export function unauthorized(): Response {

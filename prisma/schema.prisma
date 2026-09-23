@@ -13,6 +13,10 @@ model User {
   id            String   @id @default(cuid())
   phone         String   @unique
   name          String
+  firstName     String?  // split from `name` going forward; `name` stays in sync on every profile write
+  lastName      String?
+  homeTown      String?
+  isWhatsApp    Boolean  @default(true) // whether `phone` is reachable on WhatsApp — toggle shown on profile
   passwordHash  String
   role          String   @default("customer") // customer | partner | gate_staff | admin
   email         String?  // optional contact address — used for admin daily digest delivery
@@ -21,6 +25,10 @@ model User {
   referralCode  String   @unique @default(cuid())
   points        Int      @default(0)
   totalEarned   Int      @default(0)
+  mustResetPassword     Boolean   @default(false) // set on account creation (system-issued one-time password); cleared only by POST /api/auth/set-password
+  passwordSetAt         DateTime? // last time the user (not the system) set their own password
+  oneTimePasswordUsedAt DateTime? // first successful login with the system-issued password — guards against reuse after that
+  isPlatformOwner       Boolean   @default(false) // irrevocable, only ever set via prisma/scripts/seed-platform-owner.ts — never accept this field from any API request body
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -33,6 +41,10 @@ model User {
   redemptions       Redemption[]
   scanLogs          ScanLog[]
   passwordResetRequests PasswordResetRequest[]
+  passwordResetTokens   PasswordResetToken[]
+  vouchers              Voucher[]
+  referralRewards       ReferralReward[]
+  teamMemberships       TeamMember[]
 }
 
 // ─── PASSWORD RESETS ─────────────────────────────────────────────────────────
@@ -51,6 +63,46 @@ model PasswordResetRequest {
 
   @@index([status, createdAt])
   @@index([userId])
+}
+
+// Self-service email-verified password reset — separate from the admin-mediated
+// PasswordResetRequest above, which stays as a fallback for users without email access.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── AUDIT LOG ───────────────────────────────────────────────────────────────
+// Insert-only. Deliberately has NO relation to User (nothing cascades into or out
+// of it) and NO update/delete route anywhere in the app — that absence is the
+// tamper-evidence mechanism. Only a platform-owner account (User.isPlatformOwner)
+// may ever read it. See src/lib/auditLog.ts.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorRole  String?
+  action     String
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  userAgent  String?
+  method     String?
+  path       String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
 }
 
 // ─── FOUNDERS ────────────────────────────────────────────────────────────────
@@ -140,6 +192,7 @@ model TicketType {
   capacity    Int
   sold        Int      @default(0)
   active      Boolean  @default(true)
+  salesChannel String  @default("both") // advance | gate | both — time-window gate, independent of `active`
   color       String   @default("#8B5CF6")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -232,6 +285,7 @@ model Order {
   user    User        @relation(fields: [userId], references: [id])
   tickets Ticket[]
   items   OrderItem[]
+  vouchers Voucher[]
 
   @@index([userId, status])
   @@index([status, createdAt])
@@ -249,6 +303,7 @@ model OrderItem {
   order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product    Product?    @relation(fields: [productId], references: [id])
   ticketType TicketType? @relation(fields: [ticketTypeId], references: [id])
+  vouchers   Voucher[]
 
   @@index([orderId])
   @@index([ticketTypeId])
@@ -322,9 +377,31 @@ model Referral {
   source  User     @relation("ReferralSource", fields: [sourceUserId], references: [id])
   target  User     @relation("ReferralTarget", fields: [targetUserId], references: [id])
   partner Partner? @relation(fields: [partnerId], references: [id])
+  reward  ReferralReward?
 
   @@index([sourceUserId])
   @@index([targetUserId])
+}
+
+// Cash ledger for the 10%-of-ticket-value customer referral payout — mirrors the
+// existing Partner → Commission pattern. Kept separate from `Referral` (a pure
+// attribution record) and from `User.points` (the unrelated in-app rewards catalog
+// currency, left untouched so nothing else earning points is orphaned).
+model ReferralReward {
+  id         String    @id @default(cuid())
+  referralId String    @unique
+  userId     String
+  orderId    String
+  amount     Decimal   @db.Decimal(10, 2)
+  status     String    @default("pending") // pending | paid | cancelled
+  paidAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  referral Referral @relation(fields: [referralId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
 }
 
 // ─── REWARDS ─────────────────────────────────────────────────────────────────
@@ -363,6 +440,7 @@ model PointsConfig {
   id              String   @id @default(cuid())
   pointsPerSale   Int      @default(10)
   bonusMultiplier Float    @default(1.0)
+  referralPercentage Decimal @default(10) @db.Decimal(5, 2) // % of ticket-only subtotal paid to the referrer as cash (ReferralReward)
   active          Boolean  @default(true)
   updatedAt       DateTime @updatedAt
 }
@@ -377,21 +455,92 @@ model Product {
   price       Decimal  @db.Decimal(10, 2)
   stock       Int
   sold        Int      @default(0)
-  category    String   @default("drink") // drink | food | merchandise | other
+  category    String   @default("drink") // drink | food | merchandise | table | other
   merchType   String?  // tshirt | hoodie | cap | wineglass | tote | vinyl | other
   size        String?  // S | M | L | XL | XXL | One Size | etc
   color       String?
   image       String?
   active      Boolean  @default(true)
   lowStockAt  Int      @default(10)
+  isTable     Boolean  @default(false)
+  capacityPerUnit Int? // seats covered per unit purchased — only meaningful when isTable
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   event      Event?      @relation(fields: [eventId], references: [id], onDelete: Cascade)
   orderItems OrderItem[]
+  vouchers   Voucher[]
 
   @@index([eventId])
   @@index([category])
+}
+
+// ─── PRE-EVENT PURCHASES (vouchers / merch / tables) ─────────────────────────
+// Minted one row per unit purchased when an order containing a Product line item
+// is fulfilled (see fulfillOrder.ts). Fully separate from Ticket/ScanLog — safer
+// than generalizing the live ticket-scanning path for a net-new feature.
+model Voucher {
+  id           String    @id @default(cuid())
+  orderId      String
+  orderItemId  String
+  productId    String
+  userId       String
+  eventId      String?
+  code         String    @unique
+  qrCode       String    @unique
+  status       String    @default("unredeemed") // unredeemed | redeemed | cancelled
+  redeemedAt   DateTime?
+  redeemedById String?
+  createdAt    DateTime  @default(now())
+
+  order     Order     @relation(fields: [orderId], references: [id])
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+  scanLogs  VoucherScanLog[]
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([eventId, status])
+}
+
+model VoucherScanLog {
+  id        String   @id @default(cuid())
+  voucherId String
+  eventId   String?
+  scannedBy String?
+  result    String   // valid | already_used | invalid
+  deviceId  String?
+  createdAt DateTime @default(now())
+
+  voucher Voucher @relation(fields: [voucherId], references: [id])
+
+  @@index([voucherId])
+  @@index([eventId, createdAt])
+}
+
+// ─── STREET TEAMS ─────────────────────────────────────────────────────────────
+// Pure grouping/reporting layer over data other phases already produce
+// (ReferralReward, Commission) — not a new attribution mechanism of its own.
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  members TeamMember[]
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  teamId   String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+  @@index([userId])
 }
 
 // ─── SOCIAL FEED ─────────────────────────────────────────────────────────────

@@ -55,6 +55,42 @@ export const getMerchForPage = unstable_cache(
   { revalidate: 120 }
 )
 
+/** Pre-event drink/liquor vouchers and table bookings — same shape as merch, different categories. */
+export const getPreEventExtrasForPage = unstable_cache(
+  async () => {
+    const products = await prisma.product.findMany({
+      where: {
+        category: { in: ['drink', 'food', 'table', 'other'] },
+        active: true,
+      },
+      orderBy: [{ category: 'asc' }, { price: 'asc' }],
+      include: { event: { select: { id: true, name: true, date: true, slug: true } } },
+    })
+    return products
+      .filter((p): p is (typeof p & { event: NonNullable<typeof p.event> }) => p.event != null)
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        price: Number(p.price),
+        stock: p.stock,
+        sold: p.sold,
+        category: p.category,
+        isTable: p.isTable,
+        capacityPerUnit: p.capacityPerUnit,
+        description: p.description,
+        image: p.image,
+        event: {
+          id: p.event.id,
+          name: p.event.name,
+          date: p.event.date.toISOString(),
+          slug: p.event.slug,
+        },
+      }))
+  },
+  ['public-pre-event-extras'],
+  { revalidate: 120 }
+)
+
 const getPublishedEventsCached = unstable_cache(
   async (take: number) => {
     const events = await prisma.event.findMany({
@@ -86,6 +122,7 @@ const getPublishedEventsCached = unstable_cache(
         price: Number(t.price),
         capacity: t.capacity,
         sold: t.sold,
+        salesChannel: t.salesChannel,
       })),
       _count: e._count,
     }))
@@ -148,6 +185,7 @@ export function getPublicEventDetailForPage(slug: string) {
           capacity: t.capacity,
           sold: t.sold,
           color: t.color,
+          salesChannel: t.salesChannel,
         })),
         media: row.media.map(m => ({
           id: m.id,

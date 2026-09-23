@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { ok, error, serverError } from '@/lib/api'
 import { checkAuthLimit } from '@/lib/rateLimit'
+import { normalizeWhatsAppPhone } from '@/lib/phone'
 
 // POST /api/auth/request-password-reset
 // Public endpoint. Creates a pending PasswordResetRequest if the phone matches a user.
@@ -22,7 +23,11 @@ export async function POST(req: Request) {
 
     if (!phone || phone.length > 20) return generic
 
-    const user = await prisma.user.findUnique({ where: { phone }, select: { id: true } })
+    // Accounts store phones normalized (+263...); buyers often type 0771... here.
+    const user = await prisma.user.findUnique({
+      where: { phone: normalizeWhatsAppPhone(phone) ?? phone },
+      select: { id: true },
+    })
     if (!user) return generic
 
     // Throttle: only allow one open request per user at a time. If one exists, leave it.

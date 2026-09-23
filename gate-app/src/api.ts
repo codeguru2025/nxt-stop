@@ -102,6 +102,38 @@ export async function scanTicket(qrCode: string): Promise<ScanResult> {
   return data.data as ScanResult
 }
 
+export type VoucherScanResult = {
+  result: 'valid' | 'already_used' | 'invalid'
+  message: string
+  voucher?: { code: string; product: string; holder: string }
+}
+
+// Pre-event purchases (drink/liquor vouchers, merch, tables) — a separate QR
+// namespace from Ticket. Call this as a fallback when scanTicket comes back
+// "Ticket not found" so one scanner button covers both.
+export async function scanVoucher(qrCode: string): Promise<VoucherScanResult> {
+  const session = await AsyncStorage.getItem('nxt_session')
+
+  const res = await fetch(`${BASE}/api/scan/voucher`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session ? { Cookie: `nxt-session=${session}` } : {}),
+    },
+    body: JSON.stringify({ qrCode }),
+    credentials: 'include',
+  })
+
+  if (res.status === 401 || res.status === 403) {
+    await AsyncStorage.removeItem('nxt_session')
+    throw new Error('SESSION_EXPIRED')
+  }
+
+  const data = await res.json()
+  if (!data.success) throw new Error(data.error ?? 'Scan failed')
+  return data.data as VoucherScanResult
+}
+
 export async function getScanStats(): Promise<{ scanned: number; valid: number; invalid: number; early: number; used: number }> {
   try {
     const session = await AsyncStorage.getItem('nxt_session')

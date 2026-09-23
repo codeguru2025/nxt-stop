@@ -4,6 +4,7 @@
 export const ADMIN_CAPABILITIES = [
   'stats', 'events', 'partners', 'store', 'rewards', 'founders',
   'tickets', 'gallery', 'videos', 'gate_staff', 'admins', 'password_resets',
+  'referrals', 'teams',
 ] as const
 
 export type AdminCapability = (typeof ADMIN_CAPABILITIES)[number]
@@ -25,4 +26,6 @@ export const ADMIN_CAPABILITY_LABELS: Record<AdminCapability, string> = {
   gate_staff: 'Gate Staff',
   admins: 'Admins',
   password_resets: 'Password Resets',
+  referrals: 'Referrals',
+  teams: 'Teams',
 }

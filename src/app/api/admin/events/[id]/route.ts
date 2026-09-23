@@ -104,6 +104,8 @@ export async function PATCH(
               ...(tt.capacity !== undefined && { capacity: parseInt(String(tt.capacity)) }),
               ...(tt.color !== undefined && { color: tt.color }),
               ...(tt.description !== undefined && { description: tt.description }),
+              ...(tt.active !== undefined && { active: !!tt.active }),
+              ...(tt.salesChannel !== undefined && { salesChannel: tt.salesChannel }),
             },
           })
         } else if (tt.name && tt.capacity) {
@@ -115,6 +117,7 @@ export async function PATCH(
               capacity: parseInt(String(tt.capacity)),
               color: tt.color ?? '#8B5CF6',
               description: tt.description ?? null,
+              salesChannel: tt.salesChannel ?? 'both',
             },
           })
         }

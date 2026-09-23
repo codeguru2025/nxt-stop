@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { requireCapability, isAdminCapability } from '@/lib/auth'
 import { ok, error, forbidden, notFound, serverError } from '@/lib/api'
+import { writeAuditLog } from '@/lib/auditLog'
 import bcrypt from 'bcryptjs'
 
 // PATCH /api/admin/admins/[id] — update name/email/capabilities, or reset password
@@ -17,8 +18,17 @@ export async function PATCH(
     if (!admin) return notFound('Admin')
     if (admin.role !== 'admin') return error('User is not an admin', 400)
 
+    // Note: isPlatformOwner is deliberately never destructured/accepted here — no route in
+    // the app ever writes it. See prisma/scripts/seed-platform-owner.ts.
     const { name, email, password, capabilities } = await req.json()
     const data: { name?: string; email?: string | null; passwordHash?: string; capabilities?: string[] } = {}
+
+    // An admin can't change their OWN capabilities — closes a self-escalation gap where an
+    // `admins`-capability holder could otherwise grant themselves every other capability.
+    // A different admins-capability holder must do it.
+    if (capabilities !== undefined && id === session.id) {
+      return error('You cannot change your own capabilities — ask another admin to do it', 403)
+    }
 
     if (name !== undefined) {
       if (!name.trim()) return error('Name cannot be empty')
@@ -60,6 +70,17 @@ export async function PATCH(
       await prisma.user.update({ where: { id }, data })
     }
 
+    writeAuditLog({
+      actorId: session.id,
+      actorRole: session.role,
+      action: 'admin.update',
+      entityType: 'User',
+      entityId: id,
+      before: { capabilities: admin.capabilities },
+      after: { ...data, passwordHash: data.passwordHash ? '(changed)' : undefined },
+      req,
+    })
+
     return ok({ message: 'Admin updated' })
   } catch (e) {
     return serverError(e)
@@ -95,6 +116,17 @@ export async function DELETE(
       return { blocked: false }
     })
     if (result.blocked) return error('Cannot remove the last remaining admin')
+
+    writeAuditLog({
+      actorId: session.id,
+      actorRole: session.role,
+      action: 'admin.revoke',
+      entityType: 'User',
+      entityId: id,
+      before: { role: 'admin' },
+      after: { role: 'customer' },
+      req: _req,
+    })
 
     return ok({ message: 'Admin access revoked' })
   } catch (e) {

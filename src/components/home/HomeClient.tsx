@@ -350,10 +350,10 @@ export default function HomeClient({ initialEvents, initialTeasers }: HomeProps)
                 Share your link with friends. When they come through, you earn — drinks, upgrades, free entry. It's that simple.
               </p>
               <Link
-                href="/register"
+                href="/events"
                 className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl px-8 py-4 font-bold text-lg transition-all hover:shadow-lg hover:shadow-purple-500/25"
               >
-                Get Your Link — It's Free
+                Buy a Ticket to Get Your Link
                 <ArrowRight size={20} />
               </Link>
             </div>

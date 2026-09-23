@@ -6,17 +6,19 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, CalendarDays, Users, Package,
   Gift, UserCircle2, QrCode, LogOut, Shield,
-  ImageIcon, Video, Ticket, Menu, X, KeyRound, Lock
+  ImageIcon, Video, Ticket, Menu, X, KeyRound, Lock, ScrollText, Share2, UsersRound
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AdminCapability } from '@/lib/adminCapabilities'
 
-const NAV: { href: string; icon: typeof LayoutDashboard; label: string; exact?: boolean; capability?: AdminCapability }[] = [
+const NAV: { href: string; icon: typeof LayoutDashboard; label: string; exact?: boolean; capability?: AdminCapability; ownerOnly?: boolean }[] = [
   { href: '/admin',           icon: LayoutDashboard, label: 'Overview',       exact: true, capability: 'stats' },
   { href: '/admin/events',    icon: CalendarDays,    label: 'Events',                      capability: 'events' },
   { href: '/admin/partners',  icon: Users,           label: 'Partners',                    capability: 'partners' },
   { href: '/admin/store',     icon: Package,         label: 'Store',                       capability: 'store' },
   { href: '/admin/rewards',   icon: Gift,            label: 'Rewards',                     capability: 'rewards' },
+  { href: '/admin/referrals', icon: Share2,          label: 'Referrals',                   capability: 'referrals' },
+  { href: '/admin/teams',     icon: UsersRound,      label: 'Teams',                       capability: 'teams' },
   { href: '/admin/founders',  icon: UserCircle2,     label: 'Founders',                    capability: 'founders' },
   { href: '/admin/tickets',    icon: Ticket,          label: 'Tickets & Orders',           capability: 'tickets' },
   { href: '/admin/gallery',    icon: ImageIcon,       label: 'Gallery',                    capability: 'gallery' },
@@ -24,6 +26,7 @@ const NAV: { href: string; icon: typeof LayoutDashboard; label: string; exact?: 
   { href: '/admin/gate-staff',       icon: Users,     label: 'Gate Staff',                 capability: 'gate_staff' },
   { href: '/admin/admins',            icon: Shield,    label: 'Admins',                    capability: 'admins' },
   { href: '/admin/password-resets',   icon: KeyRound,  label: 'Password Resets',           capability: 'password_resets' },
+  { href: '/admin/audit-log',         icon: ScrollText, label: 'Audit Log',                ownerOnly: true },
   { href: '/gate',                    icon: QrCode,    label: 'Gate Scanner' }, // shared with gate_staff role, not capability-gated
 ]
 
@@ -32,10 +35,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [open, setOpen] = useState(false)
   const [pendingResets, setPendingResets] = useState(0)
   const [capabilities, setCapabilities] = useState<AdminCapability[] | null>(null)
+  const [isPlatformOwner, setIsPlatformOwner] = useState(false)
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
-      if (d.success && d.data.role === 'admin') setCapabilities(d.data.capabilities ?? [])
+      if (d.success && d.data.role === 'admin') {
+        setCapabilities(d.data.capabilities ?? [])
+        setIsPlatformOwner(!!d.data.isPlatformOwner)
+      }
     })
   }, [])
 
@@ -53,8 +60,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const visibleNav = capabilities
-    ? NAV.filter(item => !item.capability || capabilities.includes(item.capability))
-    : NAV
+    ? NAV.filter(item => {
+        if (item.ownerOnly) return isPlatformOwner
+        return !item.capability || capabilities.includes(item.capability)
+      })
+    : NAV.filter(item => !item.ownerOnly)
 
   const currentNavItem = NAV.find(item => item.exact ? pathname === item.href : pathname.startsWith(item.href))
   const denied = !!capabilities && !!currentNavItem?.capability && !capabilities.includes(currentNavItem.capability)

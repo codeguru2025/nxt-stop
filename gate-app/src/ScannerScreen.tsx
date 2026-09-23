@@ -12,15 +12,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import * as Haptics from 'expo-haptics'
-import { scanTicket, logout, getScanStats, type ScanResult } from './api'
+import { scanTicket, scanVoucher, logout, getScanStats, type ScanResult, type VoucherScanResult } from './api'
 
 type Props = { onLogout: () => void }
 
 type Stats = { scanned: number; valid: number; invalid: number; early: number }
 
+type CombinedResult = (ScanResult | VoucherScanResult) & { voucher?: VoucherScanResult['voucher'] }
+
 export default function ScannerScreen({ onLogout }: Props) {
   const [permission, requestPermission] = useCameraPermissions()
-  const [result, setResult] = useState<ScanResult | null>(null)
+  const [result, setResult] = useState<CombinedResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [manualCode, setManualCode] = useState('')
   const [stats, setStats] = useState<Stats>({ scanned: 0, valid: 0, invalid: 0, early: 0 })
@@ -74,7 +76,16 @@ export default function ScannerScreen({ onLogout }: Props) {
     if (autoResetRef.current) clearTimeout(autoResetRef.current)
 
     try {
-      const data = await scanTicket(code.trim())
+      let data: CombinedResult = await scanTicket(code.trim())
+      // Not a ticket — try the voucher namespace (pre-event purchases: drink/liquor
+      // vouchers, merch, tables) before giving up.
+      if (data.result === 'invalid' && /not found/i.test(data.message)) {
+        try {
+          data = await scanVoucher(code.trim())
+        } catch {
+          // fall through with the original "ticket not found" result
+        }
+      }
       setResult(data)
       updateStats(data)
       triggerHaptic(data.result)
@@ -187,7 +198,7 @@ export default function ScannerScreen({ onLogout }: Props) {
             <Text style={[styles.resultLabel, { color: resultColor }]}>{resultLabel}</Text>
             <Text style={styles.resultMessage}>{result.message}</Text>
 
-            {result.ticket && (
+            {'ticket' in result && result.ticket && (
               <View style={styles.ticketInfo}>
                 <Text style={styles.ticketHolder}>{result.ticket.holder}</Text>
                 {result.ticket.phone && (
@@ -200,11 +211,21 @@ export default function ScannerScreen({ onLogout }: Props) {
                   <Text style={styles.ticketEvent}>{result.ticket.event}</Text>
                 )}
                 <Text style={styles.ticketNumber}>{result.ticket.number}</Text>
-                {result.usedAt && (
+                {'usedAt' in result && result.usedAt && (
                   <Text style={styles.usedAt}>
                     Used at: {new Date(result.usedAt).toLocaleTimeString()}
                   </Text>
                 )}
+              </View>
+            )}
+
+            {result.voucher && (
+              <View style={styles.ticketInfo}>
+                <Text style={styles.ticketHolder}>{result.voucher.holder}</Text>
+                <View style={[styles.ticketTypeBadge, { backgroundColor: '#8B5CF6' }]}>
+                  <Text style={styles.ticketTypeText}>{result.voucher.product}</Text>
+                </View>
+                <Text style={styles.ticketNumber}>{result.voucher.code}</Text>
               </View>
             )}
 

@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
     const {
       eventId, name, description, price, stock, category,
-      image, lowStockAt, merchType, size, color,
+      image, lowStockAt, merchType, size, color, isTable, capacityPerUnit,
     } = await req.json()
 
     if (!eventId || !name || price === undefined || stock === undefined) {
@@ -49,6 +49,8 @@ export async function POST(req: Request) {
         merchType:  merchType  ?? null,
         size:       size       ?? null,
         color:      color      ?? null,
+        isTable: !!isTable,
+        capacityPerUnit: capacityPerUnit != null ? Number(capacityPerUnit) : null,
       },
     })
 

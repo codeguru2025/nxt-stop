@@ -20,6 +20,12 @@ type TicketPreview = {
 
 type ActivationResult = {
   orderNumber: string
+  buyer: {
+    name: string
+    phone: string
+    accountCreated: boolean
+    passwordEmailed: boolean
+  }
   ticket: {
     number: string
     event: string
@@ -44,6 +50,10 @@ export default function ActivateClient() {
   const [activating, setActivating] = useState(false)
   const [result, setResult] = useState<ActivationResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [buyerName, setBuyerName] = useState('')
+  const [buyerPhone, setBuyerPhone] = useState('')
+  const [buyerEmail, setBuyerEmail] = useState('')
+  const buyerReady = buyerName.trim() !== '' && buyerPhone.trim() !== ''
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
@@ -87,19 +97,27 @@ export default function ActivateClient() {
   }, [code])
 
   const confirmActivation = async () => {
-    if (!preview || preview.alreadyActivated) return
+    if (!preview || preview.alreadyActivated || !buyerReady) return
     setActivating(true)
     setError(null)
     try {
       const res = await fetch('/api/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ activationCode: code.trim().toUpperCase() }),
+        body: JSON.stringify({
+          activationCode: code.trim().toUpperCase(),
+          buyerName: buyerName.trim(),
+          buyerPhone: buyerPhone.trim(),
+          buyerEmail: buyerEmail.trim() || undefined,
+        }),
       }).then(r => r.json())
       if (res.success) {
         setResult(res.data)
         setPreview(null)
         setCode('')
+        setBuyerName('')
+        setBuyerPhone('')
+        setBuyerEmail('')
       } else {
         setError(res.error ?? 'Activation failed')
       }
@@ -116,6 +134,9 @@ export default function ActivateClient() {
     setPreviewError(null)
     setResult(null)
     setError(null)
+    setBuyerName('')
+    setBuyerPhone('')
+    setBuyerEmail('')
     setTimeout(() => inputRef.current?.focus(), 50)
   }
 
@@ -167,6 +188,18 @@ export default function ActivateClient() {
                 <div className="text-lg font-black text-purple-400">{formatCurrency(result.ticket.price)}</div>
                 <div className="text-xs text-gray-600">Order {result.orderNumber}</div>
               </div>
+              <div className="bg-[#111] rounded-xl p-4 text-left space-y-1 mb-5">
+                <div className="text-xs text-gray-500 uppercase tracking-wider">Buyer</div>
+                <div className="text-sm text-white font-semibold">{result.buyer.name}</div>
+                <div className="text-xs text-gray-400 font-mono">{result.buyer.phone}</div>
+                <div className="text-xs text-gray-400 pt-1">
+                  {!result.buyer.accountCreated
+                    ? 'Added to their existing NXT STOP account.'
+                    : result.buyer.passwordEmailed
+                      ? 'New account created — their password has been emailed to them.'
+                      : 'New account created. No email given — to sign in later they tap "Forgot password" and request admin help with this phone number.'}
+                </div>
+              </div>
               <button onClick={reset} className="w-full btn-primary flex items-center justify-center gap-2">
                 <DollarSign size={16} /> Sell Another
               </button>
@@ -205,9 +238,40 @@ export default function ActivateClient() {
                 <p className="text-2xl font-black text-purple-400 mt-3">{formatCurrency(preview.price)}</p>
 
                 {!preview.alreadyActivated && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Buyer details</p>
+                    <input
+                      type="text"
+                      placeholder="Buyer's full name *"
+                      value={buyerName}
+                      onChange={e => setBuyerName(e.target.value)}
+                      className="w-full"
+                      autoComplete="off"
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Phone number * (e.g. 0771234567)"
+                      value={buyerPhone}
+                      onChange={e => setBuyerPhone(e.target.value)}
+                      className="w-full"
+                      autoComplete="off"
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email (optional) — for their account password"
+                      value={buyerEmail}
+                      onChange={e => setBuyerEmail(e.target.value)}
+                      className="w-full"
+                      autoComplete="off"
+                    />
+                    <p className="text-xs text-gray-600">The ticket goes on their NXT STOP account. If the number already has one, it&apos;s added there.</p>
+                  </div>
+                )}
+
+                {!preview.alreadyActivated && (
                   <button
                     onClick={confirmActivation}
-                    disabled={activating}
+                    disabled={activating || !buyerReady}
                     className="w-full btn-primary mt-4 flex items-center justify-center gap-2"
                   >
                     {activating ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}

@@ -2,8 +2,10 @@ import { prisma } from '@/lib/db'
 import { signToken } from '@/lib/auth'
 import { ok, error, serverError } from '@/lib/api'
 import { checkAuthLimit } from '@/lib/rateLimit'
+import { writeAuditLog } from '@/lib/auditLog'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
+import { normalizeWhatsAppPhone } from '@/lib/phone'
 
 // Bcrypt hash of a random, unused string — compared against when no user is found so
 // login always takes the same time whether or not the phone number is registered.
@@ -18,9 +20,25 @@ export async function POST(req: Request) {
     const { phone, password } = await req.json()
     if (!phone || !password) return error('Phone number and password required')
 
-    const user = await prisma.user.findUnique({ where: { phone: phone.trim() } })
+    // Accounts created at checkout/sales desk store phones normalized (+263...), but people
+    // type 0771...; older accounts may be stored as typed. Match either form.
+    const typed = String(phone).trim()
+    const normalized = normalizeWhatsAppPhone(typed)
+    const user = await prisma.user.findFirst({
+      where: { phone: { in: normalized && normalized !== typed ? [typed, normalized] : [typed] } },
+    })
     const valid = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH)
-    if (!user || !valid) return error('Invalid credentials', 401)
+    if (!user || !valid) {
+      writeAuditLog({ action: 'auth.login.failure', entityType: 'User', entityId: user?.id ?? null, req })
+      return error('Invalid credentials', 401)
+    }
+
+    // First successful login on a system-issued one-time password — record it so we
+    // know the OTP has been consumed. mustResetPassword itself is only ever cleared
+    // by POST /api/auth/set-password, which is the actual single-use enforcement.
+    if (user.mustResetPassword && !user.oneTimePasswordUsedAt) {
+      await prisma.user.update({ where: { id: user.id }, data: { oneTimePasswordUsedAt: new Date() } })
+    }
 
     const token = await signToken({
       id: user.id,
@@ -39,6 +57,8 @@ export async function POST(req: Request) {
       path: '/',
     })
 
+    writeAuditLog({ actorId: user.id, actorRole: user.role, action: 'auth.login.success', entityType: 'User', entityId: user.id, req })
+
     return ok({
       user: {
         id: user.id,
@@ -47,6 +67,7 @@ export async function POST(req: Request) {
         role: user.role,
         referralCode: user.referralCode,
         points: user.points,
+        mustResetPassword: user.mustResetPassword,
       },
     })
   } catch (e) {

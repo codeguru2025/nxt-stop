@@ -56,7 +56,7 @@ const BLANK_FORM = {
   posterImage: '', bannerImage: '', videoUrl: '', hasVirtual: false, virtualPrice: 5,
   status: 'draft', lat: '', lng: '', slug: '',
   ticketTypes: [
-    { name: 'General', price: 10, capacity: 500, color: '#E8174A', active: true }
+    { name: 'General', price: 10, capacity: 500, color: '#E8174A', active: true, salesChannel: 'both' }
   ],
   lineup: [] as LineupArtist[],
 }
@@ -236,7 +236,7 @@ export default function AdminEventsClient() {
   const addTicketType = () => {
     setForm((f: any) => ({
       ...f,
-      ticketTypes: [...f.ticketTypes, { name: '', price: 0, capacity: 100, color: '#E8174A' }]
+      ticketTypes: [...f.ticketTypes, { name: '', price: 0, capacity: 100, color: '#E8174A', salesChannel: 'both' }]
     }))
   }
 
@@ -586,10 +586,22 @@ export default function AdminEventsClient() {
                       )}
                     </div>
                   </div>
-                  {editing && t.id && (
-                    <div className="flex items-center justify-between mt-1 ml-0.5">
-                      {typeof t.sold === 'number' && <p className="text-xs text-gray-600">{t.sold} sold of {t.capacity}</p>}
-                      <label className="flex items-center gap-1.5 cursor-pointer">
+                  <div className="flex items-center justify-between mt-1 ml-0.5 gap-2">
+                    {editing && t.id && typeof t.sold === 'number' && (
+                      <p className="text-xs text-gray-600 shrink-0">{t.sold} sold of {t.capacity}</p>
+                    )}
+                    <select
+                      value={t.salesChannel ?? 'both'}
+                      onChange={e => updateTicketType(i, 'salesChannel', e.target.value)}
+                      className="text-xs bg-[#1a1a1a] border border-[#2a2a2a] rounded px-2 py-1 text-gray-400"
+                      title="Sales window"
+                    >
+                      <option value="both">Advance &amp; gate</option>
+                      <option value="advance">Advance only — closes on event day</option>
+                      <option value="gate">Gate only — on sale on event day</option>
+                    </select>
+                    {editing && t.id && (
+                      <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
                         <input
                           type="checkbox"
                           checked={t.active !== false}
@@ -598,8 +610,8 @@ export default function AdminEventsClient() {
                         />
                         <span className="text-xs text-gray-500">Active</span>
                       </label>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

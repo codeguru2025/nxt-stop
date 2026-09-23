@@ -2,6 +2,7 @@ import { Resend } from 'resend'
 import { prisma } from './db'
 import { env } from './env'
 import { createTicketAttachmentPng } from './ticketAttachment'
+import { generateQRDataURL } from './qr'
 import type { DailyReport } from './reportData'
 
 let client: Resend | null | undefined
@@ -87,6 +88,135 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<void>
   })
 
   await prisma.order.update({ where: { id: order.id }, data: { emailSentAt: new Date() } })
+}
+
+// Sent once, right after checkout creates a brand-new account. Carries the
+// system-issued one-time password in plaintext — this is the only place it is ever
+// visible outside the (already-hashed) DB column.
+export async function sendWelcomeEmail(userId: string, plaintextPassword: string): Promise<void> {
+  const resend = getClient()
+  const from = env.EMAIL_FROM
+  if (!resend || !from) return
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } })
+  if (!user?.email) return
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2>Welcome to NXT STOP 🎉</h2>
+      <p>Hi ${esc(user.name)}, your account has been created.</p>
+      <p>Here's a one-time password to sign in for the first time:</p>
+      <p style="font-size: 20px; font-weight: 700; letter-spacing: 2px; background:#f4f4f4; padding: 12px 16px; border-radius: 8px; display: inline-block;">${esc(plaintextPassword)}</p>
+      <p style="color:#666; font-size: 13px;">This password only works once — you'll be asked to set your own password the first time you sign in.</p>
+    </div>`
+
+  await resend.emails.send({
+    from,
+    to: user.email,
+    subject: 'Welcome to NXT STOP — your one-time password',
+    html,
+  })
+}
+
+// Self-service password reset link (email-verified). See /api/auth/forgot-password
+// and /api/auth/reset-password.
+export async function sendPasswordResetEmail(userId: string, token: string): Promise<void> {
+  const resend = getClient()
+  const from = env.EMAIL_FROM
+  if (!resend || !from) return
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } })
+  if (!user?.email) return
+
+  const resetUrl = `${env.APP_URL}/reset-password?token=${encodeURIComponent(token)}`
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2>Reset your password</h2>
+      <p>Hi ${esc(user.name)}, click below to set a new password. This link expires in 30 minutes and can only be used once.</p>
+      <p><a href="${resetUrl}" style="display:inline-block; background:#8B5CF6; color:#fff; padding: 10px 20px; border-radius: 8px; text-decoration:none;">Reset password</a></p>
+      <p style="color:#999; font-size: 12px;">If you didn't request this, you can safely ignore this email.</p>
+    </div>`
+
+  await resend.emails.send({
+    from,
+    to: user.email,
+    subject: 'NXT STOP — reset your password',
+    html,
+  })
+}
+
+// Fired when a referral converts into a cash reward (see fulfillOrder.ts).
+export async function sendReferralRewardEarnedEmail(userId: string, amount: number): Promise<void> {
+  const resend = getClient()
+  const from = env.EMAIL_FROM
+  if (!resend || !from) return
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } })
+  if (!user?.email) return
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2>You just earned a referral reward 💸</h2>
+      <p>Hi ${esc(user.name)}, someone bought a ticket using your referral link — you've earned <strong>$${amount.toFixed(2)}</strong>.</p>
+      <p style="color:#666; font-size: 13px;">Track your total earnings and payout status on your NXT STOP dashboard.</p>
+    </div>`
+
+  await resend.emails.send({
+    from,
+    to: user.email,
+    subject: `You earned $${amount.toFixed(2)} from a referral`,
+    html,
+  })
+}
+
+// Sent when a paid order contains pre-event purchases (beverage/liquor vouchers,
+// merchandise, tables) — see fulfillOrder.ts's voucher-minting loop.
+export async function sendVoucherPurchaseEmail(orderId: string): Promise<void> {
+  const resend = getClient()
+  const from = env.EMAIL_FROM
+  if (!resend || !from) return
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      user: { select: { name: true } },
+      vouchers: { include: { product: { select: { name: true, category: true } } } },
+    },
+  })
+  if (!order || order.status !== 'paid' || order.vouchers.length === 0) return
+  if (!order.email) return
+
+  const holderName = order.recipientName || order.whatsappName || order.user.name
+
+  const attachments = await Promise.all(
+    order.vouchers.map(async (v) => {
+      const dataUrl = await generateQRDataURL(v.qrCode)
+      const base64 = dataUrl.split(',')[1] ?? ''
+      return { filename: `${v.code}.png`, content: Buffer.from(base64, 'base64') }
+    })
+  )
+
+  const rows = order.vouchers
+    .map((v) => `<li>${esc(v.product.name)} — code <strong>${esc(v.code)}</strong></li>`)
+    .join('')
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2>Your pre-event purchase is confirmed 🎟️</h2>
+      <p>Hi ${esc(holderName)}, here's what you bought — present the attached QR code (or the code itself) to redeem at the event.</p>
+      <ul>${rows}</ul>
+      <p style="color:#666; font-size: 13px;">Total paid: $${Number(order.total).toFixed(2)}</p>
+      <p style="color:#666; font-size: 13px;">Order #${esc(order.orderNumber)}</p>
+    </div>`
+
+  await resend.emails.send({
+    from,
+    to: order.email,
+    subject: `Your NXT STOP purchase — order #${order.orderNumber}`,
+    html,
+    attachments,
+  })
 }
 
 export async function sendAdminDigestEmail(report: DailyReport): Promise<void> {

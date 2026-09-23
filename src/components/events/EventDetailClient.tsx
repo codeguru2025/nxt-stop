@@ -9,13 +9,13 @@ import {
   Check, AlertCircle, Loader2, Music, Video, Star, Phone, ExternalLink,
   ChevronDown, ChevronUp, User, Play, X
 } from 'lucide-react'
-import { formatDate, formatCurrency, buildReferralUrl, getEventTimePhase } from '@/lib/utils'
+import { formatDate, formatCurrency, buildReferralUrl, getEventTimePhase, eventDayStartUtc } from '@/lib/utils'
 
 const VenueMap = dynamic(() => import('./VenueMap'), { ssr: false })
 
 type TicketType = {
   id: string; name: string; description?: string; price: number
-  capacity: number; sold: number; color: string
+  capacity: number; sold: number; color: string; salesChannel?: string
 }
 
 type Event = {
@@ -46,7 +46,7 @@ type Stage =
   | { name: 'redirect'; redirectUrl: string; orderId: string; guestToken?: string }
   | { name: 'paid'; guestToken?: string }
   | { name: 'payment_failed'; message: string; guestToken?: string }
-  | { name: 'error'; message: string }
+  | { name: 'error'; message: string; loginRequired?: boolean }
 
 export default function EventDetailClient({ initialEvent }: { initialEvent: Event | null }) {
   const searchParams = useSearchParams()
@@ -67,6 +67,8 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
   const [whatsAppName, setWhatsAppName]     = useState('')
   const [whatsAppPhone, setWhatsAppPhone]   = useState('')
   const [email, setEmail]                   = useState('')
+  const [homeTown, setHomeTown]             = useState('')
+  const [isWhatsAppToggle, setIsWhatsAppToggle] = useState(true)
   const [forSomeoneElse, setForSomeoneElse] = useState(false)
   const [recipientName, setRecipientName]   = useState('')
 
@@ -95,6 +97,15 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
 
   const selectedTicket = event?.ticketTypes.find(t => t.id === selectedType)
   const available = selectedTicket ? selectedTicket.capacity - selectedTicket.sold : 0
+  const selectedTicketBlocked = (() => {
+    if (!selectedTicket || !event) return false
+    const dayStartMs = eventDayStartUtc(event.date).getTime()
+    const now = Date.now()
+    return (
+      (selectedTicket.salesChannel === 'gate' && now < dayStartMs) ||
+      (selectedTicket.salesChannel === 'advance' && now >= dayStartMs)
+    )
+  })()
   const subtotal = selectedTicket ? selectedTicket.price * quantity : 0
   const fees = quantity * (event?.platformFee ?? 0.10)
   const total = subtotal + fees
@@ -157,6 +168,9 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
 
     if (!whatsAppPhone.trim()) return
     if (!whatsAppName.trim()) return
+    // Email is how we deliver the one-time password for the account checkout creates —
+    // required for guests; logged-in users already have one on file.
+    if (!user && !email.trim()) return
 
     // Validate phone for mobile methods
     if (isMobile && !phone.trim()) return
@@ -178,6 +192,8 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
       if (!user) {
         orderBody.guestPhone = whatsAppPhone
         orderBody.guestName = whatsAppName
+        orderBody.homeTown = homeTown.trim() || undefined
+        orderBody.isWhatsApp = isWhatsAppToggle
       }
 
       const orderRes = await fetch('/api/orders', {
@@ -187,7 +203,11 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
       }).then(r => r.json())
 
       if (!orderRes.success) {
-        setStage({ name: 'error', message: orderRes.error ?? 'Could not create order.' })
+        setStage({
+          name: 'error',
+          message: orderRes.error ?? 'Could not create order.',
+          loginRequired: orderRes.code === 'ACCOUNT_EXISTS',
+        })
         return
       }
 
@@ -242,6 +262,10 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
       <div className="text-center"><div className="text-5xl mb-4">😢</div><p className="text-gray-400">Event not found.</p></div>
     </div>
   )
+
+  // Sends the buyer to login and back to this event (ref code and all) afterwards.
+  const loginHref = () =>
+    `/login?from=${encodeURIComponent(window.location.pathname + window.location.search)}`
 
   const isCheckoutVisible = stage.name === 'checkout' || stage.name === 'processing' || stage.name === 'error'
 
@@ -498,7 +522,11 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                       <AlertCircle size={14} className="mt-0.5 shrink-0" />
                       <div>
                         {stage.message}
-                        <button onClick={() => setStage({ name: 'checkout' })} className="block text-xs text-red-300 mt-1 underline">Try again</button>
+                        {stage.loginRequired ? (
+                          <a href={loginHref()} className="block text-xs text-red-300 mt-1 underline">Log in to continue</a>
+                        ) : (
+                          <button onClick={() => setStage({ name: 'checkout' })} className="block text-xs text-red-300 mt-1 underline">Try again</button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -508,14 +536,20 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                     {event.ticketTypes.map(t => {
                       const avail = t.capacity - t.sold
                       const isSelected = selectedType === t.id
+                      const dayStart = eventDayStartUtc(event.date).getTime()
+                      const now = Date.now()
+                      const notYetOnSale = t.salesChannel === 'gate' && now < dayStart
+                      const advanceClosed = t.salesChannel === 'advance' && now >= dayStart
+                      const windowBlocked = notYetOnSale || advanceClosed
+                      const disabled = avail <= 0 || windowBlocked
                       return (
                         <button
                           key={t.id}
-                          onClick={() => avail > 0 && setSelectedType(t.id)}
-                          disabled={avail <= 0}
+                          onClick={() => !disabled && setSelectedType(t.id)}
+                          disabled={disabled}
                           className={`w-full rounded-xl p-3.5 text-left transition-all border ${
                             isSelected ? 'border-purple-500 bg-purple-500/10' :
-                            avail <= 0  ? 'border-[#2a2a2a] opacity-40 cursor-not-allowed' :
+                            disabled    ? 'border-[#2a2a2a] opacity-40 cursor-not-allowed' :
                             'border-[#2a2a2a] hover:border-[#3a3a3a]'
                           }`}
                         >
@@ -529,8 +563,10 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                           {t.description && <p className="text-xs text-gray-500 mt-1 ml-4">{t.description}</p>}
                           <div className="flex items-center justify-between mt-1.5 ml-4">
                             <span className="text-xs text-gray-600">{avail} remaining</span>
-                            {avail <= 20 && avail > 0 && <span className="text-xs text-orange-400 font-medium">Almost sold out!</span>}
-                            {avail <= 0 && <span className="text-xs text-red-400 font-medium">Sold Out</span>}
+                            {notYetOnSale && <span className="text-xs text-blue-400 font-medium">On sale at the gate</span>}
+                            {advanceClosed && <span className="text-xs text-orange-400 font-medium">Advance sales closed — pay at the gate</span>}
+                            {!windowBlocked && avail <= 20 && avail > 0 && <span className="text-xs text-orange-400 font-medium">Almost sold out!</span>}
+                            {!windowBlocked && avail <= 0 && <span className="text-xs text-red-400 font-medium">Sold Out</span>}
                           </div>
                         </button>
                       )
@@ -611,32 +647,58 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                       )}
 
                       <div className="space-y-3 bg-[#111] rounded-xl p-4 border border-[#2a2a2a]">
-                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Ticket Delivery (WhatsApp)</p>
+                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+                          {user ? 'Ticket Delivery' : 'Your Details'}
+                        </p>
+                        {!user && (
+                          <p className="text-xs text-gray-500">
+                            Already have an account?{' '}
+                            <a href={loginHref()} className="text-purple-400 hover:text-purple-300">Log in</a>
+                            {' '}first. Otherwise we&apos;ll create your NXT STOP account and email you a password.
+                          </p>
+                        )}
                         <input
                           type="text"
-                          placeholder="WhatsApp full name *"
+                          placeholder="Full name *"
                           value={whatsAppName}
                           onChange={e => setWhatsAppName(e.target.value)}
                           className="w-full"
                         />
                         <input
                           type="tel"
-                          placeholder="WhatsApp number (e.g. +263771234567) *"
+                          placeholder="Phone number (e.g. +263771234567) *"
                           value={whatsAppPhone}
                           onChange={e => setWhatsAppPhone(e.target.value)}
                           className="w-full"
                         />
                         {!user && (
-                          <p className="text-xs text-gray-600"><a href="/register" className="text-purple-400 hover:text-purple-300">Create an account</a> to manage your tickets and earn rewards.</p>
+                          <>
+                            <label className="flex items-center gap-2 text-xs text-gray-400">
+                              <input
+                                type="checkbox"
+                                checked={isWhatsAppToggle}
+                                onChange={e => setIsWhatsAppToggle(e.target.checked)}
+                              />
+                              This number is on WhatsApp — send my tickets there
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Home town (optional)"
+                              value={homeTown}
+                              onChange={e => setHomeTown(e.target.value)}
+                              className="w-full"
+                            />
+                          </>
                         )}
                       </div>
 
                       <div>
                         <input
                           type="email"
-                          placeholder="Email (optional) — get a receipt + ticket copy"
+                          placeholder={user ? 'Email (optional) — get a receipt + ticket copy' : 'Email * — we\'ll send your account password here'}
                           value={email}
                           onChange={e => setEmail(e.target.value)}
+                          required={!user}
                           className="w-full"
                         />
                       </div>
@@ -666,7 +728,7 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                   {stage.name === 'idle' ? (
                     <button
                       onClick={handleBuy}
-                      disabled={!selectedType || available <= 0}
+                      disabled={!selectedType || available <= 0 || selectedTicketBlocked}
                       className="w-full btn-primary flex items-center justify-center gap-2 text-base"
                     >
                       <Ticket size={18} />
@@ -679,8 +741,10 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                         stage.name === 'processing' ||
                         !selectedType ||
                         available <= 0 ||
+                        selectedTicketBlocked ||
                         (isMobile && !phone.trim()) ||
-                        (!whatsAppPhone.trim() || !whatsAppName.trim())
+                        (!whatsAppPhone.trim() || !whatsAppName.trim()) ||
+                        (!user && !email.trim())
                       }
                       className="w-full btn-primary flex items-center justify-center gap-2 text-base"
                     >

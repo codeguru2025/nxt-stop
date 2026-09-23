@@ -27,7 +27,7 @@ type Product = {
 
 type Event = { id: string; name: string }
 
-const DRINK_CATEGORIES = ['drink', 'food', 'other']
+const DRINK_CATEGORIES = ['drink', 'food', 'table', 'other']
 
 const MERCH_TYPES = [
   { value: 'tshirt',    label: 'T-Shirt' },
@@ -47,6 +47,7 @@ const BLANK_PRODUCT = {
   eventId: '', name: '', description: '', price: 0, stock: 50,
   category: 'drink', lowStockAt: 10, image: '',
   merchType: '', size: '', color: '',
+  isTable: false, capacityPerUnit: '',
 }
 
 const BLANK_MERCH = {
@@ -119,7 +120,11 @@ export default function AdminStoreClient() {
 
   const saveDrink = async () => {
     setSaving(true)
-    const body = { ...drinkForm, category: drinkForm.category === 'merchandise' ? 'drink' : drinkForm.category }
+    const body = {
+      ...drinkForm,
+      category: drinkForm.category === 'merchandise' ? 'drink' : drinkForm.category,
+      capacityPerUnit: drinkForm.capacityPerUnit ? parseInt(String(drinkForm.capacityPerUnit), 10) : null,
+    }
     const res = await fetch('/api/admin/products', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }).then(r => r.json())
@@ -367,6 +372,12 @@ export default function AdminStoreClient() {
               <div><label>Price ($)</label><input type="number" step="0.01" value={drinkForm.price} onChange={e => setDrinkForm(f => ({ ...f, price: parseFloat(e.target.value) || 0 }))} /></div>
               <div><label>Initial Stock</label><input type="number" value={drinkForm.stock} onChange={e => setDrinkForm(f => ({ ...f, stock: parseInt(e.target.value) || 0 }))} /></div>
               <div><label>Low Stock Alert At</label><input type="number" value={drinkForm.lowStockAt} onChange={e => setDrinkForm(f => ({ ...f, lowStockAt: parseInt(e.target.value) || 0 }))} /></div>
+              {drinkForm.category === 'table' && (
+                <div>
+                  <label>Seats per table</label>
+                  <input type="number" value={drinkForm.capacityPerUnit} onChange={e => setDrinkForm(f => ({ ...f, capacityPerUnit: e.target.value, isTable: true }))} placeholder="e.g. 6" />
+                </div>
+              )}
               <div className="sm:col-span-2"><label>Description</label><input value={drinkForm.description} onChange={e => setDrinkForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional" /></div>
 
               <div className="sm:col-span-2">

@@ -34,6 +34,16 @@ export function utcToEventLocalInput(date: Date | string | null | undefined): st
   return format(inEventZone(date), "yyyy-MM-dd'T'HH:mm")
 }
 
+/**
+ * The UTC instant of venue-local (CAT) midnight on the calendar day `eventDate` falls on.
+ * Used to gate "advance" ticket sales (must stop once the event's local day begins) and
+ * "gate" ticket sales (must not start before it) — see TicketType.salesChannel.
+ */
+export function eventDayStartUtc(eventDate: Date | string): Date {
+  const day = format(inEventZone(eventDate), 'yyyy-MM-dd')
+  return eventLocalInputToUtc(`${day}T00:00`)
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }

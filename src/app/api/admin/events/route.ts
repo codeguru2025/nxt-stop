@@ -97,6 +97,8 @@ export async function POST(req: Request) {
                 price: t.price,
                 capacity: t.capacity,
                 color: t.color ?? '#8B5CF6',
+                active: t.active ?? true,
+                salesChannel: t.salesChannel ?? 'both',
               })),
             }
           : undefined,

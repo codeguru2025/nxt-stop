@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { requireCapability, isAdminCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
+import { writeAuditLog } from '@/lib/auditLog'
 import bcrypt from 'bcryptjs'
 
 // GET /api/admin/admins — list all admin accounts
@@ -59,6 +60,16 @@ export async function POST(req: Request) {
         capabilities: capabilities ?? [],
       },
       select: { id: true, name: true, phone: true, email: true, capabilities: true, createdAt: true },
+    })
+
+    writeAuditLog({
+      actorId: session.id,
+      actorRole: session.role,
+      action: 'admin.create',
+      entityType: 'User',
+      entityId: admin.id,
+      after: { name: admin.name, phone: admin.phone, capabilities: admin.capabilities },
+      req,
     })
 
     return ok(admin, 201)

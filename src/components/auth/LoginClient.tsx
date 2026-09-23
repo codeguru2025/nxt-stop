@@ -121,8 +121,8 @@ export default function LoginClient() {
         <div className="mt-4 text-center">
           <p className="text-gray-500 text-sm">
             Don't have an account?{' '}
-            <Link href="/register" className="text-purple-400 hover:text-purple-300 font-medium">
-              Create one
+            <Link href="/events" className="text-purple-400 hover:text-purple-300 font-medium">
+              Buy a ticket to get one
             </Link>
           </p>
         </div>

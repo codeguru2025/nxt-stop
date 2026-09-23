@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 
-const PROTECTED_PATHS = ['/dashboard', '/admin', '/gate']
+const PROTECTED_PATHS = ['/dashboard', '/admin', '/gate', '/set-password']
 const ADMIN_PATHS = ['/admin']
 const GATE_PATHS = ['/gate']
 const CSRF_COOKIE = 'csrf-token'

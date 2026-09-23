@@ -1,11 +1,18 @@
 import { prisma } from './db'
 import { generateTicketNumber } from './qr'
 import { sendOrderTicketsWhatsApp } from './whatsapp'
-import { sendOrderConfirmationEmail } from './email'
+import { sendOrderConfirmationEmail, sendReferralRewardEarnedEmail, sendVoucherPurchaseEmail } from './email'
 import crypto from 'crypto'
+
+function generateVoucherCode(): string {
+  const random = crypto.randomBytes(4).toString('hex').toUpperCase()
+  return `VCH-${random}`
+}
 
 export async function fulfillOrder(orderId: string, paymentMethod: string, paymentRef?: string) {
   let ticketsMinted = false
+  let vouchersMinted = false
+  let referralRewardEarned: { userId: string; amount: number } | undefined
   await prisma.$transaction(async (tx) => {
     // Serialize fulfillment for this order (pending payment vs paid-without-tickets repair).
     const locked = await tx.$queryRaw<{ id: string }[]>`
@@ -53,13 +60,14 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
     const order = await tx.order.findUnique({
       where: { id: orderId },
       include: {
-        items: { include: { ticketType: { include: { event: true } } } },
+        items: { include: { ticketType: { include: { event: true } }, product: true } },
       },
     })
     if (!order || order.status !== 'paid') return
 
     const ticketItems = order.items.filter(i => !i.productId)
-    if (ticketItems.length === 0) return
+    const productItems = order.items.filter(i => i.productId)
+    if (ticketItems.length === 0 && productItems.length === 0) return
 
     for (const item of ticketItems) {
       let ticketType: { id: string; eventId: string; capacity: number; sold: number; [key: string]: any } | null =
@@ -114,6 +122,47 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
       ticketsMinted = true
     }
 
+    // ── Pre-event purchases: mint one Voucher per unit purchased ──────────────
+    for (const item of productItems) {
+      if (!item.productId) continue
+      // Idempotency guard, mirrors the tx.ticket.count check above.
+      const already = await tx.voucher.count({ where: { orderItemId: item.id } })
+      if (already > 0) continue
+
+      await tx.$executeRaw`SELECT id FROM "Product" WHERE id = ${item.productId} FOR UPDATE`
+      const product = item.product ?? await tx.product.findUnique({ where: { id: item.productId } })
+      if (!product) throw new Error(`Product not found for order item ${item.id} — fulfillment aborted`)
+
+      const freshProduct = await tx.product.findUnique({
+        where: { id: product.id },
+        select: { id: true, sold: true, stock: true, eventId: true },
+      })
+      if (!freshProduct) throw new Error(`Product ${product.id} missing — fulfillment aborted`)
+      if (freshProduct.sold + item.quantity > freshProduct.stock) {
+        throw new Error(
+          `Cannot fulfill order ${orderId}: only ${freshProduct.stock - freshProduct.sold} unit(s) left for this product (need ${item.quantity})`
+        )
+      }
+
+      const voucherRows = Array.from({ length: item.quantity }, () => ({
+        orderId: order.id,
+        orderItemId: item.id,
+        productId: product.id,
+        userId: order.userId,
+        eventId: freshProduct.eventId ?? null,
+        code: generateVoucherCode(),
+        qrCode: crypto.randomUUID(),
+      }))
+
+      await tx.voucher.createMany({ data: voucherRows })
+
+      await tx.product.update({
+        where: { id: product.id },
+        data: { sold: { increment: item.quantity } },
+      })
+      vouchersMinted = true
+    }
+
     if (order.referralCode) {
       const existingRef = await tx.referral.findFirst({ where: { orderId: order.id } })
       if (!existingRef) {
@@ -130,7 +179,7 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
             data: { points: { increment: points }, totalEarned: { increment: points } },
           })
 
-          await tx.referral.create({
+          const referral = await tx.referral.create({
             data: {
               sourceUserId: referrer.id,
               targetUserId: order.userId,
@@ -138,6 +187,19 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
               pointsAwarded: points,
             },
           })
+
+          // Cash reward — a % of ticket-only value (never the full order total, which after
+          // pre-event purchases can include merch/vouchers). Kept alongside the points award
+          // above rather than replacing it, so the existing Rewards catalog isn't orphaned.
+          const ticketSubtotal = ticketItems.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
+          const pct = Number(config?.referralPercentage ?? 10)
+          const amount = Math.round(ticketSubtotal * (pct / 100) * 100) / 100
+          if (amount > 0) {
+            await tx.referralReward.create({
+              data: { referralId: referral.id, userId: referrer.id, orderId: order.id, amount },
+            })
+            referralRewardEarned = { userId: referrer.id, amount }
+          }
         }
       }
     }
@@ -177,6 +239,18 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
     })
     sendOrderConfirmationEmail(orderId).catch((err) => {
       console.error(`Email delivery failed for order ${orderId}`, err)
+    })
+  }
+
+  if (vouchersMinted) {
+    sendVoucherPurchaseEmail(orderId).catch((err) => {
+      console.error(`Voucher email failed for order ${orderId}`, err)
+    })
+  }
+
+  if (referralRewardEarned) {
+    sendReferralRewardEarnedEmail(referralRewardEarned.userId, referralRewardEarned.amount).catch((err) => {
+      console.error(`Referral reward email failed for user ${referralRewardEarned!.userId}`, err)
     })
   }
 }
