@@ -8,6 +8,7 @@ import { eventDayStartUtc, eventEndTime } from '@/lib/utils'
 import { createAccountWithOneTimePassword, splitName } from '@/lib/onboarding'
 import { sendWelcomeEmail } from '@/lib/email'
 import { cookies } from 'next/headers'
+import { REF_COOKIE } from '@/lib/visits'
 import crypto from 'crypto'
 import { z } from 'zod'
 
@@ -51,7 +52,10 @@ export async function POST(req: Request) {
     if (!parsed.success) {
       return error(parsed.error.issues.map((i: { message: string }) => i.message).join('; '))
     }
-    const { eventId, ticketTypeId, productId, quantity, referralCode, partnerId, guestPhone, guestName, recipientName, whatsappPhone, whatsappName, email, homeTown, isWhatsApp } = parsed.data
+    const { eventId, ticketTypeId, productId, quantity, referralCode: referralCodeParam, partnerId, guestPhone, guestName, recipientName, whatsappPhone, whatsappName, email, homeTown, isWhatsApp } = parsed.data
+    // A referral link clicked in the last 30 days still earns its owner credit even if the
+    // buyer browsed elsewhere before checking out (cookie set by /r/CODE — see lib/visits.ts)
+    const referralCode = referralCodeParam || (await cookies()).get(REF_COOKIE)?.value || undefined
 
     const normalizedWhatsappPhone = normalizeWhatsAppPhone(whatsappPhone ?? guestPhone ?? '')
     if (!normalizedWhatsappPhone) return error('Enter a valid WhatsApp number in international format')

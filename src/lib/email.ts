@@ -264,6 +264,9 @@ export async function sendAdminDigestEmail(report: DailyReport): Promise<void> {
         ${row('Scan issues — invalid', report.scanAnomalies.invalid)}
         ${row('Scan issues — already used', report.scanAnomalies.alreadyUsed)}
         ${row('Scan issues — early scan', report.scanAnomalies.earlyScan)}
+        ${row('Website — pages viewed', report.website.pageViews)}
+        ${row('Website — different visitors', report.website.visitors)}
+        ${row('Referral link clicks', report.website.referralClicks)}
       </table>
       ${
         report.perEvent.length

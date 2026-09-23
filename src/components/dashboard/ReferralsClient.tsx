@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Share2, Copy, Check, QrCode, Star, TrendingUp, DollarSign } from 'lucide-react'
 import { buildReferralUrl, formatCurrency, formatDate } from '@/lib/utils'
+import ReferralStats from './ReferralStats'
 
 type User = { referralCode: string; points: number; name: string; _count: { referralsMade: number } }
 type ReferralRow = {
@@ -66,7 +67,7 @@ export default function ReferralsClient() {
   const refUrl = buildReferralUrl(user.referralCode)
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="max-w-3xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-2xl font-black text-white">My Referrals</h1>
         <p className="text-gray-500 text-sm mt-0.5">Share your link — earn points AND 10% cash on every ticket sold</p>
@@ -125,6 +126,8 @@ export default function ReferralsClient() {
           </button>
         </div>
       </div>
+
+      <ReferralStats />
 
       {/* Referral history */}
       {referrals.length > 0 && (

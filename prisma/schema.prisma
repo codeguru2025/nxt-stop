@@ -566,6 +566,27 @@ model SocialPost {
   @@index([userId])
 }
 
+// ─── SITE VISITS ─────────────────────────────────────────────────────────────
+
+// One row per page view (and per referral-link click, path /r/CODE). Kept apart from
+// AuditLog so visits never bury important actions. Rows older than 90 days are deleted.
+model PageView {
+  id           String   @id @default(cuid())
+  path         String   // pathname only — no query string
+  userId       String?  // set when the visitor is logged in
+  visitorId    String   // random id in the nxt-vid cookie; ties anonymous visits together
+  referralCode String?  // referral link this visit is credited to (click, ?ref=, or nxt-ref cookie)
+  source       String?  // where they came from: whatsapp, facebook, instagram, google, direct, …
+  device       String?  // mobile | tablet | desktop
+  ipHash       String?  // salted hash — raw IPs are never stored
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([referralCode, createdAt])
+  @@index([userId, createdAt])
+  @@index([path, createdAt])
+}
+
 // ─── TWO-ADMIN APPROVAL ──────────────────────────────────────────────────────
 
 // A serious admin change (event edit/delete, prices, admin accounts, payouts, …) held

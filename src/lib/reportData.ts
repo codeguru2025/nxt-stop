@@ -15,6 +15,7 @@ export type DailyReport = {
   otherProductRevenue: number
   attendance: number
   scanAnomalies: { invalid: number; alreadyUsed: number; earlyScan: number }
+  website: { pageViews: number; visitors: number; referralClicks: number }
   perEvent: { id: string; name: string; ticketsSold: number; revenue: number; attendance: number }[]
 }
 
@@ -130,5 +131,17 @@ export async function buildDailyReport(hoursBack = 24): Promise<DailyReport> {
       earlyScan: scanCounts.earlyScan,
     },
     perEvent,
+    website: await websiteSummary(windowStart, windowEnd),
   }
+}
+
+/** Visits in the window (robots excluded at record time — see lib/visits.ts). */
+async function websiteSummary(from: Date, to: Date): Promise<DailyReport['website']> {
+  const inWindow = { createdAt: { gte: from, lte: to } }
+  const [pageViews, visitors, referralClicks] = await Promise.all([
+    prisma.pageView.count({ where: { ...inWindow, NOT: { path: { startsWith: '/r/' } } } }),
+    prisma.pageView.findMany({ where: inWindow, distinct: ['visitorId'], select: { visitorId: true } }).then(r => r.length),
+    prisma.pageView.count({ where: { ...inWindow, path: { startsWith: '/r/' } } }),
+  ]).catch(() => [0, 0, 0] as const)
+  return { pageViews, visitors, referralClicks }
 }

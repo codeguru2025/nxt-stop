@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import PWAInstallPrompt from '@/components/PWAInstallPrompt'
 import CsrfProvider from '@/components/CsrfProvider'
+import PageTracker from '@/components/PageTracker'
 import MustResetPasswordGate from '@/components/auth/MustResetPasswordGate'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </div>
         <CsrfProvider />
+        <PageTracker />
         <MustResetPasswordGate />
         <PWAInstallPrompt />
       </body>

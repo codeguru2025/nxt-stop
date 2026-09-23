@@ -5,6 +5,7 @@ import AdminLayout from './AdminLayout'
 import { ScrollText, Lock, Loader2, ShieldCheck, KeyRound, DollarSign, Users, LogIn, CircleDot, AlertTriangle } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import type { AuditCategory } from '@/lib/auditDescribe'
+import PageVisitsPanel from './PageVisitsPanel'
 
 type Row = {
   id: string
@@ -51,6 +52,7 @@ export default function AdminAuditLogClient() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [filter, setFilter] = useState<Filter>('important')
   const [showTech, setShowTech] = useState(false)
+  const [tab, setTab] = useState<'actions' | 'visits'>('actions')
 
   const load = (after?: string) => {
     const url = after ? `/api/admin/audit-log?cursor=${after}&limit=100` : '/api/admin/audit-log?limit=100'
@@ -109,6 +111,21 @@ export default function AdminAuditLogClient() {
           </p>
         </div>
 
+        <div className="flex gap-1 mb-5 border-b border-[#2a2a2a]" role="tablist">
+          {([['actions', 'What people did'], ['visits', 'Page visits']] as const).map(([k, label]) => (
+            <button
+              key={k}
+              role="tab"
+              aria-selected={tab === k}
+              onClick={() => setTab(k)}
+              className={`px-4 py-2 text-sm -mb-px border-b-2 ${tab === k ? 'border-purple-400 text-white' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'visits' ? <PageVisitsPanel /> : (<>
         <div className="flex flex-wrap gap-2 mb-5">
           {FILTERS.map(f => (
             <button
@@ -182,6 +199,7 @@ export default function AdminAuditLogClient() {
             Load older entries
           </button>
         )}
+        </>)}
       </div>
     </AdminLayout>
   )
