@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { createAuditLogPdf } from './auditLogPdf'
 import { prisma } from './db'
 import { env } from './env'
 import { createTicketAttachmentPng } from './ticketAttachment'
@@ -228,7 +229,7 @@ export async function sendAdminDigestEmail(report: DailyReport): Promise<void> {
   // addresses in ADMIN_DIGEST_EMAILS (e.g. stakeholders without a login).
   const admins = await prisma.user.findMany({
     where: { role: 'admin', email: { not: null } },
-    select: { email: true },
+    select: { email: true, isPlatformOwner: true },
   })
   const extra = (env.ADMIN_DIGEST_EMAILS ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   const recipients = Array.from(new Set([...admins.map((a) => a.email as string), ...extra]))
@@ -275,10 +276,37 @@ export async function sendAdminDigestEmail(report: DailyReport): Promise<void> {
       }
     </div>`
 
-  await resend.emails.send({
-    from,
-    to: recipients,
-    subject: `NXT STOP daily report — ${report.windowEnd.toDateString()}`,
-    html,
-  })
+  const subject = `NXT STOP daily report — ${report.windowEnd.toDateString()}`
+
+  // The audit log is restricted to platform owner accounts, so only their copy of the
+  // report carries it (as a branded PDF). Everyone else gets the report alone.
+  const auditRecipients = new Set(admins.filter((a) => a.isPlatformOwner).map((a) => a.email as string))
+  const plainRecipients = recipients.filter((r) => !auditRecipients.has(r))
+
+  if (auditRecipients.size > 0) {
+    let attachments: { filename: string; content: Buffer }[] = []
+    let auditNote = ''
+    try {
+      const { pdf, count } = await createAuditLogPdf(report.windowStart, report.windowEnd)
+      const day = report.windowEnd.toISOString().slice(0, 10)
+      attachments = [{ filename: `nxt-stop-audit-log-${day}.pdf`, content: pdf }]
+      auditNote = `<p style="margin-top:24px; padding:12px 16px; background:#f5f3ff; border-left:4px solid #7c3aed; font-size:13px;">
+        <strong>Audit log:</strong> ${count} entr${count === 1 ? 'y' : 'ies'} in this period — full log attached as a PDF.
+        This attachment is only sent to platform owner accounts.</p>`
+    } catch (err) {
+      console.error('[digest] audit log PDF failed — sending report without it', err)
+      auditNote = '<p style="margin-top:24px; color:#b91c1c; font-size:13px;">The audit log PDF could not be generated today — view it in the admin panel.</p>'
+    }
+    await resend.emails.send({
+      from,
+      to: [...auditRecipients],
+      subject,
+      html: html.replace(/<\/div>\s*$/, `${auditNote}</div>`),
+      attachments,
+    })
+  }
+
+  if (plainRecipients.length > 0) {
+    await resend.emails.send({ from, to: plainRecipients, subject, html })
+  }
 }

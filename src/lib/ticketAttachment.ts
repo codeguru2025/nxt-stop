@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf'
 import { generateQRDataURL } from './qr'
 import { EVENT_TIME_ZONE } from './utils'
 
-const LOGO_URL = 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
+export const LOGO_URL = 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
 
 type TicketAttachmentInput = {
   ticketNumber: string
@@ -41,7 +41,7 @@ function statusColors(status: string): { bg: string; fg: string } {
   return { bg: '#fee2e2', fg: '#dc2626' }
 }
 
-async function fetchDataUri(url: string | null | undefined): Promise<string | null> {
+export async function fetchDataUri(url: string | null | undefined): Promise<string | null> {
   if (!url) return null
   try {
     const res = await fetch(url)

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AdminCapability } from '@/lib/adminCapabilities'
+import AdminPushToggle from './AdminPushToggle'
 
 const NAV: { href: string; icon: typeof LayoutDashboard; label: string; exact?: boolean; capability?: AdminCapability; ownerOnly?: boolean }[] = [
   { href: '/admin',           icon: LayoutDashboard, label: 'Overview',       exact: true, capability: 'stats' },
@@ -135,6 +136,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Footer */}
         <div className="p-3 border-t border-[#2a2a2a]">
+          <AdminPushToggle />
           <Link
             href="/"
             onClick={() => setOpen(false)}

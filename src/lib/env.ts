@@ -39,4 +39,9 @@ export const env = {
   get EMAIL_FROM()            { return process.env.EMAIL_FROM },
   get ADMIN_DIGEST_EMAILS()   { return process.env.ADMIN_DIGEST_EMAILS },
   get ADMIN_DIGEST_HOUR_UTC() { return process.env.ADMIN_DIGEST_HOUR_UTC ?? '6' },
+
+  // Web Push (admin alerts, e.g. failed payments). Generate with: npx web-push generate-vapid-keys
+  get VAPID_PUBLIC_KEY()  { return process.env.VAPID_PUBLIC_KEY },
+  get VAPID_PRIVATE_KEY() { return process.env.VAPID_PRIVATE_KEY },
+  get VAPID_SUBJECT()     { return process.env.VAPID_SUBJECT ?? 'mailto:admin@nxtstop.com' },
 } as const

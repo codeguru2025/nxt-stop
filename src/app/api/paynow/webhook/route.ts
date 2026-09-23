@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { fulfillOrder } from '@/lib/fulfillOrder'
 import { createHash } from 'crypto'
+import { notifyAdminsPaymentFailed } from '@/lib/push'
 
 // POST /api/paynow/webhook
 // Paynow posts status updates here (resultUrl).
@@ -53,10 +54,15 @@ export async function POST(req: Request) {
         }
       }
     } else if (status === 'cancelled' || status === 'failed') {
-      await prisma.order.updateMany({
-        where: { orderNumber: reference, status: 'pending' },
-        data: { status: 'failed' },
-      })
+      const pending = await prisma.order.findFirst({ where: { orderNumber: reference, status: 'pending' }, select: { id: true } })
+      if (pending) {
+        // Guarded on status so only one of webhook/poll flips it — and alerts admins — once
+        const { count } = await prisma.order.updateMany({
+          where: { id: pending.id, status: 'pending' },
+          data: { status: 'failed' },
+        })
+        if (count === 1) void notifyAdminsPaymentFailed(pending.id)
+      }
     }
 
     return new Response('OK', { status: 200 })

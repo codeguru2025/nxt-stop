@@ -45,6 +45,7 @@ model User {
   vouchers              Voucher[]
   referralRewards       ReferralReward[]
   teamMemberships       TeamMember[]
+  pushSubscriptions     PushSubscription[]
 }
 
 // ─── PASSWORD RESETS ─────────────────────────────────────────────────────────
@@ -560,6 +561,24 @@ model SocialPost {
   user  User  @relation(fields: [userId], references: [id])
 
   @@index([eventId])
+  @@index([userId])
+}
+
+// ─── PUSH NOTIFICATIONS ─────────────────────────────────────────────────────
+
+// One row per browser/device an admin enabled alerts on (Web Push). Rows whose
+// endpoint the push service reports as gone (404/410) are deleted on send.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId])
 }
 

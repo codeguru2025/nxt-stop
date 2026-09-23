@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Ticket, Star, Share2, Copy, Check, QrCode, ArrowRight, Gift } from 'lucide-react'
+import { Ticket, Star, Share2, Copy, Check, QrCode, ArrowRight, Gift, Receipt, UserCog } from 'lucide-react'
 import { buildReferralUrl, formatCurrency } from '@/lib/utils'
 
 type User = {
@@ -145,6 +145,8 @@ export default function DashboardClient() {
           { href: '/dashboard/tickets', icon: Ticket, label: 'My Tickets', desc: 'View and download your tickets' },
           { href: '/dashboard/referrals', icon: Share2, label: 'Referrals', desc: 'Track your referral performance' },
           { href: '/dashboard/rewards', icon: Gift, label: 'Rewards', desc: 'Redeem your points for prizes' },
+          { href: '/dashboard/purchases', icon: Receipt, label: 'My Purchases', desc: 'Drink vouchers, tables, merch & order history' },
+          { href: '/dashboard/account', icon: UserCog, label: 'My Account', desc: 'Edit your details and change your password' },
         ].map(nav => (
           <Link key={nav.href} href={nav.href} className="card p-4 hover:border-[#3a3a3a] transition-all group hover:-translate-y-0.5">
             <div className="flex items-center gap-3 mb-2">

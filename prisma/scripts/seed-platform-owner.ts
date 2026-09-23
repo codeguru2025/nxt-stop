@@ -1,5 +1,6 @@
-// One-off: grant the irrevocable platform-owner flag to a single account, identified
-// by email. This is the ONLY place in the entire codebase that ever sets
+// One-off: grant the irrevocable platform-owner flag to an account, identified
+// by email (currently the platform owner and the platform creator — both may read the
+// audit log and receive its daily PDF). This is the ONLY place in the entire codebase that ever sets
 // User.isPlatformOwner — no API route accepts this field from a request body.
 //
 // Run with: npx tsx prisma/scripts/seed-platform-owner.ts <email>

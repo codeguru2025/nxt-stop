@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nxt-stop-v1'
+const CACHE_NAME = 'nxt-stop-v2'
 const STATIC_ASSETS = ['/', '/events', '/gallery', '/merch']
 
 self.addEventListener('install', (e) => {
@@ -44,4 +44,36 @@ self.addEventListener('fetch', (e) => {
       }))
     )
   }
+})
+
+// ── Admin push alerts (e.g. failed payments) — see src/lib/push.ts ──
+self.addEventListener('push', (e) => {
+  let data = {}
+  try { data = e.data ? e.data.json() : {} } catch { data = { body: e.data && e.data.text() } }
+  const title = data.title || 'NXT STOP'
+  e.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || '',
+      icon: 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png',
+      tag: data.tag,
+      renotify: !!data.tag,
+      data: { url: data.url || '/admin' },
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  const url = (e.notification.data && e.notification.data.url) || '/admin'
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) {
+        if (new URL(w.url).origin === self.location.origin && 'focus' in w) {
+          w.navigate(url)
+          return w.focus()
+        }
+      }
+      return self.clients.openWindow(url)
+    })
+  )
 })

@@ -49,7 +49,7 @@ export default function AdminAuditLogClient() {
               <Lock size={24} className="text-red-400" />
             </div>
             <h3 className="font-bold text-white mb-1">Owner Only</h3>
-            <p className="text-gray-500 text-sm">Only the platform owner account can view the audit log.</p>
+            <p className="text-gray-500 text-sm">Only platform owner accounts (owner and creator) can view the audit log.</p>
           </div>
         </div>
       </AdminLayout>

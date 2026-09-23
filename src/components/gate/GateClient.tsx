@@ -18,6 +18,9 @@ type ScanResult = {
     event?: string
   }
   usedAt?: string
+  // Set when the code was a pre-event purchase (drink/liquor voucher, merch, table)
+  voucher?: { code: string; product: string; holder: string }
+  redeemedAt?: string
 }
 
 type Stats = { scanned: number; valid: number; invalid: number }
@@ -75,11 +78,19 @@ export default function GateClient() {
     setResult(null)
 
     try {
-      const res = await fetch('/api/scan', {
+      const post = (path: string) => fetch(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qrCode: code.trim() }),
       }).then(r => r.json())
+
+      let res = await post('/api/scan')
+      // Not a ticket — try the voucher namespace (drink/liquor vouchers, merch, tables),
+      // same fallback the gate app uses.
+      if (res.success && res.data?.result === 'invalid' && /not found/i.test(res.data?.message ?? '')) {
+        const voucherRes = await post('/api/scan/voucher').catch(() => null)
+        if (voucherRes?.success && !/not found/i.test(voucherRes.data?.message ?? '')) res = voucherRes
+      }
 
       if (res.success) {
         const data = res.data as ScanResult
@@ -363,12 +374,32 @@ export default function GateClient() {
               result.result === 'already_used' ? 'text-yellow-400' :
               'text-red-400'
             }`}>
-              {result.result === 'valid'        ? 'ENTRY GRANTED' :
-               result.result === 'already_used' ? 'ALREADY USED' :
-               'INVALID TICKET'}
+              {result.voucher
+                ? (result.result === 'valid' ? 'VOUCHER REDEEMED' :
+                   result.result === 'already_used' ? 'ALREADY REDEEMED' :
+                   'INVALID VOUCHER')
+                : (result.result === 'valid'        ? 'ENTRY GRANTED' :
+                   result.result === 'already_used' ? 'ALREADY USED' :
+                   'INVALID TICKET')}
             </h2>
 
             <p className="text-gray-400 text-sm mb-4">{result.message}</p>
+
+            {result.voucher && (
+              <div className="bg-[#111] rounded-xl p-4 text-left space-y-2">
+                <div className="text-lg text-white font-bold">{result.voucher.product}</div>
+                <div className="flex items-center gap-2 text-sm">
+                  <User size={14} className="text-gray-500" />
+                  <span className="text-gray-300">{result.voucher.holder}</span>
+                </div>
+                <div className="text-xs text-gray-600 font-mono">{result.voucher.code}</div>
+                {result.redeemedAt && (
+                  <div className="text-xs text-yellow-500">
+                    Redeemed at: {new Date(result.redeemedAt).toLocaleTimeString()}
+                  </div>
+                )}
+              </div>
+            )}
 
             {result.ticket && (
               <div className="bg-[#111] rounded-xl p-4 text-left space-y-2">
