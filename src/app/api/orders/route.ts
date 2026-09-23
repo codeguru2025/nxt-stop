@@ -4,7 +4,7 @@ import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { generateOrderNumber } from '@/lib/qr'
 import { checkOrderLimit } from '@/lib/rateLimit'
 import { normalizeWhatsAppPhone } from '@/lib/phone'
-import { eventDayStartUtc } from '@/lib/utils'
+import { eventDayStartUtc, eventEndTime } from '@/lib/utils'
 import { createAccountWithOneTimePassword, splitName } from '@/lib/onboarding'
 import { sendWelcomeEmail } from '@/lib/email'
 import { cookies } from 'next/headers'
@@ -137,8 +137,18 @@ export async function POST(req: Request) {
       if (productId) {
         await tx.$executeRaw`SELECT id FROM "Product" WHERE id = ${productId} FOR UPDATE`
 
-        const product = await tx.product.findFirst({ where: { id: productId, active: true } })
+        const product = await tx.product.findFirst({
+          where: { id: productId, active: true },
+          include: { event: { select: { date: true, endDate: true, status: true } } },
+        })
         if (!product) throw Object.assign(new Error('Product not found'), { status: 404 })
+        // Event-linked items (drink vouchers, tables) stop selling when their event is over
+        if (product.event && (
+          ['ended', 'cancelled'].includes(product.event.status) ||
+          new Date() > eventEndTime(product.event.date, product.event.endDate)
+        )) {
+          throw Object.assign(new Error('This event has ended — sales are closed'), { status: 409 })
+        }
 
         const pendingReserved = await tx.orderItem.aggregate({
           where: { productId, order: { status: 'pending' } },
@@ -199,8 +209,8 @@ export async function POST(req: Request) {
       if (ticketType.salesChannel === 'gate' && new Date() < dayStart) {
         throw Object.assign(new Error('This ticket type goes on sale on the day of the event'), { status: 409 })
       }
-      const eventCutoff = ticketType.event.endDate ?? new Date(ticketType.event.date.getTime() + 24 * 60 * 60 * 1000)
-      if (new Date() > eventCutoff) {
+      // Same end time the event page uses, so the page and the server agree on "ended"
+      if (new Date() > eventEndTime(ticketType.event.date, ticketType.event.endDate)) {
         // Tag the error so we can auto-flag the event AFTER the tx rolls back
         throw Object.assign(new Error('This event has ended — ticket sales are closed'), { status: 409, autoEndEventId: eventId })
       }

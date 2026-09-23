@@ -16,6 +16,7 @@ type TicketPreview = {
   color: string
   price: number
   alreadyActivated: boolean
+  salesClosed: string | null
 }
 
 type ActivationResult = {
@@ -97,7 +98,7 @@ export default function ActivateClient() {
   }, [code])
 
   const confirmActivation = async () => {
-    if (!preview || preview.alreadyActivated || !buyerReady) return
+    if (!preview || preview.alreadyActivated || preview.salesClosed || !buyerReady) return
     setActivating(true)
     setError(null)
     try {
@@ -237,7 +238,14 @@ export default function ActivateClient() {
                 <p className="text-xs text-gray-600 font-mono mt-1">{preview.ticketNumber}</p>
                 <p className="text-2xl font-black text-purple-400 mt-3">{formatCurrency(preview.price)}</p>
 
-                {!preview.alreadyActivated && (
+                {!preview.alreadyActivated && preview.salesClosed && (
+                  <div className="mt-4 flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-sm text-red-400">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                    <span>Can&apos;t sell this ticket: {preview.salesClosed}</span>
+                  </div>
+                )}
+
+                {!preview.alreadyActivated && !preview.salesClosed && (
                   <div className="mt-4 space-y-2">
                     <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Buyer details</p>
                     <input
@@ -268,7 +276,7 @@ export default function ActivateClient() {
                   </div>
                 )}
 
-                {!preview.alreadyActivated && (
+                {!preview.alreadyActivated && !preview.salesClosed && (
                   <button
                     onClick={confirmActivation}
                     disabled={activating || !buyerReady}

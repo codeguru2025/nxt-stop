@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl, getEventTimePhase, eventLocalInputToUtc, utcToEventLocalInput, formatDate, eventDayStartUtc } from '../utils'
+import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl, getEventTimePhase, eventLocalInputToUtc, utcToEventLocalInput, formatDate, eventDayStartUtc, eventEndTime, ticketSalesClosedReason } from '../utils'
 
 describe('slugify', () => {
   it('lowercases and hyphenates', () => {
@@ -172,5 +172,47 @@ describe('getEventTimePhase', () => {
     expect(getEventTimePhase('2026-06-15T20:00:00Z')).toBe('live')
     vi.setSystemTime(new Date('2026-06-16T06:00:00Z'))
     expect(getEventTimePhase('2026-06-15T20:00:00Z')).toBe('ended')
+  })
+})
+
+describe('eventEndTime', () => {
+  it('uses endDate when set', () => {
+    expect(eventEndTime('2026-06-15T18:00:00Z', '2026-06-16T02:00:00Z').toISOString()).toBe('2026-06-16T02:00:00.000Z')
+  })
+
+  it('defaults to 8 hours after start — same rule the event page uses', () => {
+    expect(eventEndTime('2026-06-15T18:00:00Z', null).toISOString()).toBe('2026-06-16T02:00:00.000Z')
+  })
+})
+
+describe('ticketSalesClosedReason (online checkout + cash sales at the desk)', () => {
+  // Event starts 20:00 CAT on 15 June (18:00Z); event day begins 00:00 CAT = 14 June 22:00Z
+  const event = { date: '2026-06-15T18:00:00Z', endDate: '2026-06-16T00:00:00Z', status: 'published' }
+  const at = (iso: string) => new Date(iso)
+
+  it('advance tickets sell before event day and stop at midnight CAT', () => {
+    expect(ticketSalesClosedReason(event, 'advance', at('2026-06-14T21:59:00Z'))).toBeNull()
+    expect(ticketSalesClosedReason(event, 'advance', at('2026-06-14T22:00:00Z'))).toMatch(/Advance sales have closed/)
+  })
+
+  it('gate tickets are blocked before event day and sell from midnight CAT', () => {
+    expect(ticketSalesClosedReason(event, 'gate', at('2026-06-14T21:59:00Z'))).toMatch(/goes on sale on the day/)
+    expect(ticketSalesClosedReason(event, 'gate', at('2026-06-14T22:00:00Z'))).toBeNull()
+  })
+
+  it('"both" tickets sell any time until the event ends', () => {
+    expect(ticketSalesClosedReason(event, 'both', at('2026-06-10T10:00:00Z'))).toBeNull()
+    expect(ticketSalesClosedReason(event, 'both', at('2026-06-15T23:59:00Z'))).toBeNull()
+  })
+
+  it('nothing sells once the end time passes', () => {
+    for (const channel of ['both', 'gate', 'advance']) {
+      expect(ticketSalesClosedReason(event, channel, at('2026-06-16T00:01:00Z'))).toMatch(/event has ended/)
+    }
+  })
+
+  it('nothing sells for an ended or cancelled event, even before its end time', () => {
+    expect(ticketSalesClosedReason({ ...event, status: 'cancelled' }, 'both', at('2026-06-10T10:00:00Z'))).toMatch(/closed/)
+    expect(ticketSalesClosedReason({ ...event, status: 'ended' }, 'gate', at('2026-06-15T19:00:00Z'))).toMatch(/closed/)
   })
 })

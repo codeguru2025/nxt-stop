@@ -108,15 +108,41 @@ const DEFAULT_EVENT_DURATION_MS = 8 * 60 * 60 * 1000
 
 export type EventTimePhase = 'upcoming' | 'live' | 'ended'
 
+/** When the event is over — its `endDate`, or DEFAULT_EVENT_DURATION_MS after the start. */
+export function eventEndTime(start: string | Date, endDate?: string | Date | null): Date {
+  return endDate != null && endDate !== ''
+    ? new Date(endDate)
+    : new Date(new Date(start).getTime() + DEFAULT_EVENT_DURATION_MS)
+}
+
+/**
+ * Why this ticket type can't be sold right now, or null if it can. Server-side source
+ * of truth shared by online checkout and cash sales of printed tickets at the desk:
+ * nothing sells once the event is cancelled/ended or past its end time; advance tickets
+ * stop at midnight (venue time) on event day; gate tickets only sell from that moment.
+ */
+export function ticketSalesClosedReason(
+  event: { date: string | Date; endDate?: string | Date | null; status: string },
+  salesChannel: string,
+  now: Date = new Date()
+): string | null {
+  if (event.status === 'cancelled' || event.status === 'ended') return 'Ticket sales for this event are closed'
+  if (now > eventEndTime(event.date, event.endDate)) return 'This event has ended — ticket sales are closed'
+  const dayStart = eventDayStartUtc(event.date)
+  if (salesChannel === 'advance' && now >= dayStart) {
+    return 'Advance sales have closed — this ticket is available at the gate on the day'
+  }
+  if (salesChannel === 'gate' && now < dayStart) return 'This ticket type goes on sale on the day of the event'
+  return null
+}
+
 /** Derive coming soon / live / ended from wall-clock time (not only DB `status`). */
 export function getEventTimePhase(
   start: string | Date,
   endDate?: string | Date | null
 ): EventTimePhase {
   const startMs = new Date(start).getTime()
-  const endMs = endDate != null && endDate !== ''
-    ? new Date(endDate).getTime()
-    : startMs + DEFAULT_EVENT_DURATION_MS
+  const endMs = eventEndTime(start, endDate).getTime()
   const now = Date.now()
   if (now < startMs) return 'upcoming'
   if (now < endMs) return 'live'

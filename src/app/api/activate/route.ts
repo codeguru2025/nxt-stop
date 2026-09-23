@@ -7,6 +7,7 @@ import { createAccountWithOneTimePassword, splitName } from '@/lib/onboarding'
 import { sendWelcomeEmail } from '@/lib/email'
 import { writeAuditLog } from '@/lib/auditLog'
 import { z } from 'zod'
+import { ticketSalesClosedReason } from '@/lib/utils'
 
 const activateSchema = z.object({
   activationCode: z.string().trim().min(1, 'Activation code is required'),
@@ -45,8 +46,8 @@ export async function POST(req: Request) {
     const ticket = await prisma.ticket.findUnique({
       where: { activationCode: clean },
       include: {
-        event:      { select: { id: true, name: true, date: true, venue: true } },
-        ticketType: { select: { id: true, name: true, color: true, price: true } },
+        event:      { select: { id: true, name: true, date: true, endDate: true, status: true, venue: true } },
+        ticketType: { select: { id: true, name: true, color: true, price: true, salesChannel: true } },
       },
     })
 
@@ -57,6 +58,8 @@ export async function POST(req: Request) {
     if (ticket.status !== 'physical') {
       return error(`Cannot activate ticket with status: ${ticket.status}`)
     }
+    const salesClosed = ticketSalesClosedReason(ticket.event, ticket.ticketType.salesChannel)
+    if (salesClosed) return error(salesClosed, 409)
 
     // Wrap all mutations in a transaction. The atomic updateMany with WHERE status='physical'
     // is the idempotency guard — if two requests race, only one gets count=1.
@@ -175,8 +178,8 @@ export async function GET(req: Request) {
     const ticket = await prisma.ticket.findUnique({
       where: { activationCode },
       include: {
-        event:      { select: { name: true, date: true, venue: true } },
-        ticketType: { select: { name: true, color: true, price: true } },
+        event:      { select: { name: true, date: true, endDate: true, status: true, venue: true } },
+        ticketType: { select: { name: true, color: true, price: true, salesChannel: true } },
       },
     })
 
@@ -192,6 +195,7 @@ export async function GET(req: Request) {
       color: ticket.ticketType.color,
       price: ticket.ticketType.price,
       alreadyActivated: ticket.status !== 'physical',
+      salesClosed: ticketSalesClosedReason(ticket.event, ticket.ticketType.salesChannel),
     })
   } catch (e) {
     return serverError(e)
