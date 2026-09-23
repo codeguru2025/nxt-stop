@@ -116,8 +116,8 @@ export default function ReferralStats() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // loading is switched on by the range buttons, so the effect only fetches
   useEffect(() => {
-    setLoading(true)
     fetch(`/api/dashboard/referral-stats?days=${days}`)
       .then(r => r.json())
       .then(d => { if (d.success) setStats(d.data) })
@@ -140,7 +140,7 @@ export default function ReferralStats() {
           {[7, 30, 90].map(n => (
             <button
               key={n}
-              onClick={() => setDays(n)}
+              onClick={() => { if (n !== days) { setLoading(true); setDays(n) } }}
               className={`text-xs px-2.5 py-1 rounded-md border ${days === n ? 'bg-purple-500/15 border-purple-500/30 text-purple-200' : 'border-[#2a2a2a] text-gray-500 hover:text-white'}`}
             >
               {n} days
