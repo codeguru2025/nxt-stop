@@ -3,6 +3,8 @@ import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import { generateQRDataURL, generateTicketNumber } from '@/lib/qr'
 import crypto from 'crypto'
+import { holdForApproval } from '@/lib/approvals'
+import { describeTicketPrint } from '@/lib/approvalDescribe'
 
 // GET /api/admin/tickets?search=&eventId=&status=&page=&includeQR=true
 // When includeQR=true is set alongside status=physical, returns tickets with regenerated qrDataUrl
@@ -139,7 +141,8 @@ export async function POST(req: Request) {
     const session = await requireCapability('tickets').catch(() => null)
     if (!session) return forbidden()
 
-    const { eventId, ticketTypeId, quantity } = await req.json()
+    const body = await req.json()
+    const { eventId, ticketTypeId, quantity } = body
     if (!eventId || !ticketTypeId || !quantity || quantity < 1 || quantity > 200) {
       return error('eventId, ticketTypeId, and quantity (1–200) are required')
     }
@@ -166,6 +169,12 @@ export async function POST(req: Request) {
       const activationCode = crypto.randomBytes(4).toString('hex').toUpperCase()
       return { ticketNumber, qrCode, activationCode, userId: session.id, eventId, ticketTypeId, status: 'physical' as const }
     })
+
+    const held = await holdForApproval(req, session, {
+      action: 'ticket.print', capability: 'tickets', route: '/api/admin/tickets', body,
+      entityType: 'TicketType', entityId: String(ticketTypeId), describe: () => describeTicketPrint(body),
+    })
+    if (held) return held
 
     await prisma.$transaction(async (tx) => {
       await tx.ticket.createMany({ data: ticketRows })

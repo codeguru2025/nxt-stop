@@ -3,6 +3,8 @@ import { requireCapability, isAdminCapability } from '@/lib/auth'
 import { ok, error, forbidden, notFound, serverError } from '@/lib/api'
 import { writeAuditLog } from '@/lib/auditLog'
 import bcrypt from 'bcryptjs'
+import { holdForApproval } from '@/lib/approvals'
+import { describeAdminUpdate, describeAdminRevoke } from '@/lib/approvalDescribe'
 
 // PATCH /api/admin/admins/[id] — update name/email/capabilities, or reset password
 export async function PATCH(
@@ -20,7 +22,8 @@ export async function PATCH(
 
     // Note: isPlatformOwner is deliberately never destructured/accepted here — no route in
     // the app ever writes it. See prisma/scripts/seed-platform-owner.ts.
-    const { name, email, password, capabilities } = await req.json()
+    const body = await req.json()
+    const { name, email, password, capabilities } = body
     const data: { name?: string; email?: string | null; passwordHash?: string; capabilities?: string[] } = {}
 
     // An admin can't change their OWN capabilities — closes a self-escalation gap where an
@@ -50,6 +53,15 @@ export async function PATCH(
     }
 
     if (Object.keys(data).length === 0) return error('Nothing to update')
+
+    // Editing your own name/email/password is personal; changing another admin needs approval
+    if (id !== session.id) {
+      const held = await holdForApproval(req, session, {
+        action: 'admin.update', capability: 'admins', route: '/api/admin/admins/[id]', params: { id }, body,
+        entityType: 'User', entityId: id, describe: () => describeAdminUpdate(id, body),
+      })
+      if (held) return held
+    }
 
     if (capabilities !== undefined && admin.capabilities.includes('admins') && !capabilities.includes('admins')) {
       // Never let a change leave the whole system with no admin able to manage admins — that
@@ -90,7 +102,7 @@ export async function PATCH(
 // DELETE /api/admin/admins/[id] — revoke admin access (demoted to customer, not deleted —
 // admins may have their own orders/tickets/scan history, unlike gate staff)
 export async function DELETE(
-  _req: Request,
+  req: Request,
   ctx: RouteContext<'/api/admin/admins/[id]'>
 ) {
   try {
@@ -103,6 +115,12 @@ export async function DELETE(
     const admin = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } })
     if (!admin) return notFound('Admin')
     if (admin.role !== 'admin') return error('User is not an admin', 400)
+
+    const held = await holdForApproval(req, session, {
+      action: 'admin.revoke', capability: 'admins', route: '/api/admin/admins/[id]', params: { id },
+      entityType: 'User', entityId: id, describe: () => describeAdminRevoke(id),
+    })
+    if (held) return held
 
     // Locks every admin row for the duration of the transaction so two concurrent revokes
     // (e.g. two admins revoking each other at once) can't both pass the count check and
@@ -125,7 +143,7 @@ export async function DELETE(
       entityId: id,
       before: { role: 'admin' },
       after: { role: 'customer' },
-      req: _req,
+      req,
     })
 
     return ok({ message: 'Admin access revoked' })

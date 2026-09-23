@@ -117,7 +117,8 @@ export default function AdminEventsClient() {
         body: JSON.stringify(form),
       }).then(r => r.json())
 
-      if (res.success) { load(); setShowForm(false); setEditing(null); setForm(BLANK_FORM) }
+      // pendingApproval: held for a second admin — the layout shows the notice, so just close
+      if (res.success || res.pendingApproval) { load(); setShowForm(false); setEditing(null); setForm(BLANK_FORM) }
       else setSaveError(res.error ?? 'Failed to save event')
     } catch {
       setSaveError('Network error — please try again')
@@ -167,10 +168,10 @@ export default function AdminEventsClient() {
   }
 
   const deleteEvent = async (id: string) => {
-    if (!confirm('Delete this event? This cannot be undone.')) return
+    if (!confirm('Delete this event? Another admin must approve it, and once approved it cannot be undone.')) return
     try {
       const res = await fetch(`/api/admin/events/${id}`, { method: 'DELETE' }).then(r => r.json())
-      if (!res.success) alert(res.error ?? 'Failed to delete event')
+      if (!res.success && !res.pendingApproval) alert(res.error ?? 'Failed to delete event')
     } catch { alert('Network error') }
     load()
   }

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { ok, forbidden, serverError } from '@/lib/api'
+import { describeAuditEntry, auditUserIds } from '@/lib/auditDescribe'
 
 // GET /api/admin/audit-log — platform-owner only, re-verified from the DB (never the JWT).
 // There is deliberately no PATCH/DELETE route anywhere for AuditLog — nothing in the API
@@ -29,7 +30,13 @@ export async function GET(req: Request) {
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
     })
 
-    return ok({ rows, nextCursor: rows.length === take ? rows[rows.length - 1].id : null })
+    // Plain-language wording for each entry (who did what), with people's names filled in
+    const ids = [...new Set(rows.flatMap(auditUserIds))]
+    const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }) : []
+    const names = Object.fromEntries(users.map(u => [u.id, u.name]))
+    const described = rows.map(r => ({ ...r, ...describeAuditEntry(r, names), actorName: r.actorId ? names[r.actorId] ?? null : null }))
+
+    return ok({ rows: described, nextCursor: rows.length === take ? rows[rows.length - 1].id : null })
   } catch (e) {
     return serverError(e)
   }

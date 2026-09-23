@@ -55,7 +55,7 @@ export default function GateStaffClient() {
       body: JSON.stringify(form),
     }).then(r => r.json())
     setSaving(false)
-    if (res.success) {
+    if (res.success || res.pendingApproval) {
       setForm({ name: '', phone: '', password: '' })
       setShowForm(false)
       load()
@@ -75,7 +75,9 @@ export default function GateStaffClient() {
       body: JSON.stringify({ password: resetPw }),
     }).then(r => r.json())
     setResetting(false)
-    if (res.success) {
+    if (res.pendingApproval) {
+      setResetTarget(null); setResetPw('')
+    } else if (res.success) {
       setResetSuccess(true)
       setTimeout(() => { setResetTarget(null); setResetPw(''); setResetSuccess(false) }, 1500)
     } else {

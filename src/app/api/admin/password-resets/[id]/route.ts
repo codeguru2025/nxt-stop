@@ -2,6 +2,8 @@ import { prisma } from '@/lib/db'
 import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import bcrypt from 'bcryptjs'
+import { holdForApproval } from '@/lib/approvals'
+import { describePasswordReset } from '@/lib/approvalDescribe'
 
 // PATCH /api/admin/password-resets/[id]
 // Body: { password?: string, action: 'approve' | 'reject' }
@@ -34,6 +36,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const password = String(body?.password ?? '')
     if (password.length < 8) return error('Password must be at least 8 characters')
     if (password.length > 200) return error('Password too long')
+
+    const held = await holdForApproval(req, session, {
+      action: 'password-reset.approve', capability: 'password_resets', route: '/api/admin/password-resets/[id]', params: { id }, body,
+      entityType: 'PasswordResetRequest', entityId: id, describe: () => describePasswordReset(id),
+    })
+    if (held) return held
 
     const passwordHash = await bcrypt.hash(password, 10)
 

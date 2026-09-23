@@ -27,14 +27,16 @@ export function pushConfigured(): boolean {
 }
 
 /**
- * Sends a Web Push notification to every device of every admin account. Never throws —
- * alerts are best-effort and must not break the request that triggered them.
+ * Sends a Web Push notification to every device of every admin account — or only of the
+ * admins in `opts.userIds` when given. Never throws: alerts are best-effort and must not
+ * break the request that triggered them.
  */
-export async function notifyAdmins(payload: PushPayload): Promise<void> {
+export async function notifyAdmins(payload: PushPayload, opts: { userIds?: string[] } = {}): Promise<void> {
   try {
     if (!pushConfigured()) return
+    if (opts.userIds && opts.userIds.length === 0) return
     const subs = await prisma.pushSubscription.findMany({
-      where: { user: { role: 'admin' } },
+      where: { user: { role: 'admin' }, ...(opts.userIds && { userId: { in: opts.userIds } }) },
       select: { id: true, endpoint: true, p256dh: true, auth: true },
     })
     const body = JSON.stringify(payload)

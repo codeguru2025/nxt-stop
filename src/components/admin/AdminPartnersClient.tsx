@@ -51,7 +51,7 @@ export default function AdminPartnersClient() {
       body: JSON.stringify(form),
     }).then(r => r.json())
     setSaving(false)
-    if (res.success) { load(); setShowForm(false) }
+    if (res.success || res.pendingApproval) { load(); setShowForm(false) }
   }
 
   const startEdit = (p: Partner) => {

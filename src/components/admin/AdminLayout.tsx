@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, CalendarDays, Users, Package,
   Gift, UserCircle2, QrCode, LogOut, Shield,
-  ImageIcon, Video, Ticket, Menu, X, KeyRound, Lock, ScrollText, Share2, UsersRound
+  ImageIcon, Video, Ticket, Menu, X, KeyRound, Lock, ScrollText, Share2, UsersRound, ShieldCheck, Check
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AdminCapability } from '@/lib/adminCapabilities'
@@ -14,6 +14,7 @@ import AdminPushToggle from './AdminPushToggle'
 
 const NAV: { href: string; icon: typeof LayoutDashboard; label: string; exact?: boolean; capability?: AdminCapability; ownerOnly?: boolean }[] = [
   { href: '/admin',           icon: LayoutDashboard, label: 'Overview',       exact: true, capability: 'stats' },
+  { href: '/admin/approvals', icon: ShieldCheck,     label: 'Approvals' }, // every admin — approving is how serious changes go live
   { href: '/admin/events',    icon: CalendarDays,    label: 'Events',                      capability: 'events' },
   { href: '/admin/partners',  icon: Users,           label: 'Partners',                    capability: 'partners' },
   { href: '/admin/store',     icon: Package,         label: 'Store',                       capability: 'store' },
@@ -37,6 +38,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [pendingResets, setPendingResets] = useState(0)
   const [capabilities, setCapabilities] = useState<AdminCapability[] | null>(null)
   const [isPlatformOwner, setIsPlatformOwner] = useState(false)
+  const [waitingOnMe, setWaitingOnMe] = useState(0)
+  const [approvalNotice, setApprovalNotice] = useState<string | null>(null)
+
+  // Approvals badge — refreshed every minute and whenever a decision is made
+  useEffect(() => {
+    const load = () => fetch('/api/admin/approvals').then(r => r.json()).then(d => { if (d.success) setWaitingOnMe(d.data.waitingOnMe) }).catch(() => {})
+    load()
+    const id = setInterval(load, 60_000)
+    window.addEventListener('nxt:approvals-changed', load)
+    return () => { clearInterval(id); window.removeEventListener('nxt:approvals-changed', load) }
+  }, [])
+
+  // Green notice when something this admin saved was held for approval (see CsrfProvider)
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined
+    const onPending = (e: Event) => {
+      setApprovalNotice((e as CustomEvent<string>).detail)
+      if (t) clearTimeout(t)
+      t = setTimeout(() => setApprovalNotice(null), 9000)
+    }
+    window.addEventListener('nxt:approval-pending', onPending)
+    return () => { window.removeEventListener('nxt:approval-pending', onPending); if (t) clearTimeout(t) }
+  }, [])
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
@@ -124,6 +148,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 <item.icon size={16} className="shrink-0" />
                 <span className="truncate flex-1">{item.label}</span>
+                {item.href === '/admin/approvals' && waitingOnMe > 0 && (
+                  <span className="ml-auto bg-purple-500 text-white text-xs font-black rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+                    {waitingOnMe}
+                  </span>
+                )}
                 {item.href === '/admin/password-resets' && pendingResets > 0 && (
                   <span className="ml-auto bg-yellow-500 text-black text-xs font-black rounded-full w-5 h-5 flex items-center justify-center shrink-0">
                     {pendingResets}
@@ -157,6 +186,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Page content */}
       <div className="flex flex-col flex-1 md:ml-60 min-h-screen min-w-0">
+
+        {approvalNotice && (
+          <div role="status" className="fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:max-w-md z-50 bg-[#0f1f14] border border-green-500/30 text-green-200 rounded-2xl p-4 shadow-2xl flex items-start gap-3">
+            <Check size={18} className="text-green-400 shrink-0 mt-0.5" />
+            <div className="text-sm flex-1">
+              {approvalNotice}{' '}
+              <Link href="/admin/approvals" className="underline text-green-300 whitespace-nowrap">View approvals</Link>
+            </div>
+            <button onClick={() => setApprovalNotice(null)} className="text-green-400/70 hover:text-green-200" aria-label="Dismiss"><X size={16} /></button>
+          </div>
+        )}
 
         {/* Mobile top bar */}
         <header className="md:hidden sticky top-0 z-20 bg-[#111] border-b border-[#2a2a2a] px-4 h-14 flex items-center gap-3">

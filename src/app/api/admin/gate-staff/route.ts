@@ -2,6 +2,8 @@ import { prisma } from '@/lib/db'
 import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import bcrypt from 'bcryptjs'
+import { holdForApproval } from '@/lib/approvals'
+import { describeGateStaffCreate } from '@/lib/approvalDescribe'
 
 // GET /api/admin/gate-staff — list all gate staff
 export async function GET() {
@@ -27,7 +29,8 @@ export async function POST(req: Request) {
     const session = await requireCapability('gate_staff').catch(() => null)
     if (!session) return forbidden()
 
-    const { name, phone, password } = await req.json()
+    const body = await req.json()
+    const { name, phone, password } = body
 
     if (!name || !phone || !password) {
       return error('Name, phone number, and password are required')
@@ -38,6 +41,12 @@ export async function POST(req: Request) {
 
     const existing = await prisma.user.findUnique({ where: { phone: phone.trim() } })
     if (existing) return error('Phone number already registered')
+
+    const held = await holdForApproval(req, session, {
+      action: 'gate-staff.create', capability: 'gate_staff', route: '/api/admin/gate-staff', body,
+      entityType: 'User', describe: () => describeGateStaffCreate(body),
+    })
+    if (held) return held
 
     const passwordHash = await bcrypt.hash(password, 10)
 

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { ok, notFound, serverError } from '@/lib/api'
+import { publicAvailability } from '@/lib/publicTickets'
 
 export async function GET(
   _req: Request,
@@ -22,13 +23,18 @@ export async function GET(
           orderBy: { order: 'asc' },
         },
         _count: {
-          select: { tickets: true, socialPosts: true },
+          select: { socialPosts: true },
         },
       },
     })
 
     if (!event) return notFound('Event')
-    return ok(event)
+    // Public: no sales numbers and no paid stream link
+    const { ticketTypes, virtualStreamUrl: _stream, ...rest } = event
+    return ok({
+      ...rest,
+      ticketTypes: ticketTypes.map(({ capacity, sold, ...t }) => ({ ...t, ...publicAvailability(capacity, sold) })),
+    })
   } catch (e) {
     return serverError(e)
   }

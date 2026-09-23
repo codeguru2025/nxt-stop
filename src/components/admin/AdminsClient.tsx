@@ -95,7 +95,7 @@ export default function AdminsClient() {
       body: JSON.stringify({ ...form, email: form.email || undefined }),
     }).then(r => r.json())
     setSaving(false)
-    if (res.success) {
+    if (res.success || res.pendingApproval) {
       setForm({ name: '', phone: '', email: '', password: '', capabilities: [] })
       setShowForm(false)
       load()
@@ -131,7 +131,9 @@ export default function AdminsClient() {
       body: JSON.stringify(body),
     }).then(r => r.json())
     setEditSaving(false)
-    if (res.success) {
+    if (res.pendingApproval) {
+      setEditTarget(null) // held for another admin — AdminLayout shows the notice
+    } else if (res.success) {
       setEditSuccess(true)
       load()
       setTimeout(() => { setEditTarget(null); setEditSuccess(false) }, 1200)
@@ -145,7 +147,7 @@ export default function AdminsClient() {
     setRevokingId(a.id)
     const res = await fetch(`/api/admin/admins/${a.id}`, { method: 'DELETE' }).then(r => r.json())
     setRevokingId(null)
-    if (!res.success) alert(res.error ?? 'Failed to revoke admin access')
+    if (!res.success && !res.pendingApproval) alert(res.error ?? 'Failed to revoke admin access')
     load()
   }
 

@@ -252,9 +252,9 @@ describe('ticket greying on the event page (NXTSTOP SESSIONS, 19 Dec 2026)', () 
   const before = new Date('2026-12-18T23:59:00+02:00') // day before, 11:59 PM CAT
   const onDay = new Date('2026-12-19T00:00:00+02:00')  // midnight CAT, event day
   const types = [
-    { name: 'General Advance', price: 10, sold: 5, capacity: 500, salesChannel: 'advance' },
-    { name: 'General Gate', price: 20, sold: 0, capacity: 1000, salesChannel: 'gate' },
-    { name: 'VIP Advance', price: 40, sold: 100, capacity: 100, salesChannel: 'advance' }, // sold out
+    { name: 'General Advance', price: 10, soldOut: false, salesChannel: 'advance' },
+    { name: 'General Gate', price: 20, soldOut: false, salesChannel: 'gate' },
+    { name: 'VIP Advance', price: 40, soldOut: true, salesChannel: 'advance' },
   ]
 
   it('gate tickets are greyed out before event day and open at midnight', () => {

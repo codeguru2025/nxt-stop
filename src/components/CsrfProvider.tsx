@@ -27,7 +27,15 @@ export default function CsrfProvider() {
         }
       }
 
-      return originalFetch(input, init)
+      const res = await originalFetch(input, init)
+      // A serious admin change was held for a second admin's approval (lib/approvals.ts) —
+      // tell AdminLayout so it can show one consistent notice whatever screen sent it.
+      if (res.headers.get('x-approval-pending')) {
+        res.clone().json()
+          .then((d: { error?: string }) => window.dispatchEvent(new CustomEvent('nxt:approval-pending', { detail: d?.error ?? 'Sent for approval' })))
+          .catch(() => {})
+      }
+      return res
     }
 
     return () => {

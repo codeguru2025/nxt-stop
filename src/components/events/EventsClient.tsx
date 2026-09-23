@@ -8,8 +8,8 @@ import { formatDate, formatCurrency, getEventTimePhase, lowestOnSalePrice, type 
 type Event = {
   id: string; name: string; slug: string; date: string; endDate?: string; venue: string
   description?: string; posterImage?: string; status: string
-  ticketTypes: { name: string; price: number; capacity: number; sold: number; salesChannel?: string }[]
-  _count: { tickets: number }
+  ticketTypes: { name: string; price: number; soldOut: boolean; almostSoldOut: boolean; salesChannel?: string }[]
+  sellingFast?: boolean
 }
 
 function phaseBadge(phase: EventTimePhase) {
@@ -28,10 +28,7 @@ const EventCard = memo(function EventCard({ event, referral }: { event: Event; r
   const timePhase = getEventTimePhase(event.date, event.endDate)
 
   const minPrice = lowestOnSalePrice(event.date, event.ticketTypes)
-  const totalCap = event.ticketTypes.reduce((s, t) => s + t.capacity, 0)
-  const totalSold = event.ticketTypes.reduce((s, t) => s + t.sold, 0)
-  const pct = totalCap > 0 ? (totalSold / totalCap) * 100 : 0
-  const isLow = pct > 80 && timePhase !== 'ended'
+  const isLow = !!event.sellingFast && timePhase !== 'ended'
 
   return (
     <Link
@@ -73,26 +70,7 @@ const EventCard = memo(function EventCard({ event, referral }: { event: Event; r
           </div>
         </div>
 
-        {/* Capacity bar */}
-        {totalCap > 0 && (
-          <div className="mb-4">
-            <div className="flex justify-between text-xs text-gray-600 mb-1">
-              <span>{totalSold} sold</span>
-              <span>{totalCap} capacity</span>
-            </div>
-            <div className="h-1.5 bg-[#2a2a2a] rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${pct}%`,
-                  background: pct > 80 ? '#EF4444' : pct > 50 ? '#F59E0B' : '#E8174A'
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Ticket types preview */}
+        {/* Ticket types preview (sales numbers are never shown publicly — see lib/publicTickets.ts) */}
         <div className="flex gap-1.5 flex-wrap mb-4">
           {event.ticketTypes.slice(0, 3).map(t => (
             <span key={t.name} className="text-xs bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded-md px-2 py-0.5">

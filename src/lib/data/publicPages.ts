@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache'
 import { prisma } from '@/lib/db'
+import { publicAvailability, eventSellingFast } from '@/lib/publicTickets'
 
 /** Gallery — same as GET /api/gallery first page (URLs point at DO Spaces). */
 export const getGalleryPhotosForPage = unstable_cache(
@@ -102,7 +103,6 @@ const getPublishedEventsCached = unstable_cache(
           where: { active: true },
           orderBy: { price: 'asc' },
         },
-        _count: { select: { tickets: true } },
       },
     })
     return events.map(e => ({
@@ -117,14 +117,14 @@ const getPublishedEventsCached = unstable_cache(
       posterImage: e.posterImage ?? undefined,
       status: e.status,
       lineup: e.lineup ?? undefined,
+      // Sales numbers stay server-side — only availability flags go to the browser
       ticketTypes: e.ticketTypes.map(t => ({
         name: t.name,
         price: Number(t.price),
-        capacity: t.capacity,
-        sold: t.sold,
         salesChannel: t.salesChannel,
+        ...publicAvailability(t.capacity, t.sold),
       })),
-      _count: e._count,
+      sellingFast: eventSellingFast(e.ticketTypes),
     }))
   },
   ['published-events-list'],
@@ -153,7 +153,7 @@ export function getPublicEventDetailForPage(slug: string) {
           },
           media: { orderBy: { order: 'asc' } },
           _count: {
-            select: { tickets: true, socialPosts: true },
+            select: { socialPosts: true },
           },
         },
       })
@@ -182,10 +182,9 @@ export function getPublicEventDetailForPage(slug: string) {
           name: t.name,
           description: t.description ?? undefined,
           price: Number(t.price),
-          capacity: t.capacity,
-          sold: t.sold,
           color: t.color,
           salesChannel: t.salesChannel,
+          ...publicAvailability(t.capacity, t.sold),
         })),
         media: row.media.map(m => ({
           id: m.id,

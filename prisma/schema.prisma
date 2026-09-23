@@ -46,6 +46,8 @@ model User {
   referralRewards       ReferralReward[]
   teamMemberships       TeamMember[]
   pushSubscriptions     PushSubscription[]
+  changeRequestsMade     ChangeRequest[] @relation("ChangeRequester")
+  changeRequestsReviewed ChangeRequest[] @relation("ChangeReviewer")
 }
 
 // ─── PASSWORD RESETS ─────────────────────────────────────────────────────────
@@ -562,6 +564,41 @@ model SocialPost {
 
   @@index([eventId])
   @@index([userId])
+}
+
+// ─── TWO-ADMIN APPROVAL ──────────────────────────────────────────────────────
+
+// A serious admin change (event edit/delete, prices, admin accounts, payouts, …) held
+// until a different admin approves it. On approval the original API request is
+// replayed as the requester — see src/lib/approvals.ts.
+model ChangeRequest {
+  id            String    @id @default(cuid())
+  action        String    // e.g. event.update — see APPROVAL_ACTIONS in lib/approvals.ts
+  capability    String?   // admin-panel section an approver must hold (platform owners always can)
+  method        String
+  route         String    // route pattern replayed on approval, e.g. /api/admin/events/[id]
+  params        Json?     // route params, e.g. { id }
+  bodyEnc       String?   // AES-256-GCM encrypted JSON body (may hold passwords); wiped once decided
+  bodyHash      String    // de-duplicates identical pending requests
+  entityType    String
+  entityId      String?
+  entityVersion String?   // entity updatedAt when requested — approval fails if it changed since
+  title         String    // plain-language summary shown to approvers
+  changes       Json      // [{ label, from, to }] — passwords never included
+  status        String    @default("pending") // pending | applying | applied | rejected | cancelled | expired | failed
+  requestedById String
+  reviewedById  String?
+  reviewNote    String?
+  reviewedAt    DateTime?
+  failureReason String?
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+
+  requestedBy User  @relation("ChangeRequester", fields: [requestedById], references: [id])
+  reviewedBy  User? @relation("ChangeReviewer", fields: [reviewedById], references: [id])
+
+  @@index([status, createdAt])
+  @@index([requestedById])
 }
 
 // ─── PUSH NOTIFICATIONS ─────────────────────────────────────────────────────

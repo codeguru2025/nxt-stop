@@ -4,6 +4,8 @@ import { ok, error, forbidden, serverError } from '@/lib/api'
 import { slugify, eventLocalInputToUtc } from '@/lib/utils'
 import { generateEventQrCode } from '@/lib/qr'
 import crypto from 'crypto'
+import { holdForApproval } from '@/lib/approvals'
+import { describeEventCreate } from '@/lib/approvalDescribe'
 
 export async function GET() {
   try {
@@ -67,6 +69,15 @@ export async function POST(req: Request) {
       slug = cleaned
     } else {
       slug = slugify(name) + '-' + crypto.randomBytes(4).toString('hex')
+    }
+
+    // A draft is invisible to the public; creating straight into a live status needs approval
+    if ((status ?? 'draft') !== 'draft') {
+      const held = await holdForApproval(req, session, {
+        action: 'event.create', capability: 'events', route: '/api/admin/events', body,
+        entityType: 'Event', describe: () => describeEventCreate(body),
+      })
+      if (held) return held
     }
 
     const event = await prisma.event.create({

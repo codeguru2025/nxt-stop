@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { SignJWT, jwtVerify } from 'jose'
 import { prisma } from './db'
 import { env } from './env'
+import { approvalContext } from './approvalContext'
 
 function getJwtSecret(): Uint8Array {
   return new TextEncoder().encode(env.JWT_SECRET)
@@ -33,6 +34,15 @@ export async function verifyToken(token: string): Promise<SessionUser | null> {
 }
 
 export async function getSession(): Promise<SessionUser | null> {
+  // Replaying an approved change: act as the admin who requested it (see approvalContext.ts)
+  const replay = approvalContext.getStore()
+  if (replay) {
+    const u = await prisma.user.findUnique({
+      where: { id: replay.requesterId },
+      select: { id: true, phone: true, name: true, role: true, referralCode: true },
+    })
+    return u ? { ...u, referralCode: u.referralCode ?? '' } : null
+  }
   const cookieStore = await cookies()
   const token = cookieStore.get('nxt-session')?.value
   if (!token) return null

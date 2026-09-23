@@ -15,7 +15,7 @@ const VenueMap = dynamic(() => import('./VenueMap'), { ssr: false })
 
 type TicketType = {
   id: string; name: string; description?: string; price: number
-  capacity: number; sold: number; color: string; salesChannel?: string
+  soldOut: boolean; almostSoldOut: boolean; maxPerOrder: number; color: string; salesChannel?: string
 }
 
 type Event = {
@@ -25,7 +25,7 @@ type Event = {
   lineup?: string; hasVirtual: boolean; virtualPrice: number
   platformFee: number; status: string; ticketTypes: TicketType[]
   media: { id: string; type: string; url: string; youtubeUrl?: string; caption?: string }[]
-  _count: { tickets: number; socialPosts: number }
+  _count: { socialPosts: number }
   lat?: number | null; lng?: number | null
 }
 
@@ -62,12 +62,12 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
     return () => clearInterval(id)
   }, [])
   const isBuyable = (t: TicketType, at: number) =>
-    t.capacity - t.sold > 0 && !!event && ticketChannelWindow(event.date, t.salesChannel, at) === 'open'
+    !t.soldOut && !!event && ticketChannelWindow(event.date, t.salesChannel, at) === 'open'
   // Pre-select the cheapest ticket that can actually be bought — never a greyed-out one
   const [selectedType, setSelectedType] = useState<string>(() => {
     const types = initialEvent?.ticketTypes ?? []
     const start = Date.now()
-    return (types.find(t => t.capacity - t.sold > 0 && !!initialEvent && ticketChannelWindow(initialEvent.date, t.salesChannel, start) === 'open') ?? types[0])?.id ?? ''
+    return (types.find(t => !t.soldOut && !!initialEvent && ticketChannelWindow(initialEvent.date, t.salesChannel, start) === 'open') ?? types[0])?.id ?? ''
   })
   const [quantity, setQuantity] = useState(1)
   const [paymentMethod, setPaymentMethod] = useState('ecocash')
@@ -108,7 +108,8 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
   const selectedTicket = event?.ticketTypes.find(t => t.id === selectedType)
-  const available = selectedTicket ? selectedTicket.capacity - selectedTicket.sold : 0
+  // Most this order may take — never the actual stock (sales numbers stay server-side)
+  const available = selectedTicket ? selectedTicket.maxPerOrder : 0
   const selectedTicketBlocked =
     !!selectedTicket && !!event && ticketChannelWindow(event.date, selectedTicket.salesChannel, now) !== 'open'
 
@@ -358,10 +359,17 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                 <MapPin size={16} className="text-purple-400" />
                 <span>{event.venue}{event.address ? `, ${event.address}` : ''}</span>
               </div>
-              <div className="flex items-center gap-2 text-gray-400">
-                <Ticket size={16} className="text-purple-400" />
-                <span>{event.ticketTypes.reduce((s, t) => s + t.sold, 0)} tickets sold</span>
-              </div>
+              {event.ticketTypes.length > 0 && event.ticketTypes.every(t => t.soldOut) ? (
+                <div className="flex items-center gap-2 text-red-400">
+                  <Ticket size={16} />
+                  <span>Sold out</span>
+                </div>
+              ) : event.ticketTypes.some(t => t.almostSoldOut) ? (
+                <div className="flex items-center gap-2 text-orange-400">
+                  <Ticket size={16} />
+                  <span>Selling fast — some tickets almost gone</span>
+                </div>
+              ) : null}
             </div>
 
             <button
@@ -549,7 +557,7 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                   {/* Ticket type selection */}
                   <div className="space-y-2 mb-5">
                     {event.ticketTypes.map(t => {
-                      const avail = t.capacity - t.sold
+                      const avail = t.soldOut ? 0 : t.maxPerOrder
                       const channelWindow = ticketChannelWindow(event.date, t.salesChannel, now)
                       const notYetOnSale = channelWindow === 'gate_not_yet'
                       const advanceClosed = channelWindow === 'advance_closed'
@@ -577,10 +585,10 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
                           </div>
                           {t.description && <p className="text-xs text-gray-500 mt-1 ml-4">{t.description}</p>}
                           <div className="flex items-center justify-between mt-1.5 ml-4">
-                            <span className="text-xs text-gray-600">{windowBlocked ? 'Not on sale online now' : `${avail} remaining`}</span>
+                            <span className="text-xs text-gray-600">{windowBlocked ? 'Not on sale online now' : t.soldOut ? '' : 'Available'}</span>
                             {notYetOnSale && <span className="text-xs text-blue-400 font-medium">On sale at the gate</span>}
                             {advanceClosed && <span className="text-xs text-orange-400 font-medium">Advance sales closed — pay at the gate</span>}
-                            {!windowBlocked && avail <= 20 && avail > 0 && <span className="text-xs text-orange-400 font-medium">Almost sold out!</span>}
+                            {!windowBlocked && t.almostSoldOut && <span className="text-xs text-orange-400 font-medium">Almost sold out!</span>}
                             {!windowBlocked && avail <= 0 && <span className="text-xs text-red-400 font-medium">Sold Out</span>}
                           </div>
                         </button>

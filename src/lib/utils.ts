@@ -140,13 +140,12 @@ export function ticketChannelWindow(
  */
 export function lowestOnSalePrice(
   eventDate: string | Date,
-  ticketTypes: { price: number; sold: number; capacity?: number; salesChannel?: string }[],
+  ticketTypes: { price: number; soldOut?: boolean; salesChannel?: string }[],
   now: number | Date = Date.now()
 ): number {
   if (ticketTypes.length === 0) return 0
   const onSale = ticketTypes.filter(t =>
-    (t.capacity === undefined || t.capacity - t.sold > 0) &&
-    ticketChannelWindow(eventDate, t.salesChannel, now) === 'open'
+    !t.soldOut && ticketChannelWindow(eventDate, t.salesChannel, now) === 'open'
   )
   return Math.min(...(onSale.length ? onSale : ticketTypes).map(t => t.price))
 }

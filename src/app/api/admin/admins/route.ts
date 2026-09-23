@@ -3,6 +3,8 @@ import { requireCapability, isAdminCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import { writeAuditLog } from '@/lib/auditLog'
 import bcrypt from 'bcryptjs'
+import { holdForApproval } from '@/lib/approvals'
+import { describeAdminCreate } from '@/lib/approvalDescribe'
 
 // GET /api/admin/admins — list all admin accounts
 export async function GET() {
@@ -28,7 +30,8 @@ export async function POST(req: Request) {
     const session = await requireCapability('admins').catch(() => null)
     if (!session) return forbidden()
 
-    const { name, phone, password, email, capabilities } = await req.json()
+    const body = await req.json()
+    const { name, phone, password, email, capabilities } = body
 
     if (!name || !phone || !password) {
       return error('Name, phone number, and password are required')
@@ -47,6 +50,12 @@ export async function POST(req: Request) {
 
     const existing = await prisma.user.findUnique({ where: { phone: phone.trim() } })
     if (existing) return error('Phone number already registered')
+
+    const held = await holdForApproval(req, session, {
+      action: 'admin.create', capability: 'admins', route: '/api/admin/admins', body,
+      entityType: 'User', describe: () => describeAdminCreate(body),
+    })
+    if (held) return held
 
     const passwordHash = await bcrypt.hash(password, 10)
 

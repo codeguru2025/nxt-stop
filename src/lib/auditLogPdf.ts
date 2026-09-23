@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf'
 import { prisma } from './db'
 import { LOGO_URL, fetchDataUri } from './ticketAttachment'
 import { EVENT_TIME_ZONE } from './utils'
+import { describeAuditEntry, auditUserIds, type AuditCategory } from './auditDescribe'
 
 // Brand palette — same purple → pink gradient stops as the ticket card (ticketAttachment.ts)
 const PURPLE: [number, number, number] = [124, 58, 237]
@@ -26,27 +27,18 @@ const catTime = new Intl.DateTimeFormat('en-GB', {
 // Column layout: label, width (mm). Widths sum to PAGE_W - 2*M = 273.
 const COLS: { label: string; w: number }[] = [
   { label: 'TIME (CAT)', w: 30 },
-  { label: 'ACTOR', w: 45 },
-  { label: 'ACTION', w: 48 },
-  { label: 'ENTITY', w: 40 },
-  { label: 'IP', w: 26 },
-  { label: 'DETAILS', w: 84 },
+  { label: 'WHAT HAPPENED', w: 190 },
+  { label: 'TYPE', w: 28 },
+  { label: 'FROM IP', w: 25 },
 ]
 
-/** Compact one-line summary of a JSON before/after payload for the DETAILS column. */
-function summarize(before: unknown, after: unknown): string {
-  const fmt = (v: unknown) => {
-    if (v == null) return ''
-    if (typeof v !== 'object') return String(v)
-    return Object.entries(v as Record<string, unknown>)
-      .map(([k, val]) => `${k}: ${typeof val === 'object' && val !== null ? JSON.stringify(val) : String(val)}`)
-      .join(', ')
-  }
-  const b = fmt(before)
-  const a = fmt(after)
-  if (b && a) return `before — ${b}  |  after — ${a}`
-  return a || b || '—'
+const CATEGORY_LABEL: Record<AuditCategory, string> = {
+  security: 'Login', approval: 'Approval', money: 'Money', access: 'Admin access',
+  sales: 'Sale', events: 'Event', other: 'Other',
 }
+
+// The PDF's built-in font has no arrow glyph
+const pdfSafe = (t: string) => t.replace(/→/g, '->')
 
 function accentBar(doc: jsPDF, y: number, h: number) {
   const third = PAGE_W / 3
@@ -69,10 +61,12 @@ export async function createAuditLogPdf(windowStart: Date, windowEnd: Date): Pro
   ])
 
   const actorIds = [...new Set(entries.map(e => e.actorId).filter(Boolean))] as string[]
-  const actors = actorIds.length
-    ? await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true, phone: true } })
+  const userIds = [...new Set(entries.flatMap(auditUserIds))]
+  const users = userIds.length
+    ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } })
     : []
-  const actorMap = new Map(actors.map(a => [a.id, a]))
+  const names = Object.fromEntries(users.map(u => [u.id, u.name]))
+  const described = entries.map(e => ({ e, d: describeAuditEntry(e, names) }))
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' })
 
@@ -101,14 +95,14 @@ export async function createAuditLogPdf(windowStart: Date, windowEnd: Date): Pro
 
   // ── Summary strip ──
   y = 32
-  const byAction = new Map<string, number>()
-  for (const e of entries) byAction.set(e.action, (byAction.get(e.action) ?? 0) + 1)
-  const failedLogins = byAction.get('auth.login.failure') ?? 0
-  const topActions = [...byAction.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4)
+  const count = (action: string) => entries.filter(e => e.action === action).length
+  const failedLogins = count('auth.login.failure')
+  const needsLook = described.filter(x => x.d.alert).length
 
   const tiles: { label: string; value: string; alert?: boolean }[] = [
-    { label: 'TOTAL ENTRIES', value: String(entries.length) },
-    { label: 'DISTINCT ACTORS', value: String(actorIds.length) },
+    { label: 'THINGS THAT HAPPENED', value: String(entries.length) },
+    { label: 'PEOPLE INVOLVED', value: String(actorIds.length) },
+    { label: 'CHANGES APPROVED', value: String(count('change.approved')) },
     { label: 'FAILED LOGINS', value: String(failedLogins), alert: failedLogins > 0 },
   ]
   const tileW = 50
@@ -126,14 +120,17 @@ export async function createAuditLogPdf(windowStart: Date, windowEnd: Date): Pro
     doc.text(t.value, x + 4, y + 13)
     doc.setFont('helvetica', 'normal')
   })
-  if (topActions.length) {
-    const x = M + 3 * (tileW + 4)
+  {
+    const x = M + 4 * (tileW + 4)
     doc.setFontSize(7)
     doc.setTextColor(...MUTED)
-    doc.text('MOST FREQUENT ACTIONS', x, y + 5.5)
+    doc.text('WORTH A CLOSER LOOK', x, y + 5.5)
     doc.setFontSize(8.5)
-    doc.setTextColor(...INK)
-    doc.text(topActions.map(([a, n]) => `${a} × ${n}`).join('    '), x, y + 12, { maxWidth: PAGE_W - M - x })
+    doc.setTextColor(...(needsLook ? PINK : INK))
+    doc.text(
+      needsLook ? `${needsLook} entr${needsLook === 1 ? 'y is' : 'ies are'} shown in pink below` : 'Nothing unusual',
+      x, y + 12, { maxWidth: PAGE_W - M - x }
+    )
   }
   y += 24
 
@@ -159,20 +156,13 @@ export async function createAuditLogPdf(windowStart: Date, windowEnd: Date): Pro
 
   const FOOTER_TOP = PAGE_H - 14
   const LINE_H = 3.4
-  entries.forEach((e, i) => {
-    const actor = e.actorId ? actorMap.get(e.actorId) : undefined
-    const cells = [
-      catTime.format(e.createdAt),
-      actor ? `${actor.name}${e.actorRole ? ` (${e.actorRole})` : ''}\n${actor.phone}` : e.actorId ? e.actorId : 'System / anonymous',
-      e.action,
-      `${e.entityType}${e.entityId ? `\n${e.entityId}` : ''}`,
-      e.ip ?? '—',
-      summarize(e.before, e.after),
-    ]
+  described.forEach(({ e, d }, i) => {
+    const what = pdfSafe([d.summary, ...d.details.map(l => `   • ${l}`)].join('\n'))
+    const cells = [catTime.format(e.createdAt), what, CATEGORY_LABEL[d.category], e.ip ?? '—']
     doc.setFontSize(7.5)
     const wrapped = cells.map((text, ci) => doc.splitTextToSize(text, COLS[ci].w - 4) as string[])
-    // Cap very long detail payloads so a single row can never exceed a page
-    wrapped[5] = wrapped[5].length > 8 ? [...wrapped[5].slice(0, 7), '...'] : wrapped[5]
+    // Cap very long entries so a single row can never exceed a page
+    wrapped[1] = wrapped[1].length > 12 ? [...wrapped[1].slice(0, 11), '   ...'] : wrapped[1]
     const rowH = Math.max(...wrapped.map(w => w.length)) * LINE_H + 3
 
     if (y + rowH > FOOTER_TOP) {
@@ -187,9 +177,19 @@ export async function createAuditLogPdf(windowStart: Date, windowEnd: Date): Pro
     }
     let x = M
     wrapped.forEach((lines, ci) => {
-      doc.setTextColor(...(ci === 2 ? PURPLE : ci === 0 || ci === 4 ? MUTED : INK))
-      doc.setFont('helvetica', ci === 2 ? 'bold' : 'normal')
-      doc.text(lines, x + 2, y + 4)
+      if (ci === 1) {
+        // First line is the sentence (bold; pink when worth a closer look), rest are details
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(...(d.alert ? PINK : INK))
+        doc.text(lines[0] ?? '', x + 2, y + 4)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(...MUTED)
+        if (lines.length > 1) doc.text(lines.slice(1), x + 2, y + 4 + LINE_H)
+      } else {
+        doc.setFont('helvetica', ci === 2 ? 'bold' : 'normal')
+        doc.setTextColor(...(ci === 2 ? PURPLE : MUTED))
+        doc.text(lines, x + 2, y + 4)
+      }
       x += COLS[ci].w
     })
     doc.setDrawColor(...RULE)

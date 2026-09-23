@@ -62,7 +62,7 @@ export default function PasswordResetsClient() {
     if (res.success) {
       setDone(prev => ({ ...prev, [id]: action === 'approve' ? 'approved' : 'rejected' }))
       setTimeout(() => setRequests(prev => prev.filter(r => r.id !== id)), 1500)
-    } else {
+    } else if (!res.pendingApproval) {
       setError(prev => ({ ...prev, [id]: res.error ?? 'Failed' }))
     }
   }

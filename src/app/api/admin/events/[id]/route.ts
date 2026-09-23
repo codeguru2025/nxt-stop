@@ -2,6 +2,8 @@ import { prisma } from '@/lib/db'
 import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, notFound, serverError } from '@/lib/api'
 import { eventLocalInputToUtc } from '@/lib/utils'
+import { holdForApproval } from '@/lib/approvals'
+import { describeEventUpdate, describeEventDelete } from '@/lib/approvalDescribe'
 
 export async function GET(
   _req: Request,
@@ -68,6 +70,12 @@ export async function PATCH(
       if (endAt && isNaN(endAt.getTime())) return error('Invalid end date/time')
     }
     if (startAt && endAt && endAt <= startAt) return error('End time must be after the start time')
+
+    const held = await holdForApproval(req, session, {
+      action: 'event.update', capability: 'events', route: '/api/admin/events/[id]', params: { id }, body,
+      entityType: 'Event', entityId: id, describe: () => describeEventUpdate(id, body),
+    })
+    if (held) return held
 
     const event = await prisma.event.update({
       where: { id },
@@ -136,7 +144,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   ctx: RouteContext<'/api/admin/events/[id]'>
 ) {
   try {
@@ -150,6 +158,12 @@ export async function DELETE(
     if (soldTickets > 0) {
       return error(`Cannot delete event with ${soldTickets} sold ticket(s). Cancel or refund them first.`)
     }
+
+    const held = await holdForApproval(req, session, {
+      action: 'event.delete', capability: 'events', route: '/api/admin/events/[id]', params: { id },
+      entityType: 'Event', entityId: id, describe: () => describeEventDelete(id),
+    })
+    if (held) return held
 
     await prisma.event.delete({ where: { id } })
     return ok({ deleted: true })

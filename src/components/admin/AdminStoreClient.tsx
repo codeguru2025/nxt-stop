@@ -129,7 +129,7 @@ export default function AdminStoreClient() {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }).then(r => r.json())
     setSaving(false)
-    if (res.success) { load(); setShowForm(false); setDrinkForm({ ...BLANK_PRODUCT }) }
+    if (res.success || res.pendingApproval) { load(); setShowForm(false); setDrinkForm({ ...BLANK_PRODUCT }) }
   }
 
   const saveMerch = async () => {
@@ -145,7 +145,7 @@ export default function AdminStoreClient() {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }).then(r => r.json())
     setSaving(false)
-    if (res.success) { load(); setShowForm(false); setMerchForm({ ...BLANK_MERCH }) }
+    if (res.success || res.pendingApproval) { load(); setShowForm(false); setMerchForm({ ...BLANK_MERCH }) }
   }
 
   const updateStock = async (id: string, newStock: number) => {

@@ -7,6 +7,8 @@ import { sendOrderTicketsWhatsApp } from '@/lib/whatsapp'
 import { sendOrderConfirmationEmail } from '@/lib/email'
 import { normalizeWhatsAppPhone } from '@/lib/phone'
 import { env } from '@/lib/env'
+import { holdForApproval } from '@/lib/approvals'
+import { describeOrderAction } from '@/lib/approvalDescribe'
 
 // GET /api/admin/orders?search=&status=&page=
 export async function GET(req: Request) {
@@ -62,11 +64,20 @@ export async function POST(req: Request) {
     const session = await requireCapability('tickets').catch(() => null)
     if (!session) return forbidden()
 
-    const { orderId, action, channel, contact } = await req.json()
+    const body = await req.json()
+    const { orderId, action, channel, contact } = body
     if (!orderId || !action) return error('orderId and action required')
 
     const order = await prisma.order.findUnique({ where: { id: orderId } })
     if (!order) return error('Order not found', 404)
+
+    if (action === 'fulfill' || action === 'cancel') {
+      const held = await holdForApproval(req, session, {
+        action: `order.${action}`, capability: 'tickets', route: '/api/admin/orders', body,
+        entityType: 'Order', entityId: String(orderId), describe: () => describeOrderAction(body),
+      })
+      if (held) return held
+    }
 
     if (action === 'fulfill') {
       // Manually fulfill — used when webhook failed but user did pay

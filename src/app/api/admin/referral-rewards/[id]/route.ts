@@ -2,6 +2,8 @@ import { prisma } from '@/lib/db'
 import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, notFound, serverError } from '@/lib/api'
 import { writeAuditLog } from '@/lib/auditLog'
+import { holdForApproval } from '@/lib/approvals'
+import { describeReferralPayout } from '@/lib/approvalDescribe'
 
 // PATCH /api/admin/referral-rewards/[id] — mark a payout paid/cancelled
 export async function PATCH(
@@ -13,11 +15,18 @@ export async function PATCH(
     if (!session) return forbidden()
     const { id } = await ctx.params
 
-    const { status } = await req.json().catch(() => ({}))
+    const body = await req.json().catch(() => ({}))
+    const { status } = body
     if (!['paid', 'cancelled', 'pending'].includes(status)) return error('Invalid status')
 
     const existing = await prisma.referralReward.findUnique({ where: { id } })
     if (!existing) return notFound('Referral reward')
+
+    const held = await holdForApproval(req, session, {
+      action: 'referral-reward.update', capability: 'referrals', route: '/api/admin/referral-rewards/[id]', params: { id }, body,
+      entityType: 'ReferralReward', entityId: id, describe: () => describeReferralPayout(id, body),
+    })
+    if (held) return held
 
     const updated = await prisma.referralReward.update({
       where: { id },

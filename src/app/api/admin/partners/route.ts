@@ -4,6 +4,8 @@ import { ok, error, forbidden, serverError } from '@/lib/api'
 import bcrypt from 'bcryptjs'
 import { generateQRDataURL } from '@/lib/qr'
 import crypto from 'crypto'
+import { holdForApproval } from '@/lib/approvals'
+import { describePartnerCreate, describePartnerUpdate } from '@/lib/approvalDescribe'
 
 export async function GET() {
   try {
@@ -30,9 +32,10 @@ export async function POST(req: Request) {
     const session = await requireCapability('partners').catch(() => null)
     if (!session) return forbidden()
 
+    const body = await req.json()
     const {
       name, phone, type, businessName, commissionRate, commissionPerTicket, password,
-    } = await req.json()
+    } = body
 
     if (!name || !phone || !type || !password) {
       return error('name, phone, type, and password are required')
@@ -40,6 +43,12 @@ export async function POST(req: Request) {
 
     const existing = await prisma.user.findUnique({ where: { phone: phone.trim() } })
     if (existing) return error('Phone number already registered')
+
+    const held = await holdForApproval(req, session, {
+      action: 'partner.create', capability: 'partners', route: '/api/admin/partners', body,
+      entityType: 'Partner', describe: () => describePartnerCreate(body),
+    })
+    if (held) return held
 
     const passwordHash = await bcrypt.hash(password, 10)
     const referralCode = crypto.randomBytes(6).toString('hex').toUpperCase()
@@ -75,8 +84,15 @@ export async function PATCH(req: Request) {
     const session = await requireCapability('partners').catch(() => null)
     if (!session) return forbidden()
 
-    const { partnerId, commissionRate, commissionPerTicket, active } = await req.json()
+    const body = await req.json()
+    const { partnerId, commissionRate, commissionPerTicket, active } = body
     if (!partnerId) return error('partnerId is required')
+
+    const held = await holdForApproval(req, session, {
+      action: 'partner.update', capability: 'partners', route: '/api/admin/partners', body,
+      entityType: 'Partner', entityId: String(partnerId), describe: () => describePartnerUpdate(body),
+    })
+    if (held) return held
 
     const partner = await prisma.partner.update({
       where: { id: partnerId },
