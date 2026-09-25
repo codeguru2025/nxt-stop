@@ -2,13 +2,14 @@ import { getSession, requireAuth } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { z } from 'zod'
+import { getReferralPercent, DEFAULT_REFERRAL_PERCENT } from '@/lib/referralRate'
 
 export async function GET() {
   try {
     const session = await getSession()
     if (!session) return unauthorized()
 
-    const user = await prisma.user.findUnique({
+    const [user, referralPercent, eventParticipations] = await Promise.all([prisma.user.findUnique({
       where: { id: session.id },
       select: {
         id: true,
@@ -28,12 +29,6 @@ export async function GET() {
         createdAt: true,
         mustResetPassword: true,
         isPlatformOwner: true,
-        // Upcoming events they're on the line-up for — the dashboard offers a link per event
-        eventParticipations: {
-          where: { event: { date: { gte: new Date(Date.now() - 86_400_000) }, status: { notIn: ['draft', 'cancelled'] } } },
-          orderBy: { event: { date: 'asc' } },
-          select: { role: true, event: { select: { name: true, slug: true, date: true } } },
-        },
         _count: {
           select: {
             tickets: true,
@@ -42,10 +37,25 @@ export async function GET() {
           },
         },
       },
-    })
+    }),
+    getReferralPercent().catch(() => DEFAULT_REFERRAL_PERCENT),
+    // Upcoming events they're on the line-up for — the dashboard offers a link per event.
+    // Kept separate and non-fatal: every logged-in page calls this route, so a problem
+    // here (e.g. the EventParticipant migration not applied yet) must not log people out.
+    prisma.eventParticipant.findMany({
+      where: {
+        userId: session.id,
+        event: { date: { gte: new Date(Date.now() - 86_400_000) }, status: { notIn: ['draft', 'cancelled'] } },
+      },
+      orderBy: { event: { date: 'asc' } },
+      select: { role: true, event: { select: { name: true, slug: true, date: true } } },
+    }).catch((err) => {
+      console.error('[auth/me] line-up lookup failed', err)
+      return []
+    })])
 
     if (!user) return unauthorized()
-    return ok(user)
+    return ok({ ...user, referralPercent, eventParticipations })
   } catch (e) {
     return serverError(e)
   }

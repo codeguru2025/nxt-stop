@@ -7,7 +7,7 @@ import { buildReferralUrl, formatCurrency, formatDate } from '@/lib/utils'
 import { FEATURES } from '@/lib/features'
 import ReferralStats from './ReferralStats'
 
-type User = { referralCode: string; points: number; name: string; _count: { referralsMade: number } }
+type User = { referralCode: string; points: number; name: string; referralPercent: number; _count: { referralsMade: number } }
 type ReferralRow = {
   id: string
   targetName: string
@@ -69,7 +69,7 @@ export default function ReferralsClient() {
   const steps = [
     'Copy your unique referral link above',
     'Share it on WhatsApp, Instagram, or anywhere',
-    'When someone buys tickets or merch through your link, you earn 10% of what they spend',
+    `When someone buys tickets or merch through your link, you earn ${user.referralPercent}% of what they spend`,
     FEATURES.points
       ? 'You also earn points — redeem them for drinks, upgrades, free entry, and more. Cash rewards are paid out by the team'
       : 'Your earnings are paid out by the team',
@@ -79,7 +79,7 @@ export default function ReferralsClient() {
     <div className="max-w-3xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-2xl font-black text-white">My Referrals</h1>
-        <p className="text-gray-500 text-sm mt-0.5">Share your link — earn 10% of everything bought through it</p>
+        <p className="text-gray-500 text-sm mt-0.5">Share your link — earn {user.referralPercent}% of everything bought through it</p>
       </div>
 
       {/* Stats */}
@@ -115,7 +115,7 @@ export default function ReferralsClient() {
           Your Referral Link
         </h3>
         <p className="text-gray-500 text-sm mb-4">
-          Share this link. When someone buys tickets or merch through it, you earn 10% of what they spend.
+          Share this link. When someone buys tickets or merch through it, you earn {user.referralPercent}% of what they spend.
         </p>
 
         <div className="bg-[#111] rounded-xl p-4 mb-4 font-mono text-sm text-gray-300 break-all border border-[#2a2a2a]">

@@ -6,6 +6,7 @@ import { normalizeWhatsAppPhone } from '@/lib/phone'
 import { createAccountWithOneTimePassword, splitName } from '@/lib/onboarding'
 import { sendWelcomeEmail } from '@/lib/email'
 import { writeAuditLog } from '@/lib/auditLog'
+import { getReferralPercent } from '@/lib/referralRate'
 
 // Line-up members (DJs, MCs, acts) marked as participants of an event. Each gets an
 // account — made here if they don't have one — so they have a share link without ever
@@ -23,12 +24,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     if (!session) return forbidden()
     const { id } = await ctx.params
 
-    const participants = await prisma.eventParticipant.findMany({
-      where: { eventId: id },
-      orderBy: { createdAt: 'asc' },
-      select: participantSelect,
-    })
-    return ok(participants)
+    const [participants, referralPercent] = await Promise.all([
+      prisma.eventParticipant.findMany({ where: { eventId: id }, orderBy: { createdAt: 'asc' }, select: participantSelect }),
+      getReferralPercent(),
+    ])
+    return ok({ participants, referralPercent })
   } catch (e) {
     return serverError(e)
   }

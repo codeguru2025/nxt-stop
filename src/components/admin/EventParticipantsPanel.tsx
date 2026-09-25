@@ -30,11 +30,13 @@ export default function EventParticipantsPanel({ eventId, eventName, eventSlug, 
   const [formError, setFormError] = useState('')
   const [passwords, setPasswords] = useState<Record<string, string>>({}) // participantId → one-time password, shown once
   const [copied, setCopied] = useState<string | null>(null)
+  const [percent, setPercent] = useState<number | null>(null)
+  const earns = percent === null ? 'a share' : `${percent}%`
 
   useEffect(() => {
     fetch(`/api/admin/events/${eventId}/participants`)
       .then(r => r.json())
-      .then(d => { if (d.success) setParticipants(d.data) })
+      .then(d => { if (d.success) { setParticipants(d.data.participants); setPercent(d.data.referralPercent) } })
       .finally(() => setLoading(false))
   }, [eventId])
 
@@ -81,7 +83,7 @@ export default function EventParticipantsPanel({ eventId, eventName, eventSlug, 
       `Hi ${p.name}! You're on the line-up for ${eventName} 🎤`,
       `Here's your personal NXT STOP link to share with your fans:`,
       linkFor(p),
-      `You earn 10% of everything bought through it.`,
+      `You earn ${earns} of everything bought through it.`,
       pw
         ? `Log in at ${base}/login with ${p.user.phone} and the one-time password ${pw} (you'll set your own password) to see your sales and earnings.`
         : `Log in at ${base}/login with ${p.user.phone} to see your sales and earnings.`,
@@ -101,7 +103,7 @@ export default function EventParticipantsPanel({ eventId, eventName, eventSlug, 
         <span className="text-sm font-bold text-white">Share links for the line-up</span>
       </div>
       <p className="text-xs text-gray-500 mb-3">
-        Mark line-up members as participants: each gets an account and their own share link — no ticket purchase needed — and earns 10% of everything bought through it.
+        Mark line-up members as participants: each gets an account and their own share link — no ticket purchase needed — and earns {earns} of everything bought through it.
       </p>
       {!eventPublic && (
         <p className="text-xs text-yellow-500 mb-3">

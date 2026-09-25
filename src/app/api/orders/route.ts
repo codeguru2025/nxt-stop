@@ -25,7 +25,6 @@ const CreateOrderSchema = z.object({
   productId:    z.string().min(1).optional(),
   quantity:     z.number().int().min(1).max(20).default(1),
   referralCode: z.string().optional(),
-  partnerId:    z.string().optional(),
   whatsappPhone: z.string().min(7).max(30),
   whatsappName: z.string().min(1).max(100),
   guestPhone:   z.string().min(7).max(20).optional(),
@@ -52,7 +51,7 @@ export async function POST(req: Request) {
     if (!parsed.success) {
       return error(parsed.error.issues.map((i: { message: string }) => i.message).join('; '))
     }
-    const { eventId, ticketTypeId, productId, quantity, referralCode: referralCodeParam, partnerId, guestPhone, guestName, recipientName, whatsappPhone, whatsappName, email, homeTown, isWhatsApp } = parsed.data
+    const { eventId, ticketTypeId, productId, quantity, referralCode: referralCodeParam, guestPhone, guestName, recipientName, whatsappPhone, whatsappName, email, homeTown, isWhatsApp } = parsed.data
     // A referral link clicked in the last 30 days still earns its owner credit even if the
     // buyer browsed elsewhere before checking out (cookie set by /r/CODE — see lib/visits.ts)
     const referralCode = referralCodeParam || (await cookies()).get(REF_COOKIE)?.value || undefined
@@ -116,11 +115,11 @@ export async function POST(req: Request) {
 
     // Capacity check + order creation inside a transaction to prevent overselling
     const result = await prisma.$transaction(async (tx) => {
-      let resolvedPartnerId = partnerId
-      if (!resolvedPartnerId && referralCode) {
-        const partner = await tx.partner.findUnique({ where: { referralCode } })
-        resolvedPartnerId = partner?.id
-      }
+      // Partner sales come only from a partner's link code (never a partner id sent by the
+      // client), and only while that partner is switched on.
+      const resolvedPartnerId = referralCode
+        ? (await tx.partner.findFirst({ where: { referralCode, active: true }, select: { id: true } }))?.id
+        : undefined
 
       const orderBaseData = {
         orderNumber: generateOrderNumber(),

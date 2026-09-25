@@ -33,6 +33,7 @@ export default function AdminPartnersClient() {
     type: 'dj', businessName: '', commissionRate: 10, commissionPerTicket: 0
   })
   const [formError, setFormError] = useState('')
+  const [percent, setPercent] = useState<number | null>(null)
 
   const load = () => {
     fetch('/api/admin/partners').then(r => r.json()).then(d => {
@@ -43,6 +44,7 @@ export default function AdminPartnersClient() {
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
       if (!d.success || d.data.role !== 'admin') { router.push('/login'); return }
+      setPercent(d.data.referralPercent)
       load()
     })
   }, [router])
@@ -100,7 +102,7 @@ export default function AdminPartnersClient() {
             <p className="text-gray-500 text-xs mb-4">
               {RATES
                 ? 'Partners get their own login, share link and commission — no ticket purchase needed.'
-                : 'Partners get their own login and share link — no ticket purchase needed — and earn 10% of everything bought through it, like everyone. For DJs and MCs on a line-up, use “Give share link” in the event editor instead.'}
+                : `Partners get their own login and share link — no ticket purchase needed — and earn ${percent ?? '…'}% of everything bought through it, like everyone. For DJs and MCs on a line-up, use “Give share link” in the event editor instead.`}
             </p>
             <div className="grid sm:grid-cols-2 gap-4">
               <div><label>Full Name *</label><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="DJ Fire" /></div>

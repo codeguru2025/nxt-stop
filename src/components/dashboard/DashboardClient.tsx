@@ -9,7 +9,7 @@ import { FEATURES } from '@/lib/features'
 
 type User = {
   id: string; name: string; phone: string; role: string
-  referralCode: string; points: number; totalEarned: number
+  referralCode: string; points: number; totalEarned: number; referralPercent: number
   eventParticipations: { role: string; event: { name: string; slug: string; date: string } }[]
   _count: { tickets: number; referralsMade: number; redemptions: number }
 }
@@ -143,7 +143,7 @@ export default function DashboardClient() {
             <Mic2 size={18} className="text-purple-400" />
             You&apos;re on the line-up
           </h3>
-          <p className="text-gray-400 text-sm mb-4">Share your link for each show with your fans — you earn 10% of everything bought through it.</p>
+          <p className="text-gray-400 text-sm mb-4">Share your link for each show with your fans — you earn {user.referralPercent}% of everything bought through it.</p>
           <div className="space-y-3">
             {user.eventParticipations.map(p => {
               const url = buildReferralUrl(user.referralCode, p.event.slug)
@@ -174,7 +174,7 @@ export default function DashboardClient() {
           Your Referral Link
         </h3>
         <p className="text-gray-500 text-sm mb-4">
-          Share this — earn <span className="text-yellow-400 font-semibold">10%</span> of everything your friends buy through it
+          Share this — earn <span className="text-yellow-400 font-semibold">{user.referralPercent}%</span> of everything your friends buy through it
         </p>
 
         <div className="flex gap-2">

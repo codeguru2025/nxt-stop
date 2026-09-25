@@ -3,6 +3,7 @@ import { entityVersion, type Change, type Description } from './approvals'
 import { formatDate, eventLocalInputToUtc } from './utils'
 import { ADMIN_CAPABILITY_LABELS, isAdminCapability } from './adminCapabilities'
 import { FEATURES } from './features'
+import { getReferralPercent } from './referralRate'
 
 // Plain-language descriptions of held changes, shown to the admin asked to approve them.
 // Every describer lists only what would actually change; passwords are never included.
@@ -217,7 +218,7 @@ export async function describePartnerCreate(body: any, existingName: string | nu
       { label: 'Name', to: text(existingName ?? body.name) },
       { label: 'Phone (login)', to: text(body.phone) },
       { label: 'Type', to: text(body.type) },
-      { label: 'Earns', to: !FEATURES.partnerCommissionRates ? '10% of everything bought through their link (same as everyone)' : Number(body.commissionPerTicket) > 0 ? `${money(body.commissionPerTicket)} per ticket` : `${Number(body.commissionRate ?? 10)}% of ticket sales` },
+      { label: 'Earns', to: !FEATURES.partnerCommissionRates ? `${await getReferralPercent()}% of everything bought through their link (same as everyone)` : Number(body.commissionPerTicket) > 0 ? `${money(body.commissionPerTicket)} per ticket` : `${Number(body.commissionRate ?? 10)}% of ticket sales` },
       existingName
         ? { label: 'Account', to: 'uses their existing login' }
         : { label: 'Password', to: 'set (hidden)' },

@@ -57,7 +57,7 @@ export default function AdminReferralsClient() {
               <Share2 size={20} className="text-purple-400" />
               Referral Rewards
             </h1>
-            <p className="text-gray-500 text-sm mt-0.5">10% cash payouts earned by customer referrals</p>
+            <p className="text-gray-500 text-sm mt-0.5">Cash payouts earned through share links</p>
           </div>
           <div className="flex gap-1.5">
             {(['pending', 'paid', 'cancelled', 'all'] as const).map(f => (

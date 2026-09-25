@@ -4,6 +4,7 @@ import { sendOrderTicketsWhatsApp } from './whatsapp'
 import { sendOrderConfirmationEmail, sendReferralRewardEarnedEmail, sendVoucherPurchaseEmail } from './email'
 import crypto from 'crypto'
 import { FEATURES } from './features'
+import { activeRewardsConfig, DEFAULT_REFERRAL_PERCENT } from './referralRate'
 
 function generateVoucherCode(): string {
   const random = crypto.randomBytes(4).toString('hex').toUpperCase()
@@ -177,7 +178,7 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
     if (referrerId && referrerId !== order.userId) {
       const existingRef = await tx.referral.findFirst({ where: { orderId: order.id } })
       if (!existingRef) {
-        const config = await tx.pointsConfig.findFirst({ where: { active: true } })
+        const config = await activeRewardsConfig(tx)
         let points = 0
         if (FEATURES.points) {
           const pointsPerSale = config?.pointsPerSale ?? 10
@@ -207,7 +208,7 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
         // Cash reward — a % of everything bought through the link (tickets and merch),
         // not counting the per-ticket platform fee.
         const purchased = order.items.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
-        const pct = Number(config?.referralPercentage ?? 10)
+        const pct = Number(config?.referralPercentage ?? DEFAULT_REFERRAL_PERCENT)
         const amount = Math.round(purchased * (pct / 100) * 100) / 100
         if (amount > 0) {
           await tx.referralReward.create({
