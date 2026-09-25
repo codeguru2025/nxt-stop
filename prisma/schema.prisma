@@ -48,6 +48,7 @@ model User {
   pushSubscriptions     PushSubscription[]
   changeRequestsMade     ChangeRequest[] @relation("ChangeRequester")
   changeRequestsReviewed ChangeRequest[] @relation("ChangeReviewer")
+  eventParticipations    EventParticipant[]
 }
 
 // ─── PASSWORD RESETS ─────────────────────────────────────────────────────────
@@ -156,6 +157,7 @@ model Event {
   socialPosts SocialPost[]
   scanLogs    ScanLog[]
   media       EventMedia[]
+  participants EventParticipant[]
 
   @@index([status, date])
 }
@@ -350,6 +352,23 @@ model EventPartner {
   partner Partner @relation(fields: [partnerId], references: [id])
 
   @@unique([eventId, partnerId])
+}
+
+// Line-up members (DJs, MCs, acts) an admin has given an account, so they get a share
+// link without buying a ticket. The public line-up itself stays in Event.lineup (JSON).
+model EventParticipant {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  name      String   // as billed on the line-up
+  role      String   // line-up role: main_act | headline | mc | resident_dj | support_dj | guest_dj | special_guest
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
+  @@index([userId])
 }
 
 model Commission {

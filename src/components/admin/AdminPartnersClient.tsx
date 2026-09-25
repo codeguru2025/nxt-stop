@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import AdminLayout from './AdminLayout'
 import { Plus, Users, TrendingUp, DollarSign, Loader2, Check, X, Edit2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { FEATURES } from '@/lib/features'
+
+const RATES = FEATURES.partnerCommissionRates
 
 type Partner = {
   id: string; type: string; businessName?: string; referralCode: string
@@ -29,6 +32,7 @@ export default function AdminPartnersClient() {
     name: '', phone: '', password: '',
     type: 'dj', businessName: '', commissionRate: 10, commissionPerTicket: 0
   })
+  const [formError, setFormError] = useState('')
 
   const load = () => {
     fetch('/api/admin/partners').then(r => r.json()).then(d => {
@@ -45,13 +49,15 @@ export default function AdminPartnersClient() {
 
   const save = async () => {
     setSaving(true)
+    setFormError('')
     const res = await fetch('/api/admin/partners', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
-    }).then(r => r.json())
+    }).then(r => r.json()).catch(() => ({ error: 'Network error — try again' }))
     setSaving(false)
     if (res.success || res.pendingApproval) { load(); setShowForm(false) }
+    else setFormError(res.error ?? 'Could not add partner')
   }
 
   const startEdit = (p: Partner) => {
@@ -90,11 +96,20 @@ export default function AdminPartnersClient() {
 
         {showForm && (
           <div className="card p-5 mb-6">
-            <h3 className="font-bold text-white mb-4">Add New Partner</h3>
+            <h3 className="font-bold text-white mb-1">Add New Partner</h3>
+            <p className="text-gray-500 text-xs mb-4">
+              {RATES
+                ? 'Partners get their own login, share link and commission — no ticket purchase needed.'
+                : 'Partners get their own login and share link — no ticket purchase needed — and earn 10% of everything bought through it, like everyone. For DJs and MCs on a line-up, use “Give share link” in the event editor instead.'}
+            </p>
             <div className="grid sm:grid-cols-2 gap-4">
               <div><label>Full Name *</label><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="DJ Fire" /></div>
               <div><label>Phone *</label><input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+263 77 123 4567" /></div>
-              <div><label>Password *</label><input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min 8 characters" /></div>
+              <div>
+                <label>Password</label>
+                <input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min 8 characters" />
+                <p className="text-xs text-gray-500 mt-1">Needed for a new login. Leave blank if this phone already has an account — they keep their current password.</p>
+              </div>
               <div>
                 <label>Partner Type *</label>
                 <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
@@ -102,19 +117,24 @@ export default function AdminPartnersClient() {
                 </select>
               </div>
               <div><label>Business Name</label><input value={form.businessName} onChange={e => setForm(f => ({ ...f, businessName: e.target.value }))} placeholder="DJ Fire Entertainment" /></div>
-              <div>
-                <label>Commission Rate (%)</label>
-                <input type="number" min={0} max={50} value={form.commissionRate} onChange={e => setForm(f => ({ ...f, commissionRate: parseFloat(e.target.value) }))} />
-                <p className="text-xs text-gray-500 mt-1">Percentage of ticket subtotal</p>
-              </div>
-              <div>
-                <label>Flat Commission per Ticket ($)</label>
-                <input type="number" min={0} step={0.01} value={form.commissionPerTicket} onChange={e => setForm(f => ({ ...f, commissionPerTicket: parseFloat(e.target.value) }))} />
-                <p className="text-xs text-gray-500 mt-1">Fixed $ per ticket sold — overrides % rate when &gt; 0</p>
-              </div>
+              {RATES && (
+                <>
+                  <div>
+                    <label>Commission Rate (%)</label>
+                    <input type="number" min={0} max={50} value={form.commissionRate} onChange={e => setForm(f => ({ ...f, commissionRate: parseFloat(e.target.value) }))} />
+                    <p className="text-xs text-gray-500 mt-1">Percentage of ticket subtotal</p>
+                  </div>
+                  <div>
+                    <label>Flat Commission per Ticket ($)</label>
+                    <input type="number" min={0} step={0.01} value={form.commissionPerTicket} onChange={e => setForm(f => ({ ...f, commissionPerTicket: parseFloat(e.target.value) }))} />
+                    <p className="text-xs text-gray-500 mt-1">Fixed $ per ticket sold — overrides % rate when &gt; 0</p>
+                  </div>
+                </>
+              )}
             </div>
+            {formError && <p className="text-sm text-red-400 mt-4">{formError}</p>}
             <div className="flex gap-2 mt-4">
-              <button onClick={save} disabled={saving || !form.name || !form.phone || !form.password} className="btn-primary flex items-center gap-2 text-sm">
+              <button onClick={save} disabled={saving || !form.name || !form.phone} className="btn-primary flex items-center gap-2 text-sm">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 Create Partner
               </button>
@@ -126,11 +146,11 @@ export default function AdminPartnersClient() {
         )}
 
         {/* Summary KPIs */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className={`grid ${RATES ? 'grid-cols-3' : 'grid-cols-2'} gap-4 mb-6`}>
           {[
             { label: 'Total Partners', value: partners.length, icon: Users, color: 'text-purple-400' },
             { label: 'Total Sales', value: partners.reduce((s, p) => s + p.totalSales, 0), icon: TrendingUp, color: 'text-green-400' },
-            { label: 'Commissions Owed', value: formatCurrency(partners.reduce((s, p) => s + pendingCommissions(p), 0)), icon: DollarSign, color: 'text-yellow-400' },
+            ...(RATES ? [{ label: 'Commissions Owed', value: formatCurrency(partners.reduce((s, p) => s + pendingCommissions(p), 0)), icon: DollarSign, color: 'text-yellow-400' }] : []),
           ].map(s => (
             <div key={s.label} className="stat-card">
               <s.icon size={20} className={`${s.color} mb-2`} />
@@ -152,11 +172,11 @@ export default function AdminPartnersClient() {
                     <th className="text-left p-4">Partner</th>
                     <th className="text-left p-4">Type</th>
                     <th className="text-left p-4">Referral Code</th>
-                    <th className="text-left p-4">Commission</th>
+                    {RATES && <th className="text-left p-4">Commission</th>}
                     <th className="text-left p-4">Sales</th>
-                    <th className="text-left p-4">Earned</th>
-                    <th className="text-left p-4">Pending</th>
-                    <th className="text-left p-4"></th>
+                    {RATES && <th className="text-left p-4">Earned</th>}
+                    {RATES && <th className="text-left p-4">Pending</th>}
+                    {RATES && <th className="text-left p-4"></th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1a1a1a]">
@@ -170,7 +190,7 @@ export default function AdminPartnersClient() {
                         <span className="capitalize text-gray-300 bg-[#2a2a2a] rounded-md px-2 py-0.5 text-xs">{p.type}</span>
                       </td>
                       <td className="p-4 font-mono text-purple-400 text-xs">{p.referralCode}</td>
-                      <td className="p-4 text-gray-300">
+                      {RATES && <td className="p-4 text-gray-300">
                         {editing === p.id ? (
                           <div className="space-y-1">
                             <div className="flex items-center gap-1">
@@ -194,11 +214,11 @@ export default function AdminPartnersClient() {
                             )}
                           </div>
                         )}
-                      </td>
+                      </td>}
                       <td className="p-4 font-bold text-white">{p.totalSales}</td>
-                      <td className="p-4 text-green-400">{formatCurrency(p.totalEarned)}</td>
-                      <td className="p-4 text-yellow-400">{formatCurrency(pendingCommissions(p))}</td>
-                      <td className="p-4">
+                      {RATES && <td className="p-4 text-green-400">{formatCurrency(p.totalEarned)}</td>}
+                      {RATES && <td className="p-4 text-yellow-400">{formatCurrency(pendingCommissions(p))}</td>}
+                      {RATES && <td className="p-4">
                         {editing === p.id ? (
                           <div className="flex gap-1">
                             <button onClick={() => saveEdit(p.id)} disabled={saving} className="flex items-center gap-1 text-xs bg-green-500/10 border border-green-500/20 text-green-400 rounded-lg px-2 py-1">
@@ -213,7 +233,7 @@ export default function AdminPartnersClient() {
                             <Edit2 size={12} /> Edit
                           </button>
                         )}
-                      </td>
+                      </td>}
                     </tr>
                   ))}
                 </tbody>

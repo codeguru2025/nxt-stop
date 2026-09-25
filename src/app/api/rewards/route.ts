@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
+import { FEATURES } from '@/lib/features'
 
 export async function GET() {
   try {
@@ -16,6 +17,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    if (!FEATURES.points) return error('The points Rewards Shop is switched off', 403)
     const session = await requireAuth().catch(() => null)
     if (!session) return unauthorized()
 

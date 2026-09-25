@@ -93,6 +93,10 @@ describe('buildReferralUrl', () => {
     const url = buildReferralUrl('ABC123')
     expect(url).toContain('/r/ABC123')
   })
+
+  it('points at one event when given its slug', () => {
+    expect(buildReferralUrl('ABC123', 'summer-jam')).toMatch(/\/r\/ABC123\?e=summer-jam$/)
+  })
 })
 
 describe('event timezone (CAT, UTC+2) handling', () => {

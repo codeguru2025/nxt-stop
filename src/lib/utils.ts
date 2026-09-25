@@ -86,9 +86,10 @@ export function getInitials(name: string): string {
     .slice(0, 2)
 }
 
-export function buildReferralUrl(code: string): string {
+/** `/r/CODE` lands on the events list; pass an event slug to land on that event instead. */
+export function buildReferralUrl(code: string, eventSlug?: string): string {
   const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  return `${base}/r/${code}`
+  return `${base}/r/${code}${eventSlug ? `?e=${encodeURIComponent(eventSlug)}` : ''}`
 }
 
 export function parseReferralCode(url: string): string | null {

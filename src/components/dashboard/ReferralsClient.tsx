@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Share2, Copy, Check, QrCode, Star, TrendingUp, DollarSign } from 'lucide-react'
 import { buildReferralUrl, formatCurrency, formatDate } from '@/lib/utils'
+import { FEATURES } from '@/lib/features'
 import ReferralStats from './ReferralStats'
 
 type User = { referralCode: string; points: number; name: string; _count: { referralsMade: number } }
@@ -65,19 +66,27 @@ export default function ReferralsClient() {
   )
 
   const refUrl = buildReferralUrl(user.referralCode)
+  const steps = [
+    'Copy your unique referral link above',
+    'Share it on WhatsApp, Instagram, or anywhere',
+    'When someone buys tickets or merch through your link, you earn 10% of what they spend',
+    FEATURES.points
+      ? 'You also earn points — redeem them for drinks, upgrades, free entry, and more. Cash rewards are paid out by the team'
+      : 'Your earnings are paid out by the team',
+  ]
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-2xl font-black text-white">My Referrals</h1>
-        <p className="text-gray-500 text-sm mt-0.5">Share your link — earn points AND 10% cash on every ticket sold</p>
+        <p className="text-gray-500 text-sm mt-0.5">Share your link — earn 10% of everything bought through it</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className={`grid ${FEATURES.points ? 'grid-cols-2' : 'grid-cols-1'} gap-4 mb-4`}>
         {[
-          { icon: Share2, label: 'Referrals Made', value: user._count.referralsMade, color: 'text-purple-400' },
-          { icon: Star, label: 'Points Earned', value: user.points, color: 'text-yellow-400' },
+          { icon: Share2, label: 'Sales Through Your Link', value: user._count.referralsMade, color: 'text-purple-400' },
+          ...(FEATURES.points ? [{ icon: Star, label: 'Points Earned', value: user.points, color: 'text-yellow-400' }] : []),
         ].map(s => (
           <div key={s.label} className="stat-card text-center">
             <s.icon size={20} className={`${s.color} mx-auto mb-2`} />
@@ -106,7 +115,7 @@ export default function ReferralsClient() {
           Your Referral Link
         </h3>
         <p className="text-gray-500 text-sm mb-4">
-          Share this link. When someone buys a ticket through your link, you earn points plus 10% of the ticket value in cash.
+          Share this link. When someone buys tickets or merch through it, you earn 10% of what they spend.
         </p>
 
         <div className="bg-[#111] rounded-xl p-4 mb-4 font-mono text-sm text-gray-300 break-all border border-[#2a2a2a]">
@@ -166,17 +175,12 @@ export default function ReferralsClient() {
           How Referrals Work
         </h3>
         <div className="space-y-3">
-          {[
-            { step: '1', text: 'Copy your unique referral link above' },
-            { step: '2', text: 'Share it on WhatsApp, Instagram, or anywhere' },
-            { step: '3', text: 'When someone buys a ticket through your link, you instantly earn points plus 10% of the ticket value in cash' },
-            { step: '4', text: 'Redeem points for drinks, upgrades, free entry, and more — cash rewards are paid out by the team' },
-          ].map(s => (
-            <div key={s.step} className="flex items-start gap-3">
+          {steps.map((text, i) => (
+            <div key={i} className="flex items-start gap-3">
               <div className="w-6 h-6 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0 mt-0.5">
-                <span className="text-purple-400 text-xs font-bold">{s.step}</span>
+                <span className="text-purple-400 text-xs font-bold">{i + 1}</span>
               </div>
-              <p className="text-gray-400 text-sm">{s.text}</p>
+              <p className="text-gray-400 text-sm">{text}</p>
             </div>
           ))}
         </div>

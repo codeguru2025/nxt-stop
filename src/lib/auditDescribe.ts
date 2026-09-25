@@ -129,6 +129,14 @@ export function describeAuditEntry(row: AuditRow, names: Record<string, string> 
       const removed = b.userId ? names[str(b.userId)] : undefined
       return d(`${who} removed ${removed ?? 'someone'} from a street team`, 'other')
     }
+    case 'event.participant.add':
+      return d(
+        `${who} gave ${quote(a.name) || 'a line-up member'} a share link for ${quote(a.eventName) || 'an event'}`,
+        'events',
+        a.newAccount ? ['A new account was created for them (no ticket purchase needed)'] : ['Linked to their existing account']
+      )
+    case 'event.participant.remove':
+      return d(`${who} removed ${quote(b.name) || 'a line-up member'} as a participant of ${quote(b.eventName) || 'an event'} (their account stays)`, 'events')
   }
 
   // Anything not yet given its own wording: still readable, never the raw code alone

@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs'
 import { generateQRDataURL } from '@/lib/qr'
 import crypto from 'crypto'
 import { holdForApproval } from '@/lib/approvals'
+import { normalizeWhatsAppPhone } from '@/lib/phone'
 import { describePartnerCreate, describePartnerUpdate } from '@/lib/approvalDescribe'
 
 export async function GET() {
@@ -37,28 +38,41 @@ export async function POST(req: Request) {
       name, phone, type, businessName, commissionRate, commissionPerTicket, password,
     } = body
 
-    if (!name || !phone || !type || !password) {
-      return error('name, phone, type, and password are required')
+    if (!name || !phone || !type) {
+      return error('name, phone, and type are required')
     }
 
-    const existing = await prisma.user.findUnique({ where: { phone: phone.trim() } })
-    if (existing) return error('Phone number already registered')
+    // Someone who already has an account (e.g. a performer who once bought a ticket) is
+    // made a partner on that same account — no new login, no ticket purchase needed.
+    const typed = String(phone).trim()
+    const normalized = normalizeWhatsAppPhone(typed)
+    const existing = await prisma.user.findFirst({
+      where: { phone: { in: normalized && normalized !== typed ? [typed, normalized] : [typed] } },
+      include: { partnerProfile: { select: { id: true } } },
+    })
+    if (existing?.partnerProfile) return error('This person is already a partner')
+    if (!existing && (!password || String(password).length < 8)) {
+      return error('No account uses this phone yet — set a password of at least 8 characters for them')
+    }
 
     const held = await holdForApproval(req, session, {
       action: 'partner.create', capability: 'partners', route: '/api/admin/partners', body,
-      entityType: 'Partner', describe: () => describePartnerCreate(body),
+      entityType: 'Partner', describe: () => describePartnerCreate(body, existing?.name ?? null),
     })
     if (held) return held
 
-    const passwordHash = await bcrypt.hash(password, 10)
     const referralCode = crypto.randomBytes(6).toString('hex').toUpperCase()
     const qrPayload = `${process.env.NEXT_PUBLIC_APP_URL}/r/${referralCode}`
     const qrDataUrl = await generateQRDataURL(qrPayload)
 
     const partner = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: { name, phone: phone.trim(), passwordHash, role: 'partner' },
-      })
+      const user = existing
+        ? existing.role === 'customer'
+          ? await tx.user.update({ where: { id: existing.id }, data: { role: 'partner' } })
+          : existing // admins and gate staff keep their role
+        : await tx.user.create({
+            data: { name, phone: normalized ?? typed, passwordHash: await bcrypt.hash(password, 10), role: 'partner' },
+          })
       return tx.partner.create({
         data: {
           userId: user.id,

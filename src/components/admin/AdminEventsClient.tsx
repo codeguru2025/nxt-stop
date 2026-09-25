@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import AdminLayout from './AdminLayout'
+import EventParticipantsPanel from './EventParticipantsPanel'
 
 const LocationPicker = dynamic(() => import('./LocationPicker'), { ssr: false })
 import {
@@ -558,6 +559,18 @@ export default function AdminEventsClient() {
                   </button>
                 </div>
               ))}
+              {editing ? (
+                <EventParticipantsPanel
+                  eventId={editing}
+                  eventName={form.name}
+                  eventSlug={events.find(e => e.id === editing)?.slug ?? ''}
+                  eventPublic={['published', 'live', 'ended'].includes(events.find(e => e.id === editing)?.status ?? '')}
+                  lineup={form.lineup}
+                  roleLabels={ROLE_LABELS}
+                />
+              ) : form.lineup.length > 0 && (
+                <p className="text-xs text-gray-600">Save the event first, then edit it to give line-up members their share links.</p>
+              )}
             </div>
 
             {/* Ticket types */}

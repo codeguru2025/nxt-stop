@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Mail, Phone } from 'lucide-react'
+import { FEATURES } from '@/lib/features'
 
 const SOCIALS = [
   {
@@ -87,7 +88,7 @@ export default function Footer() {
                 { label: 'Merch', href: '/merch' },
                 { label: 'Past Videos', href: '/videos' },
                 { label: 'Tickets', href: '/dashboard/tickets' },
-                { label: 'Rewards', href: '/dashboard/rewards' },
+                FEATURES.points ? { label: 'Rewards', href: '/dashboard/rewards' } : { label: 'Share & Earn', href: '/dashboard/referrals' },
                 { label: 'About', href: '/about' },
               ].map(l => (
                 <li key={l.label}>

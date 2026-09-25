@@ -28,6 +28,12 @@ export async function GET() {
         createdAt: true,
         mustResetPassword: true,
         isPlatformOwner: true,
+        // Upcoming events they're on the line-up for — the dashboard offers a link per event
+        eventParticipations: {
+          where: { event: { date: { gte: new Date(Date.now() - 86_400_000) }, status: { notIn: ['draft', 'cancelled'] } } },
+          orderBy: { event: { date: 'asc' } },
+          select: { role: true, event: { select: { name: true, slug: true, date: true } } },
+        },
         _count: {
           select: {
             tickets: true,

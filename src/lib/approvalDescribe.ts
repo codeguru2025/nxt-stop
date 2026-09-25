@@ -2,6 +2,7 @@ import { prisma } from './db'
 import { entityVersion, type Change, type Description } from './approvals'
 import { formatDate, eventLocalInputToUtc } from './utils'
 import { ADMIN_CAPABILITY_LABELS, isAdminCapability } from './adminCapabilities'
+import { FEATURES } from './features'
 
 // Plain-language descriptions of held changes, shown to the admin asked to approve them.
 // Every describer lists only what would actually change; passwords are never included.
@@ -206,14 +207,20 @@ export async function describeProductDelete(id: string): Promise<Description> {
 
 // ── Partners, payouts, orders ────────────────────────────────────────────────
 
-export async function describePartnerCreate(body: any): Promise<Description> {
+/** `existingName` is set when the phone already has an account that will be made a partner. */
+export async function describePartnerCreate(body: any, existingName: string | null = null): Promise<Description> {
   return {
-    title: `Add partner ${text(body.name)}${body.businessName ? ` (${text(body.businessName)})` : ''}`,
+    title: existingName
+      ? `Make ${text(existingName)} a partner${body.businessName ? ` (${text(body.businessName)})` : ''}`
+      : `Add partner ${text(body.name)}${body.businessName ? ` (${text(body.businessName)})` : ''}`,
     changes: [
-      { label: 'Name', to: text(body.name) },
+      { label: 'Name', to: text(existingName ?? body.name) },
       { label: 'Phone (login)', to: text(body.phone) },
-      { label: 'Commission', to: Number(body.commissionPerTicket) > 0 ? `${money(body.commissionPerTicket)} per ticket` : `${Number(body.commissionRate ?? 10)}% of ticket sales` },
-      { label: 'Password', to: 'set (hidden)' },
+      { label: 'Type', to: text(body.type) },
+      { label: 'Earns', to: !FEATURES.partnerCommissionRates ? '10% of everything bought through their link (same as everyone)' : Number(body.commissionPerTicket) > 0 ? `${money(body.commissionPerTicket)} per ticket` : `${Number(body.commissionRate ?? 10)}% of ticket sales` },
+      existingName
+        ? { label: 'Account', to: 'uses their existing login' }
+        : { label: 'Password', to: 'set (hidden)' },
     ],
   }
 }

@@ -9,6 +9,7 @@ import {
   ImageIcon, Video, Ticket, Menu, X, KeyRound, Lock, ScrollText, Share2, UsersRound, ShieldCheck, Check
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { FEATURES } from '@/lib/features'
 import type { AdminCapability } from '@/lib/adminCapabilities'
 import AdminPushToggle from './AdminPushToggle'
 
@@ -18,7 +19,7 @@ const NAV: { href: string; icon: typeof LayoutDashboard; label: string; exact?: 
   { href: '/admin/events',    icon: CalendarDays,    label: 'Events',                      capability: 'events' },
   { href: '/admin/partners',  icon: Users,           label: 'Partners',                    capability: 'partners' },
   { href: '/admin/store',     icon: Package,         label: 'Store',                       capability: 'store' },
-  { href: '/admin/rewards',   icon: Gift,            label: 'Rewards',                     capability: 'rewards' },
+  ...(FEATURES.points ? [{ href: '/admin/rewards', icon: Gift, label: 'Rewards', capability: 'rewards' as const }] : []),
   { href: '/admin/referrals', icon: Share2,          label: 'Referrals',                   capability: 'referrals' },
   { href: '/admin/teams',     icon: UsersRound,      label: 'Teams',                       capability: 'teams' },
   { href: '/admin/founders',  icon: UserCircle2,     label: 'Founders',                    capability: 'founders' },

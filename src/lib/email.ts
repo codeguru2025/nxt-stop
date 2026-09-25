@@ -159,7 +159,7 @@ export async function sendReferralRewardEarnedEmail(userId: string, amount: numb
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
       <h2>You just earned a referral reward 💸</h2>
-      <p>Hi ${esc(user.name)}, someone bought a ticket using your referral link — you've earned <strong>$${amount.toFixed(2)}</strong>.</p>
+      <p>Hi ${esc(user.name)}, someone made a purchase through your link — you've earned <strong>$${amount.toFixed(2)}</strong>.</p>
       <p style="color:#666; font-size: 13px;">Track your total earnings and payout status on your NXT STOP dashboard.</p>
     </div>`
 

@@ -107,6 +107,23 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
+  // Logged in: the sharer's own link, landing on this event. Logged out: the plain event
+  // address — never the current URL, whose ?ref= would credit whoever sent them here.
+  const [shareCopied, setShareCopied] = useState(false)
+  const shareEvent = async () => {
+    if (!event) return
+    const url = user
+      ? buildReferralUrl(user.referralCode, event.slug)
+      : `${window.location.origin}/events/${event.slug}`
+    if (navigator.share) {
+      await navigator.share({ title: event.name, url }).catch(() => {})
+      return
+    }
+    await navigator.clipboard?.writeText(url).catch(() => {})
+    setShareCopied(true)
+    setTimeout(() => setShareCopied(false), 2000)
+  }
+
   const selectedTicket = event?.ticketTypes.find(t => t.id === selectedType)
   // Most this order may take — never the actual stock (sales numbers stay server-side)
   const available = selectedTicket ? selectedTicket.maxPerOrder : 0
@@ -373,11 +390,11 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
             </div>
 
             <button
-              onClick={() => navigator.share?.({ title: event.name, url: window.location.href } as any)}
+              onClick={shareEvent}
               className="flex items-center gap-2 text-sm text-gray-500 hover:text-purple-400 transition-colors mb-8"
             >
-              <Share2 size={14} />
-              Share & Earn Rewards
+              {shareCopied ? <Check size={14} /> : <Share2 size={14} />}
+              {shareCopied ? 'Link copied!' : user ? 'Share & Earn Rewards' : 'Share'}
             </button>
 
             {event.description && (
@@ -781,7 +798,7 @@ export default function EventDetailClient({ initialEvent }: { initialEvent: Even
 
                   {ref && (
                     <p className="text-xs text-gray-600 mt-3 text-center">
-                      Referred by a friend — they'll earn reward points when you buy!
+                      Referred by a friend — they'll earn a reward when you buy!
                     </p>
                   )}
                 </div>

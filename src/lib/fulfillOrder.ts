@@ -3,6 +3,7 @@ import { generateTicketNumber } from './qr'
 import { sendOrderTicketsWhatsApp } from './whatsapp'
 import { sendOrderConfirmationEmail, sendReferralRewardEarnedEmail, sendVoucherPurchaseEmail } from './email'
 import crypto from 'crypto'
+import { FEATURES } from './features'
 
 function generateVoucherCode(): string {
   const random = crypto.randomBytes(4).toString('hex').toUpperCase()
@@ -163,48 +164,62 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
       vouchersMinted = true
     }
 
-    if (order.referralCode) {
+    // Whose link sold this: a personal code, or — while partner rates are off — a partner's
+    // code (old QR cards), which pays the partner's own account like any other link.
+    const partnerReferrer = !FEATURES.partnerCommissionRates && order.partnerId
+      ? await tx.partner.findUnique({ where: { id: order.partnerId }, select: { userId: true } })
+      : null
+    const referrer = order.referralCode
+      ? await tx.user.findUnique({ where: { referralCode: order.referralCode } })
+      : null
+    const referrerId = referrer?.id ?? partnerReferrer?.userId ?? null
+
+    if (referrerId && referrerId !== order.userId) {
       const existingRef = await tx.referral.findFirst({ where: { orderId: order.id } })
       if (!existingRef) {
-        const referrer = await tx.user.findUnique({ where: { referralCode: order.referralCode } })
-        if (referrer && referrer.id !== order.userId) {
-          const config = await tx.pointsConfig.findFirst({ where: { active: true } })
+        const config = await tx.pointsConfig.findFirst({ where: { active: true } })
+        let points = 0
+        if (FEATURES.points) {
           const pointsPerSale = config?.pointsPerSale ?? 10
           const bonus = config?.bonusMultiplier ?? 1.0
           const totalQty = ticketItems.reduce((s, i) => s + i.quantity, 0)
-          const points = Math.round(pointsPerSale * totalQty * bonus)
-
+          points = Math.round(pointsPerSale * totalQty * bonus)
           await tx.user.update({
-            where: { id: referrer.id },
+            where: { id: referrerId },
             data: { points: { increment: points }, totalEarned: { increment: points } },
           })
+        }
 
-          const referral = await tx.referral.create({
-            data: {
-              sourceUserId: referrer.id,
-              targetUserId: order.userId,
-              orderId: order.id,
-              pointsAwarded: points,
-            },
+        const referral = await tx.referral.create({
+          data: {
+            sourceUserId: referrerId,
+            targetUserId: order.userId,
+            partnerId: referrer ? null : order.partnerId,
+            orderId: order.id,
+            pointsAwarded: points,
+          },
+        })
+        if (!referrer && order.partnerId) {
+          const totalQty = ticketItems.reduce((s, i) => s + i.quantity, 0)
+          await tx.partner.update({ where: { id: order.partnerId }, data: { totalSales: { increment: totalQty } } })
+        }
+
+        // Cash reward — a % of everything bought through the link (tickets and merch),
+        // not counting the per-ticket platform fee.
+        const purchased = order.items.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
+        const pct = Number(config?.referralPercentage ?? 10)
+        const amount = Math.round(purchased * (pct / 100) * 100) / 100
+        if (amount > 0) {
+          await tx.referralReward.create({
+            data: { referralId: referral.id, userId: referrerId, orderId: order.id, amount },
           })
-
-          // Cash reward — a % of ticket-only value (never the full order total, which after
-          // pre-event purchases can include merch/vouchers). Kept alongside the points award
-          // above rather than replacing it, so the existing Rewards catalog isn't orphaned.
-          const ticketSubtotal = ticketItems.reduce((s, i) => s + Number(i.price) * i.quantity, 0)
-          const pct = Number(config?.referralPercentage ?? 10)
-          const amount = Math.round(ticketSubtotal * (pct / 100) * 100) / 100
-          if (amount > 0) {
-            await tx.referralReward.create({
-              data: { referralId: referral.id, userId: referrer.id, orderId: order.id, amount },
-            })
-            referralRewardEarned = { userId: referrer.id, amount }
-          }
+          referralRewardEarned = { userId: referrerId, amount }
         }
       }
     }
 
-    if (order.partnerId) {
+    // Per-partner commission — switched off for now; partner codes are paid above instead
+    if (order.partnerId && FEATURES.partnerCommissionRates) {
       const existingComm = await tx.commission.findFirst({
         where: { orderId: order.id, partnerId: order.partnerId },
       })
