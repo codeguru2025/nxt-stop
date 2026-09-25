@@ -30,7 +30,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ code: strin
     eventSlug(req.nextUrl.searchParams.get('e')),
   ])
   const dest = slug ? `/events/${slug}` : '/events'
-  const res = NextResponse.redirect(new URL(code ? `${dest}?ref=${encodeURIComponent(code)}` : dest, req.url))
+  // Relative Location on purpose: behind the host's proxy req.url is the internal
+  // localhost:3000 address, so an absolute redirect built from it sent visitors nowhere.
+  const res = new NextResponse(null, {
+    status: 307,
+    headers: { Location: code ? `${dest}?ref=${encodeURIComponent(code)}` : dest },
+  })
   if (!code) return res
 
   const cookieHeader = req.headers.get('cookie') ?? ''
