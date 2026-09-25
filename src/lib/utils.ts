@@ -86,10 +86,32 @@ export function getInitials(name: string): string {
     .slice(0, 2)
 }
 
+export const PRODUCTION_URL = 'https://www.nxt-stop.com'
+let warnedMissingAppUrl = false
+
+/**
+ * The site's public address, no trailing slash — the base for every absolute link we hand
+ * out (share links, QR codes, Paynow return/webhook URLs, emails, WhatsApp messages).
+ * NEXT_PUBLIC_APP_URL wins; if it's ever missing, the browser uses the address it's on and a
+ * production server uses the live domain, so links never silently point at localhost.
+ */
+export function appUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (configured) return configured.replace(/\/+$/, '')
+  if (typeof window !== 'undefined') return window.location.origin
+  if (process.env.NODE_ENV === 'production') {
+    if (!warnedMissingAppUrl) {
+      warnedMissingAppUrl = true
+      console.error(`[env] NEXT_PUBLIC_APP_URL is not set — using ${PRODUCTION_URL} for links`)
+    }
+    return PRODUCTION_URL
+  }
+  return 'http://localhost:3000'
+}
+
 /** `/r/CODE` lands on the events list; pass an event slug to land on that event instead. */
 export function buildReferralUrl(code: string, eventSlug?: string): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-  return `${base}/r/${code}${eventSlug ? `?e=${encodeURIComponent(eventSlug)}` : ''}`
+  return `${appUrl()}/r/${code}${eventSlug ? `?e=${encodeURIComponent(eventSlug)}` : ''}`
 }
 
 export function parseReferralCode(url: string): string | null {

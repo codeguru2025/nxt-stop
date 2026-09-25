@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Link2, Copy, Check, Loader2, X, MessageCircle, KeyRound } from 'lucide-react'
-import { buildReferralUrl } from '@/lib/utils'
+import { appUrl, buildReferralUrl } from '@/lib/utils'
 
 type Participant = {
   id: string; name: string; role: string
@@ -105,7 +105,7 @@ export default function EventParticipantsPanel({ eventId, eventName, eventSlug, 
   }
 
   const messageFor = (p: Participant, pwOverride?: string) => {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin
+    const base = appUrl()
     const pw = pwOverride ?? passwords[p.id]
     // "Forgot password?" works by email only, so people without one are asked to reply instead
     const stuck = p.user.email

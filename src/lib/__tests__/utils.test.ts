@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl, getEventTimePhase, eventLocalInputToUtc, utcToEventLocalInput, formatDate, eventDayStartUtc, eventEndTime, ticketSalesClosedReason, ticketChannelWindow, lowestOnSalePrice } from '../utils'
+import { slugify, formatCurrency, truncate, getInitials, parseReferralCode, buildReferralUrl, appUrl, PRODUCTION_URL, getEventTimePhase, eventLocalInputToUtc, utcToEventLocalInput, formatDate, eventDayStartUtc, eventEndTime, ticketSalesClosedReason, ticketChannelWindow, lowestOnSalePrice } from '../utils'
 
 describe('slugify', () => {
   it('lowercases and hyphenates', () => {
@@ -285,5 +285,28 @@ describe('ticket greying on the event page (NXTSTOP SESSIONS, 19 Dec 2026)', () 
     expect(lowestOnSalePrice(date, [types[2], { ...types[1], price: 60 }], before)).toBe(40) // nothing buyable → cheapest
     expect(lowestOnSalePrice(date, [types[2], { ...types[0], price: 45 }], before)).toBe(45) // sold-out $40 skipped
     expect(lowestOnSalePrice(date, [], before)).toBe(0)
+  })
+})
+
+describe('appUrl', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('uses NEXT_PUBLIC_APP_URL without a trailing slash', () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://example.com/')
+    expect(appUrl()).toBe('https://example.com')
+  })
+
+  it('falls back to the live domain in production, never localhost', () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', '')
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(appUrl()).toBe(PRODUCTION_URL)
+    expect(buildReferralUrl('ABC123')).toBe(`${PRODUCTION_URL}/r/ABC123`)
+  })
+
+  it('falls back to localhost in development', () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', '')
+    vi.stubEnv('NODE_ENV', 'development')
+    expect(appUrl()).toBe('http://localhost:3000')
   })
 })

@@ -1,5 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Paynow } = require('paynow')
+import { appUrl } from './utils'
 
 export type PaynowMethod = 'ecocash' | 'onemoney' | 'innbucks' | 'omari' | 'vmc' | 'standard'
 
@@ -26,10 +27,9 @@ function createClient() {
     process.env.PAYNOW_INTEGRATION_ID!,
     process.env.PAYNOW_INTEGRATION_KEY!
   )
-  // Strip any trailing slash so we never produce double-slash URLs (e.g. https://app.com//api/...)
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
-  client.resultUrl = `${appUrl}/api/paynow/webhook`
-  client.returnUrl = `${appUrl}/dashboard/tickets?new=1`
+  const base = appUrl()
+  client.resultUrl = `${base}/api/paynow/webhook`
+  client.returnUrl = `${base}/dashboard/tickets?new=1`
   return client
 }
 

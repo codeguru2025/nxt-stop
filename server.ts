@@ -19,7 +19,9 @@ function getJwtSecret(): Uint8Array {
 app.prepare().then(() => {
   const httpServer = createServer((req, res) => handle(req, res))
 
-  const allowedOrigin = process.env.NEXT_PUBLIC_APP_URL || (dev ? 'http://localhost:3000' : undefined)
+  // Same fallback as appUrl() in src/lib/utils.ts — a missing variable must not lock browsers out
+  const allowedOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, '')
+    || (dev ? 'http://localhost:3000' : 'https://www.nxt-stop.com')
 
   const io = new SocketServer(httpServer, {
     cors: {

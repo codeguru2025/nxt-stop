@@ -3,6 +3,7 @@ import { requireCapability } from '@/lib/auth'
 import { ok, error, forbidden, serverError } from '@/lib/api'
 import bcrypt from 'bcryptjs'
 import { generateQRDataURL } from '@/lib/qr'
+import { buildReferralUrl } from '@/lib/utils'
 import crypto from 'crypto'
 import { holdForApproval } from '@/lib/approvals'
 import { normalizeWhatsAppPhone } from '@/lib/phone'
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
     if (held) return held
 
     const referralCode = crypto.randomBytes(6).toString('hex').toUpperCase()
-    const qrPayload = `${process.env.NEXT_PUBLIC_APP_URL}/r/${referralCode}`
+    const qrPayload = buildReferralUrl(referralCode)
     const qrDataUrl = await generateQRDataURL(qrPayload)
 
     const partner = await prisma.$transaction(async (tx) => {
