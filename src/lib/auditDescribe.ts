@@ -135,6 +135,12 @@ export function describeAuditEntry(row: AuditRow, names: Record<string, string> 
         'events',
         a.newAccount ? ['A new account was created for them (no ticket purchase needed)'] : ['Linked to their existing account']
       )
+    case 'event.participant.new-password':
+      return d(
+        `${who} issued a new one-time password for ${quote(a.name) || 'a line-up member'} (${quote(a.eventName) || 'an event'})`,
+        'security',
+        [a.emailed ? 'It was also emailed to them' : 'No email on file — it was shown to the admin to pass on']
+      )
     case 'event.participant.remove':
       return d(`${who} removed ${quote(b.name) || 'a line-up member'} as a participant of ${quote(b.eventName) || 'an event'} (their account stays)`, 'events')
   }

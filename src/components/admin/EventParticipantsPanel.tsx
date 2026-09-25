@@ -6,7 +6,11 @@ import { buildReferralUrl } from '@/lib/utils'
 
 type Participant = {
   id: string; name: string; role: string
-  user: { id: string; name: string; phone: string; email: string | null; referralCode: string; mustResetPassword: boolean }
+  user: {
+    id: string; name: string; phone: string; email: string | null; referralCode: string; mustResetPassword: boolean
+    hasOwnPassword: boolean // chose their own password — we can't know it
+    canIssuePassword: boolean // account exists only for the line-up, so a new one-time password may be issued
+  }
 }
 
 type Props = {
@@ -31,6 +35,8 @@ export default function EventParticipantsPanel({ eventId, eventName, eventSlug, 
   const [passwords, setPasswords] = useState<Record<string, string>>({}) // participantId → one-time password, shown once
   const [copied, setCopied] = useState<string | null>(null)
   const [percent, setPercent] = useState<number | null>(null)
+  const [issuing, setIssuing] = useState<string | null>(null)
+  const [rowError, setRowError] = useState<Record<string, string>>({})
   const earns = percent === null ? 'a share' : `${percent}%`
 
   useEffect(() => {
@@ -76,24 +82,71 @@ export default function EventParticipantsPanel({ eventId, eventName, eventSlug, 
 
   const linkFor = (p: Participant) => buildReferralUrl(p.user.referralCode, eventSlug)
 
-  const messageFor = (p: Participant) => {
+  // One-time passwords are never stored readable, so after a refresh a new one is issued
+  // (the old one stops working) rather than sending a message with no way to log in.
+  const issuePassword = async (p: Participant): Promise<string | null> => {
+    setIssuing(p.id)
+    setRowError(e => ({ ...e, [p.id]: '' }))
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/participants`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ participantId: p.id }),
+      }).then(r => r.json())
+      if (!res.success) { setRowError(e => ({ ...e, [p.id]: res.error ?? 'Could not issue a password' })); return null }
+      setPasswords(pw => ({ ...pw, [p.id]: res.data.oneTimePassword }))
+      return res.data.oneTimePassword as string
+    } catch {
+      setRowError(e => ({ ...e, [p.id]: 'Network error — please try again' }))
+      return null
+    } finally {
+      setIssuing(null)
+    }
+  }
+
+  const messageFor = (p: Participant, pwOverride?: string) => {
     const base = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin
-    const pw = passwords[p.id]
+    const pw = pwOverride ?? passwords[p.id]
+    // "Forgot password?" works by email only, so people without one are asked to reply instead
+    const stuck = p.user.email
+      ? `Tap “Forgot password?” on the login page`
+      : `Reply to this message and we'll reset it for you`
+    const login = pw
+      ? `Log in at ${base}/login with ${p.user.phone} and your one-time password ${pw} (you'll then choose your own password) to see your sales and earnings.`
+      : p.user.hasOwnPassword
+        ? `Log in at ${base}/login with ${p.user.phone} and your NXT STOP password to see your sales and earnings. Forgot it? ${stuck}.`
+        : `Log in at ${base}/login with ${p.user.phone} and the one-time password ${p.user.email ? 'we emailed you' : 'you were given'} when you bought your ticket. Can't find it? ${stuck}.`
     return [
       `Hi ${p.name}! You're on the line-up for ${eventName} 🎤`,
       `Here's your personal NXT STOP link to share with your fans:`,
       linkFor(p),
       `You earn ${earns} of everything bought through it.`,
-      pw
-        ? `Log in at ${base}/login with ${p.user.phone} and the one-time password ${pw} (you'll set your own password) to see your sales and earnings.`
-        : `Log in at ${base}/login with ${p.user.phone} to see your sales and earnings.`,
+      login,
     ].join('\n')
   }
 
-  const copy = (key: string, text: string) => {
-    navigator.clipboard?.writeText(text).catch(() => {})
+  const copyMessage = async (p: Participant) => {
+    let pw: string | null | undefined = passwords[p.id]
+    if (!pw && p.user.canIssuePassword) {
+      pw = await issuePassword(p)
+      if (!pw) return
+    }
+    // After the network wait some browsers (Safari) refuse the clipboard; the password is
+    // now on screen, so a second tap copies straight away.
+    const done = await copy(`m-${p.id}`, messageFor(p, pw ?? undefined))
+    setRowError(e => ({ ...e, [p.id]: done ? '' : 'Password ready (shown above), but your browser blocked copying. Tap “Copy WhatsApp message” again.' }))
+  }
+
+  // Shows ✓ only when the text really reached the clipboard
+  const copy = async (key: string, text: string): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      return false
+    }
     setCopied(key)
     setTimeout(() => setCopied(c => (c === key ? null : c)), 2000)
+    return true
   }
 
   return (
@@ -122,7 +175,7 @@ export default function EventParticipantsPanel({ eventId, eventName, eventSlug, 
                   <div className="text-sm font-semibold text-white">{p.name}</div>
                   <div className="text-xs text-gray-500">
                     {roleLabels[p.role] ?? p.role} · {p.user.phone}
-                    {p.user.mustResetPassword && <span className="text-yellow-500"> · hasn&apos;t logged in yet</span>}
+                    {p.user.mustResetPassword && !p.user.hasOwnPassword && <span className="text-yellow-500"> · hasn&apos;t logged in yet</span>}
                   </div>
                 </div>
                 <button type="button" onClick={() => remove(p)} title="Remove participant" className="text-gray-600 hover:text-red-400 transition-colors">
@@ -134,8 +187,8 @@ export default function EventParticipantsPanel({ eventId, eventName, eventSlug, 
                 <div className="flex items-start gap-2 text-xs text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 mb-2">
                   <KeyRound size={13} className="shrink-0 mt-0.5" />
                   <span>
-                    New account — one-time password <strong className="font-mono">{passwords[p.id]}</strong>.
-                    {p.user.email ? ' It was also emailed to them.' : ' Send it to them — it’s only shown now.'} It’s included in the message below.
+                    One-time password <strong className="font-mono">{passwords[p.id]}</strong>.
+                    {p.user.email ? ' It was also emailed to them.' : ' Send it to them — it’s only shown now.'} It’s in the WhatsApp message.
                   </span>
                 </div>
               )}
@@ -147,10 +200,20 @@ export default function EventParticipantsPanel({ eventId, eventName, eventSlug, 
                 <button type="button" onClick={() => copy(`l-${p.id}`, linkFor(p))} className="flex items-center gap-1.5 text-xs text-purple-300 border border-purple-500/30 rounded-md px-2.5 py-1.5 hover:bg-purple-500/10">
                   {copied === `l-${p.id}` ? <Check size={12} /> : <Copy size={12} />} Copy link
                 </button>
-                <button type="button" onClick={() => copy(`m-${p.id}`, messageFor(p))} className="flex items-center gap-1.5 text-xs text-green-300 border border-green-500/30 rounded-md px-2.5 py-1.5 hover:bg-green-500/10">
-                  {copied === `m-${p.id}` ? <Check size={12} /> : <MessageCircle size={12} />} Copy WhatsApp message
+                <button type="button" onClick={() => copyMessage(p)} disabled={issuing === p.id} className="flex items-center gap-1.5 text-xs text-green-300 border border-green-500/30 rounded-md px-2.5 py-1.5 hover:bg-green-500/10 disabled:opacity-60">
+                  {issuing === p.id ? <Loader2 size={12} className="animate-spin" /> : copied === `m-${p.id}` ? <Check size={12} /> : <MessageCircle size={12} />}
+                  {!passwords[p.id] && p.user.canIssuePassword ? 'Copy message with new password' : 'Copy WhatsApp message'}
                 </button>
               </div>
+              {!passwords[p.id] && p.user.canIssuePassword && (
+                <p className="text-[11px] text-gray-600 mt-1.5">Creates a fresh one-time password for their login{p.user.email ? ' and emails it' : ''}. Any earlier one stops working.</p>
+              )}
+              {!passwords[p.id] && !p.user.canIssuePassword && (
+                <p className="text-[11px] text-gray-600 mt-1.5">
+                  {p.user.hasOwnPassword ? 'They already have their own password.' : 'This account has ticket purchases, so it keeps the password from checkout.'} The message tells them what to do if they can&apos;t log in.
+                </p>
+              )}
+              {rowError[p.id] && <p className="text-xs text-red-400 mt-1.5">{rowError[p.id]}</p>}
             </div>
           ))}
 
