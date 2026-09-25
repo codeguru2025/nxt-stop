@@ -220,18 +220,26 @@ export async function sendVoucherPurchaseEmail(orderId: string): Promise<void> {
   })
 }
 
-export async function sendAdminDigestEmail(report: DailyReport): Promise<void> {
+/**
+ * @param opts.onlyTo send just to this admin's email (an on-demand copy) instead of every
+ *   admin — refused unless the address belongs to an admin account. They get the audit
+ *   PDF only if that account is a platform owner, same as the daily send.
+ */
+export async function sendAdminDigestEmail(report: DailyReport, opts: { onlyTo?: string } = {}): Promise<void> {
   const resend = getClient()
   const from = env.EMAIL_FROM
   if (!resend || !from) return
 
   // Recipients are every admin account with an email on file, plus any extra
   // addresses in ADMIN_DIGEST_EMAILS (e.g. stakeholders without a login).
-  const admins = await prisma.user.findMany({
+  const allAdmins = await prisma.user.findMany({
     where: { role: 'admin', email: { not: null } },
     select: { email: true, isPlatformOwner: true },
   })
-  const extra = (env.ADMIN_DIGEST_EMAILS ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  const onlyTo = opts.onlyTo?.trim().toLowerCase()
+  const admins = onlyTo ? allAdmins.filter((a) => a.email?.toLowerCase() === onlyTo) : allAdmins
+  if (onlyTo && admins.length === 0) throw new Error('That email does not belong to an admin account')
+  const extra = onlyTo ? [] : (env.ADMIN_DIGEST_EMAILS ?? '').split(',').map((s) => s.trim()).filter(Boolean)
   const recipients = Array.from(new Set([...admins.map((a) => a.email as string), ...extra]))
   if (recipients.length === 0) {
     console.warn('[digest] no admin has an email on file and ADMIN_DIGEST_EMAILS is unset — nothing to send')
