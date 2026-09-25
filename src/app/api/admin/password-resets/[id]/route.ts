@@ -4,6 +4,7 @@ import { ok, error, forbidden, serverError } from '@/lib/api'
 import bcrypt from 'bcryptjs'
 import { holdForApproval } from '@/lib/approvals'
 import { describePasswordReset } from '@/lib/approvalDescribe'
+import { isCreatorProtected } from '@/lib/platformCreator'
 
 // PATCH /api/admin/password-resets/[id]
 // Body: { password?: string, action: 'approve' | 'reject' }
@@ -31,6 +32,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         data: { status: 'rejected', processedAt: new Date(), processedBy: session.id },
       })
       return ok({ message: 'Request rejected' })
+    }
+
+    if (await isCreatorProtected(request.userId, session.id)) {
+      return error('The platform creator resets their own password — use "Forgot password?" or ask them', 403)
     }
 
     const password = String(body?.password ?? '')

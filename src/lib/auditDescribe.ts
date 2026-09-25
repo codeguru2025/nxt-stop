@@ -72,6 +72,8 @@ export function describeAuditEntry(row: AuditRow, names: Record<string, string> 
     // ── Two-admin approvals ──
     case 'change.requested':
       return d(`${who} asked for approval to: ${str(a.title)}`, 'approval', changeLines(a.changes))
+    case 'change.creator-direct':
+      return d(`${who} (platform creator, no approval needed): ${str(a.title)}`, 'approval', changeLines(a.changes))
     case 'change.approved':
       return d(`${who} approved: ${str(a.title)} (asked by ${str(a.requestedBy) || 'another admin'}) — it is now live`, 'approval')
     case 'change.rejected':
@@ -104,6 +106,15 @@ export function describeAuditEntry(row: AuditRow, names: Record<string, string> 
       return d(
         `${who} marked a referral cash payout${target ? ` to ${target}` : ''} as ${label[str(a.status)] ?? str(a.status)}`,
         'money', b.status ? [`It was: ${label[str(b.status)] ?? str(b.status)}`] : []
+      )
+    }
+    case 'platform.creator.set':
+      return d(`The platform creator role was given to ${target ?? 'an account'} (server script)`, 'access', [], true)
+    case 'sms.credits.add': {
+      const n = Number(a.credits)
+      return d(
+        n < 0 ? `${who} took ${-n} SMS credits off` : `${who} added ${n} SMS credits`,
+        'money', [...(a.note ? [`Note: ${str(a.note)}`] : []), `Credits left after: ${str(a.remaining)}`], n < 0
       )
     }
 

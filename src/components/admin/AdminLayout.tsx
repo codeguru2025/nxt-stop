@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, CalendarDays, Users, Package,
   Gift, UserCircle2, QrCode, LogOut, Shield,
-  ImageIcon, Video, Ticket, Menu, X, KeyRound, Lock, ScrollText, Share2, UsersRound, ShieldCheck, Check
+  ImageIcon, Video, Ticket, Menu, X, KeyRound, Lock, ScrollText, Share2, UsersRound, ShieldCheck, Check, MessageSquare
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FEATURES } from '@/lib/features'
@@ -29,6 +29,7 @@ const NAV: { href: string; icon: typeof LayoutDashboard; label: string; exact?: 
   { href: '/admin/gate-staff',       icon: Users,     label: 'Gate Staff',                 capability: 'gate_staff' },
   { href: '/admin/admins',            icon: Shield,    label: 'Admins',                    capability: 'admins' },
   { href: '/admin/password-resets',   icon: KeyRound,  label: 'Password Resets',           capability: 'password_resets' },
+  { href: '/admin/sms',               icon: MessageSquare, label: 'SMS' }, // every admin sees credits; only owners add them
   { href: '/admin/audit-log',         icon: ScrollText, label: 'Audit Log',                ownerOnly: true },
   { href: '/gate',                    icon: QrCode,    label: 'Gate Scanner' }, // shared with gate_staff role, not capability-gated
 ]

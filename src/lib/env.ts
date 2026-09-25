@@ -4,6 +4,8 @@
  * not during `next build` (where env vars are not available).
  */
 
+import { appUrl } from './utils'
+
 function required(name: string): string {
   const value = process.env[name]
   if (!value) throw new Error(`Missing required environment variable: ${name}`)
@@ -26,7 +28,7 @@ export const env = {
   get WHATSAPP_WEBHOOK_VERIFY_TOKEN() { return process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN },
   get META_APP_SECRET() { return process.env.META_APP_SECRET },
   get REDIS_URL()       { return process.env.REDIS_URL },
-  get APP_URL()         { return process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000' },
+  get APP_URL()         { return appUrl() },
   get SEED_SECRET()     { return process.env.SEED_SECRET },
 
   get DO_SPACES_KEY()      { return process.env.DO_SPACES_KEY },
@@ -35,7 +37,12 @@ export const env = {
   get DO_SPACES_BUCKET()   { return process.env.DO_SPACES_BUCKET },
   get DO_SPACES_REGION()   { return process.env.DO_SPACES_REGION },
 
-  get RESEND_API_KEY()        { return process.env.RESEND_API_KEY },
+  // SMS gateway name (see PROVIDERS in sms.ts); unset = SMS off
+  get SMS_PROVIDER()          { return process.env.SMS_PROVIDER?.trim().toLowerCase() || undefined },
+  get SMSALA_API_TOKEN()      { return process.env.SMSALA_API_TOKEN },
+  get SMSALA_SENDER_ID()      { return process.env.SMSALA_SENDER_ID },
+
+  get RESEND_API_KEY()      { return process.env.RESEND_API_KEY },
   get EMAIL_FROM()            { return process.env.EMAIL_FROM },
   get ADMIN_DIGEST_EMAILS()   { return process.env.ADMIN_DIGEST_EMAILS },
   get ADMIN_DIGEST_HOUR_UTC() { return process.env.ADMIN_DIGEST_HOUR_UTC ?? '6' },

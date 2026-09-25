@@ -1,4 +1,5 @@
 import { prisma } from './db'
+import { smsCredits } from './smsCredits'
 
 export type DailyReport = {
   windowStart: Date
@@ -17,6 +18,18 @@ export type DailyReport = {
   scanAnomalies: { invalid: number; alreadyUsed: number; earlyScan: number }
   website: { pageViews: number; visitors: number; referralClicks: number }
   perEvent: { id: string; name: string; ticketsSold: number; revenue: number; attendance: number }[]
+  /** null until the sms_credits migration has run */
+  sms: SmsSummary | null
+}
+
+export type SmsSummary = {
+  sent: number        // SMS accepted by the gateway in the window
+  failed: number      // refused by the gateway
+  noCredit: number    // not sent because credits had run out (email/WhatsApp still went)
+  creditsUsed: number // segments of the SMS sent in the window
+  creditsAdded: number // top-ups recorded in the window
+  bought: number      // all time
+  remaining: number
 }
 
 export async function buildDailyReport(hoursBack = 24): Promise<DailyReport> {
@@ -132,6 +145,7 @@ export async function buildDailyReport(hoursBack = 24): Promise<DailyReport> {
     },
     perEvent,
     website: await websiteSummary(windowStart, windowEnd),
+    sms: await smsSummary(windowStart, windowEnd),
   }
 }
 
@@ -144,4 +158,27 @@ async function websiteSummary(from: Date, to: Date): Promise<DailyReport['websit
     prisma.pageView.count({ where: { ...inWindow, path: { startsWith: '/r/' } } }),
   ]).catch(() => [0, 0, 0] as const)
   return { pageViews, visitors, referralClicks }
+}
+
+async function smsSummary(from: Date, to: Date): Promise<SmsSummary | null> {
+  const inWindow = { createdAt: { gte: from, lte: to } }
+  try {
+    const [byStatus, added, credits] = await Promise.all([
+      prisma.smsMessage.groupBy({ by: ['status'], where: inWindow, _count: { id: true }, _sum: { segments: true } }),
+      prisma.smsTopUp.aggregate({ where: inWindow, _sum: { credits: true } }),
+      smsCredits(),
+    ])
+    const row = (status: string) => byStatus.find(r => r.status === status)
+    return {
+      sent: row('sent')?._count.id ?? 0,
+      failed: row('failed')?._count.id ?? 0,
+      noCredit: row('no_credit')?._count.id ?? 0,
+      creditsUsed: row('sent')?._sum.segments ?? 0,
+      creditsAdded: added._sum.credits ?? 0,
+      bought: credits.bought,
+      remaining: credits.remaining,
+    }
+  } catch {
+    return null
+  }
 }

@@ -4,6 +4,7 @@ import { ok, error, forbidden, notFound, serverError } from '@/lib/api'
 import { writeAuditLog } from '@/lib/auditLog'
 import bcrypt from 'bcryptjs'
 import { holdForApproval } from '@/lib/approvals'
+import { isCreatorProtected } from '@/lib/platformCreator'
 import { describeAdminUpdate, describeAdminRevoke } from '@/lib/approvalDescribe'
 
 // PATCH /api/admin/admins/[id] — update name/email/capabilities, or reset password
@@ -19,6 +20,7 @@ export async function PATCH(
     const admin = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true, capabilities: true } })
     if (!admin) return notFound('Admin')
     if (admin.role !== 'admin') return error('User is not an admin', 400)
+    if (await isCreatorProtected(id, session.id)) return error('Only the platform creator can change the creator account', 403)
 
     // Note: isPlatformOwner is deliberately never destructured/accepted here — no route in
     // the app ever writes it. See prisma/scripts/seed-platform-owner.ts.
@@ -115,6 +117,7 @@ export async function DELETE(
     const admin = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } })
     if (!admin) return notFound('Admin')
     if (admin.role !== 'admin') return error('User is not an admin', 400)
+    if (await isCreatorProtected(id, session.id)) return error('The platform creator account cannot be revoked', 403)
 
     const held = await holdForApproval(req, session, {
       action: 'admin.revoke', capability: 'admins', route: '/api/admin/admins/[id]', params: { id },

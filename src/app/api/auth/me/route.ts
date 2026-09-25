@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { z } from 'zod'
 import { getReferralPercent, DEFAULT_REFERRAL_PERCENT } from '@/lib/referralRate'
+import { platformCreatorId } from '@/lib/platformCreator'
 
 export async function GET() {
   try {
@@ -55,7 +56,8 @@ export async function GET() {
     })])
 
     if (!user) return unauthorized()
-    return ok({ ...user, referralPercent, eventParticipations })
+    const isPlatformCreator = user.role === 'admin' && (await platformCreatorId()) === user.id
+    return ok({ ...user, isPlatformCreator, referralPercent, eventParticipations })
   } catch (e) {
     return serverError(e)
   }

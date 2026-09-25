@@ -5,6 +5,7 @@ import { env } from './env'
 import { createTicketAttachmentPng } from './ticketAttachment'
 import { generateQRDataURL } from './qr'
 import type { DailyReport } from './reportData'
+import { SMS_LOW_CREDITS } from './smsCredits'
 
 let client: Resend | null | undefined
 
@@ -30,7 +31,7 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<void>
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
-      user: { select: { name: true } },
+      user: { select: { name: true, email: true } },
       tickets: {
         include: {
           event: { select: { name: true, venue: true, address: true, date: true, endDate: true, posterImage: true } },
@@ -40,7 +41,9 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<void>
     },
   })
   if (!order || order.status !== 'paid' || order.tickets.length === 0) return
-  if (!order.email) return
+  // The account's email when the order has none (logged-in buyers can skip the field)
+  const to = order.email || order.user.email
+  if (!to) return
 
   const holderName = order.recipientName || order.whatsappName || order.user.name
   const eventName = order.tickets[0].event.name
@@ -82,7 +85,7 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<void>
 
   await resend.emails.send({
     from,
-    to: order.email,
+    to,
     subject: `Your ticket${order.tickets.length > 1 ? 's' : ''} for ${eventName}`,
     html,
     attachments,
@@ -181,12 +184,13 @@ export async function sendVoucherPurchaseEmail(orderId: string): Promise<void> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
-      user: { select: { name: true } },
+      user: { select: { name: true, email: true } },
       vouchers: { include: { product: { select: { name: true, category: true } } } },
     },
   })
   if (!order || order.status !== 'paid' || order.vouchers.length === 0) return
-  if (!order.email) return
+  const to = order.email || order.user.email
+  if (!to) return
 
   const holderName = order.recipientName || order.whatsappName || order.user.name
 
@@ -213,7 +217,7 @@ export async function sendVoucherPurchaseEmail(orderId: string): Promise<void> {
 
   await resend.emails.send({
     from,
-    to: order.email,
+    to,
     subject: `Your NXT STOP purchase — order #${order.orderNumber}`,
     html,
     attachments,
@@ -275,6 +279,12 @@ export async function sendAdminDigestEmail(report: DailyReport, opts: { onlyTo?:
         ${row('Website — pages viewed', report.website.pageViews)}
         ${row('Website — different visitors', report.website.visitors)}
         ${row('Referral link clicks', report.website.referralClicks)}
+        ${report.sms ? `
+        ${row('SMS sent', `${report.sms.sent} (${report.sms.creditsUsed} credit${report.sms.creditsUsed === 1 ? '' : 's'})`)}
+        ${report.sms.failed > 0 ? row('SMS failed', report.sms.failed) : ''}
+        ${report.sms.noCredit > 0 ? row('SMS not sent — no credits', `<span style="color:#b91c1c;">${report.sms.noCredit}</span>`) : ''}
+        ${report.sms.creditsAdded !== 0 ? row('SMS credits added', report.sms.creditsAdded) : ''}
+        ${row('SMS credits left', `<span style="color:${report.sms.remaining <= SMS_LOW_CREDITS ? '#b91c1c' : 'inherit'};">${report.sms.remaining} of ${report.sms.bought} bought</span>`)}` : ''}
       </table>
       ${
         report.perEvent.length

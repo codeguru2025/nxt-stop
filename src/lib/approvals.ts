@@ -4,6 +4,7 @@ import { env } from './env'
 import { approvalContext } from './approvalContext'
 import { writeAuditLog } from './auditLog'
 import { notifyAdmins } from './push'
+import { isPlatformCreator } from './platformCreator'
 import type { SessionUser } from './auth'
 import type { AdminCapability } from './adminCapabilities'
 import type { Prisma } from '@/generated/prisma/client'
@@ -120,6 +121,21 @@ export async function holdForApproval(
 
   const d = await opts.describe()
   if (d.changes.length === 0) return null // a save that changes nothing needs no approval
+
+  // The platform creator is above approvals: their change goes live straight away, and is
+  // still written to the audit log with the same plain-language summary.
+  if (await isPlatformCreator(session.id)) {
+    writeAuditLog({
+      actorId: session.id,
+      actorRole: session.role,
+      action: 'change.creator-direct',
+      entityType: opts.entityType,
+      entityId: opts.entityId ?? null,
+      after: { title: d.title, changes: d.changes } as unknown as Prisma.InputJsonValue,
+      req,
+    })
+    return null
+  }
 
   const bodyJson = JSON.stringify(opts.body ?? null)
   const bodyHash = crypto

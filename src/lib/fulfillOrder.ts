@@ -1,6 +1,7 @@
 import { prisma } from './db'
 import { generateTicketNumber } from './qr'
 import { sendOrderTicketsWhatsApp } from './whatsapp'
+import { sendOrderPaidSms } from './sms'
 import { sendOrderConfirmationEmail, sendReferralRewardEarnedEmail, sendVoucherPurchaseEmail } from './email'
 import crypto from 'crypto'
 import { FEATURES } from './features'
@@ -261,6 +262,12 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
   if (vouchersMinted) {
     sendVoucherPurchaseEmail(orderId).catch((err) => {
       console.error(`Voucher email failed for order ${orderId}`, err)
+    })
+  }
+
+  if (ticketsMinted || vouchersMinted) {
+    sendOrderPaidSms(orderId).catch((err) => {
+      console.error(`Payment SMS failed for order ${orderId}`, err)
     })
   }
 

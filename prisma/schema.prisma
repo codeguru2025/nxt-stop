@@ -659,6 +659,37 @@ model PushSubscription {
   @@index([userId])
 }
 
+// ─── SMS ─────────────────────────────────────────────────────────────────────
+
+// SMS credits bought from the gateway, recorded by a platform owner. Credits left =
+// sum(credits) − segments of sent SmsMessage rows. A negative row corrects a mistake.
+model SmsTopUp {
+  id          String   @id @default(cuid())
+  credits     Int
+  note        String?
+  addedById   String
+  addedByName String
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Every SMS the app tried to send — the ledger behind credits used and the report.
+model SmsMessage {
+  id         String   @id @default(cuid())
+  kind       String   // transactional | otp | promotional
+  purpose    String   // what it was for, e.g. order.paid
+  phone      String   // masked, e.g. +26377***567
+  status     String   // sent | failed | no_credit
+  segments   Int      @default(1) // credits it costs (1 per 160-char segment)
+  reference  String?  // e.g. the order number
+  error      String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
 // ─── SETTINGS ────────────────────────────────────────────────────────────────
 
 model Setting {
