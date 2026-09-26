@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   toGsm7, gsm7Length, smsHost, smsSegments, ticketsPaidSms, vouchersPaidSms, paymentPendingSms, paymentFailedSms,
   welcomeSms, lineupSms, passwordResetSms, referralRewardSms, passwordChangedSms, ticketsDelayedSms, refundSms,
-  eventTomorrowSms, eventTodaySms, loginCodeSms, phoneChangeCodeSms, SMS_LIMIT,
+  eventTomorrowSms, eventTodaySms, loginCodeSms, phoneChangeCodeSms, ticketTransferSms, SMS_LIMIT,
 } from '../smsTemplates'
 
 // Anything outside GSM-7 turns the SMS into UCS-2 (70 chars a segment)
@@ -156,5 +156,18 @@ describe('code messages', () => {
     expect(login).toBe('482913 is your NXT STOP verification code. It expires in 10 minutes. Never share this code with anyone, including NXT STOP staff.')
     expect(smsSegments(login)).toBe(1)
     expect(smsSegments(phoneChangeCodeSms({ code: '482913', minutes: 10 }))).toBe(1)
+  })
+})
+
+describe('ticketTransferSms', () => {
+  it('says who sent it and where to log in', () => {
+    expect(ticketTransferSms({ sender: 'Tendai Moyo', eventName: 'Dlala Thukzin', eventDate: 'Sat 4 Oct' })).toBe(
+      'NXT STOP: Tendai Moyo sent you a ticket for Dlala Thukzin on Sat 4 Oct. Log in with this number to view it: nxt-stop.com/login',
+    )
+  })
+
+  it('fits one segment with long names', () => {
+    const sms = ticketTransferSms({ sender: 'Tendai Rutendo Chipo Nyasha Moyo-Mutasa', eventName: 'Dlala Thukzin Live at the Harare International Conference Centre 2026', eventDate: 'Sat 4 Oct' })
+    expect(gsm7Length(sms)).toBeLessThanOrEqual(SMS_LIMIT)
   })
 })

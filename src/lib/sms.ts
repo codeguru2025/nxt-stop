@@ -5,7 +5,7 @@ import { formatDate } from './utils'
 import {
   eventTodaySms, eventTomorrowSms, lineupSms, loginCodeSms, passwordChangedSms, passwordResetSms,
   paymentFailedSms, paymentPendingSms, phoneChangeCodeSms, referralRewardSms, refundSms, smsSegments,
-  ticketsDelayedSms, ticketsPaidSms, vouchersPaidSms, welcomeSms,
+  ticketsDelayedSms, ticketsPaidSms, ticketTransferSms, vouchersPaidSms, welcomeSms,
 } from './smsTemplates'
 import { checkSmsCreditAlert, maskPhone, smsCredits } from './smsCredits'
 import { CODE_TTL_MINUTES } from './smsCodes'
@@ -353,4 +353,9 @@ export async function sendLoginCodeSms(phone: string, code: string): Promise<Sms
 
 export async function sendPhoneChangeCodeSms(phone: string, code: string): Promise<SmsResult> {
   return sendSms(phone, phoneChangeCodeSms({ code, minutes: CODE_TTL_MINUTES }), { kind: 'otp', purpose: 'auth.phone-change-code' })
+}
+
+export async function sendTicketTransferSms(o: { toPhone: string; senderName: string; eventName: string; eventDate: Date; ticketNumber: string }): Promise<void> {
+  const text = ticketTransferSms({ sender: o.senderName, eventName: o.eventName, eventDate: formatDate(o.eventDate, 'EEE d MMM') })
+  await sendSms(o.toPhone, text, { kind: 'transactional', purpose: 'ticket.transfer', reference: o.ticketNumber })
 }

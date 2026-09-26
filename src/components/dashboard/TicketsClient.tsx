@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Calendar, MapPin, Printer, X, ExternalLink, Ticket, Download, Share2, Check } from 'lucide-react'
+import { Calendar, MapPin, Printer, X, ExternalLink, Ticket, Download, Share2, Check, Send, Loader2 } from 'lucide-react'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import { formatDate, formatCurrency } from '@/lib/utils'
@@ -38,7 +38,57 @@ async function fetchAsDataURL(url: string): Promise<string> {
   }
 }
 
-function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => void }) {
+/** Give a valid ticket to someone else by phone number (signed-in holders only). */
+function TransferPanel({ ticket, onTransferred }: { ticket: TicketData; onTransferred: (message: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [phone, setPhone] = useState('')
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  const transfer = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!confirm(`Send this ticket for ${ticket.event.name} to ${phone}? It leaves your account and your QR code stops working.`)) return
+    setBusy(true)
+    setErr('')
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}/transfer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, name: name || undefined }),
+      }).then(r => r.json())
+      if (res.success) onTransferred(res.data.message)
+      else setErr(res.error ?? 'Could not transfer the ticket')
+    } catch {
+      setErr('Network error — please try again')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) return (
+    <button onClick={() => setOpen(true)} className="flex items-center justify-center gap-1.5 w-full mt-3 text-xs text-gray-400 hover:text-white transition-colors">
+      <Send size={11} /> Transfer this ticket to someone else
+    </button>
+  )
+
+  return (
+    <form onSubmit={transfer} className="card p-4 mt-3 space-y-2">
+      <p className="text-xs text-gray-400">They get the ticket on their NXT STOP account and an SMS. Your QR code stops working.</p>
+      <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Their phone number, e.g. +263 77 123 4567" required className="w-full" />
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="Their name (if they have no account yet)" className="w-full" />
+      {err && <p className="text-xs text-red-400">{err}</p>}
+      <div className="flex gap-2">
+        <button type="submit" disabled={busy} className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm">
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Transfer ticket
+        </button>
+        <button type="button" onClick={() => setOpen(false)} className="text-xs text-gray-400 hover:text-white px-3">Cancel</button>
+      </div>
+    </form>
+  )
+}
+
+function TicketModal({ ticket, onClose, onTransferred }: { ticket: TicketData; onClose: () => void; onTransferred?: (message: string) => void }) {
   const ticketRef = useRef<HTMLDivElement>(null)
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -428,6 +478,8 @@ function TicketModal({ ticket, onClose }: { ticket: TicketData; onClose: () => v
         >
           <ExternalLink size={11} /> Get Directions to {ticket.event.venue}
         </a>
+
+        {onTransferred && ticket.status === 'valid' && <TransferPanel ticket={ticket} onTransferred={onTransferred} />}
       </div>
     </div>
   )
@@ -439,6 +491,7 @@ export default function TicketsClient() {
   const [tickets, setTickets] = useState<TicketData[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<TicketData | null>(null)
+  const [transferMsg, setTransferMsg] = useState('')
   const retryRef = useRef(0)
   const MAX_RETRIES = 6
 
@@ -496,6 +549,12 @@ export default function TicketsClient() {
         </div>
       </div>
 
+      {transferMsg && (
+        <div className="flex items-center gap-2 rounded-xl p-3 mb-4 text-sm border bg-green-500/10 border-green-500/20 text-green-400">
+          <Check size={14} /> {transferMsg}
+        </div>
+      )}
+
       {tickets.length === 0 ? (
         <div className="text-center py-20">
           <div className="text-6xl mb-4">🎟️</div>
@@ -551,7 +610,18 @@ export default function TicketsClient() {
         </div>
       )}
 
-      {selected && <TicketModal ticket={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <TicketModal
+          ticket={selected}
+          onClose={() => setSelected(null)}
+          // Guests viewing by order link can't transfer: that needs a signed-in holder
+          onTransferred={searchParams.get('guestToken') ? undefined : message => {
+            setTickets(ts => ts.filter(t => t.id !== selected.id))
+            setSelected(null)
+            setTransferMsg(message)
+          }}
+        />
+      )}
     </div>
   )
 }

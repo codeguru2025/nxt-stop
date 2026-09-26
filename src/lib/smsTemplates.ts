@@ -177,3 +177,11 @@ export function loginCodeSms(o: { code: string; minutes: number }): string {
 export function phoneChangeCodeSms(o: { code: string; minutes: number }): string {
   return `NXT STOP: Your code to change your phone number is ${o.code}. Valid for ${o.minutes} minutes. If you did not request this, ignore this message and your account stays safe.`
 }
+
+export function ticketTransferSms(o: { sender: string; eventName: string; eventDate: string }): string {
+  return fit(
+    event => `NXT STOP: ${toGsm7(o.sender).slice(0, 30)} sent you a ticket for ${event} on ${o.eventDate}. Log in with this number to view it: ${smsHost()}/login`,
+    o.eventName,
+    '',
+  )
+}
