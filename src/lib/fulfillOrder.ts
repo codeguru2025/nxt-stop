@@ -1,7 +1,7 @@
 import { prisma } from './db'
 import { generateTicketNumber } from './qr'
 import { sendOrderTicketsWhatsApp } from './whatsapp'
-import { sendOrderPaidSms } from './sms'
+import { sendOrderPaidSms, sendReferralRewardSms } from './sms'
 import { sendOrderConfirmationEmail, sendReferralRewardEarnedEmail, sendVoucherPurchaseEmail } from './email'
 import crypto from 'crypto'
 import { FEATURES } from './features'
@@ -274,6 +274,9 @@ export async function fulfillOrder(orderId: string, paymentMethod: string, payme
   if (referralRewardEarned) {
     sendReferralRewardEarnedEmail(referralRewardEarned.userId, referralRewardEarned.amount).catch((err) => {
       console.error(`Referral reward email failed for user ${referralRewardEarned!.userId}`, err)
+    })
+    sendReferralRewardSms(referralRewardEarned.userId, referralRewardEarned.amount).catch((err) => {
+      console.error(`Referral reward SMS failed for user ${referralRewardEarned!.userId}`, err)
     })
   }
 }

@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
 import { initiatePaynowPayment, type PaynowMethod } from '@/lib/paynow'
 import { checkPollLimit } from '@/lib/rateLimit'
+import { sendPaymentPendingSms } from '@/lib/sms'
 import { z } from 'zod'
 
 import { env } from '@/lib/env'
@@ -83,6 +84,10 @@ export async function POST(req: Request) {
       where: { id: orderId },
       data: { paymentRef: result.pollUrl, paymentMethod: method },
     })
+
+    if (isMobile && phone) {
+      sendPaymentPendingSms(orderId, method, phone).catch(err => console.error(`Payment pending SMS failed for order ${orderId}`, err))
+    }
 
     return ok(result)
   } catch (e: any) {

@@ -89,8 +89,49 @@ export function ticketsPaidSms(o: { amount: number; qty: number; eventName: stri
 
 export function vouchersPaidSms(o: { amount: number; items: string; orderNumber: string }): string {
   return fit(
-    (items, tail) => `NXT STOP: Payment of ${money(o.amount)} received for ${items}. Show your voucher codes at the bar or stand: ${smsHost()}/dashboard/purchases${tail}`,
+    (items, tail) => `NXT STOP: Payment of ${money(o.amount)} received for ${items}. Show your voucher code(s) at the bar/stand: ${smsHost()}/dashboard/purchases${tail}`,
     o.items,
     ` Order ${o.orderNumber}`,
   )
+}
+
+const METHOD_LABEL: Record<string, string> = { ecocash: 'EcoCash', onemoney: 'OneMoney' }
+
+/** `what` is the event name, or the item list for an order without tickets. */
+export function paymentPendingSms(o: { amount: number; method: string; what: string; hasTickets: boolean }): string {
+  const after = o.hasTickets ? 'Your tickets will be sent' : 'Your order will be confirmed'
+  return fit(
+    what => `NXT STOP: Check your phone and enter your ${METHOD_LABEL[o.method] ?? o.method} PIN to approve ${money(o.amount)} for ${what}. ${after} as soon as payment is confirmed.`,
+    o.what,
+    '',
+  )
+}
+
+/** Sends them back to the event to try again, or to the events list for an order without one. */
+export function paymentFailedSms(o: { amount: number; what: string; slug: string | null }): string {
+  const link = `${smsHost()}/events${o.slug ? `/${o.slug}` : ''}`
+  return fit(
+    what => `NXT STOP: Your payment of ${money(o.amount)} for ${what} did not go through and you were not charged. Try again: ${link}`,
+    o.what,
+    '',
+  )
+}
+
+// Account messages carry a password or link that can't be shortened. Welcome fits one
+// segment; line-up (once per person, event name kept whole) and the reset link take two.
+
+export function welcomeSms(o: { phone: string; password: string }): string {
+  return toGsm7(`Welcome to NXT STOP! Log in at ${smsHost()}/login with ${o.phone} and one-time password ${o.password}. You will choose your own password after logging in.`)
+}
+
+export function lineupSms(o: { eventName: string; phone: string; password: string }): string {
+  return toGsm7(`NXT STOP: You are on the line-up for ${o.eventName}! Log in at ${smsHost()}/login with ${o.phone} and one-time password ${o.password} to see your sales and earnings.`)
+}
+
+export function passwordResetSms(o: { token: string; minutes: number }): string {
+  return toGsm7(`NXT STOP: Reset your password here: ${smsHost()}/reset-password?token=${o.token} This link expires in ${o.minutes} minutes. Did not ask for this? Ignore this message.`)
+}
+
+export function referralRewardSms(o: { amount: number; total: number }): string {
+  return toGsm7(`NXT STOP: You earned ${money(o.amount)}! Someone bought tickets through your link. Total earnings: ${money(o.total)}. Track it: ${smsHost()}/dashboard`)
 }

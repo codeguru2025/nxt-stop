@@ -2,7 +2,10 @@ import { prisma } from './db'
 import { env } from './env'
 import { normalizeWhatsAppPhone } from './phone'
 import { formatDate } from './utils'
-import { smsSegments, ticketsPaidSms, vouchersPaidSms } from './smsTemplates'
+import {
+  lineupSms, passwordResetSms, paymentFailedSms, paymentPendingSms, referralRewardSms, smsSegments,
+  ticketsPaidSms, vouchersPaidSms, welcomeSms,
+} from './smsTemplates'
 import { checkSmsCreditAlert, maskPhone, smsCredits } from './smsCredits'
 
 /** Gateways route and bill these differently; promotional ones must carry an opt-out. */
@@ -24,7 +27,8 @@ async function smsala(to: string, text: string, kind: SmsKind, reference?: strin
   const res = await fetch('https://api2.smsala.com/SendSmsV2', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
+    // SMSala takes an array of messages, even for one
+    body: JSON.stringify([{
       apiToken,
       messageType: SMSALA_TYPE[kind],
       messageEncoding: '0', // GSM default alphabet — smsTemplates keeps text within it
@@ -32,7 +36,7 @@ async function smsala(to: string, text: string, kind: SmsKind, reference?: strin
       sourceAddress: sender,
       messageText: text,
       ...(reference ? { userReferenceId: reference } : {}),
-    }),
+    }]),
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
   })
   const raw = await res.text()
@@ -161,4 +165,86 @@ export async function sendOrderPaidSms(orderId: string): Promise<void> {
   }
 
   await sendSms(phone, text, { kind: 'transactional', purpose: 'order.paid', reference: order.orderNumber })
+}
+
+/** What an unpaid order is for: its event (from a ticket, else a product), or its item names. */
+async function unpaidOrder(orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      orderNumber: true, total: true, whatsappPhone: true, guestPhone: true,
+      user: { select: { phone: true } },
+      items: {
+        select: {
+          name: true, quantity: true,
+          ticketType: { select: { event: { select: { name: true, slug: true } } } },
+          product: { select: { event: { select: { name: true, slug: true } } } },
+        },
+      },
+    },
+  })
+  if (!order) return null
+  const ticketEvent = order.items.find(i => i.ticketType)?.ticketType?.event
+  const event = ticketEvent ?? order.items.find(i => i.product?.event)?.product?.event ?? null
+  return {
+    orderNumber: order.orderNumber,
+    amount: Number(order.total),
+    phone: order.whatsappPhone || order.guestPhone || order.user.phone,
+    hasTickets: !!ticketEvent,
+    what: event?.name ?? order.items.map(i => `${i.quantity}x ${i.name}`).join(', '),
+    slug: event?.slug ?? null,
+  }
+}
+
+// Mobile money only: the PIN prompt arrives on the phone that pays, so that's where this goes.
+export async function sendPaymentPendingSms(orderId: string, method: string, payerPhone: string): Promise<void> {
+  if (!provider() || !['ecocash', 'onemoney'].includes(method)) return
+  const order = await unpaidOrder(orderId)
+  if (!order) return
+  const text = paymentPendingSms({ amount: order.amount, method, what: order.what, hasTickets: order.hasTickets })
+  await sendSms(payerPhone, text, { kind: 'transactional', purpose: 'order.pending', reference: order.orderNumber })
+}
+
+// Called by whichever of the Paynow webhook or poll flips the order to failed, so it goes once.
+export async function sendPaymentFailedSms(orderId: string): Promise<void> {
+  if (!provider()) return
+  const order = await unpaidOrder(orderId)
+  if (!order) return
+  const text = paymentFailedSms({ amount: order.amount, what: order.what, slug: order.slug })
+  await sendSms(order.phone, text, { kind: 'transactional', purpose: 'order.failed', reference: order.orderNumber })
+}
+
+// New account with a system-issued one-time password (checkout or gate sale). The SMS
+// reaches buyers who gave no email, who otherwise never see the password.
+export async function sendWelcomeSms(userId: string, password: string): Promise<void> {
+  if (!provider()) return
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } })
+  if (!user) return
+  await sendSms(user.phone, welcomeSms({ phone: user.phone, password }), { kind: 'transactional', purpose: 'account.welcome' })
+}
+
+// Line-up member given a one-time password, when added or when an admin issues a new one
+export async function sendLineupSms(userId: string, eventName: string, password: string): Promise<void> {
+  if (!provider()) return
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } })
+  if (!user) return
+  await sendSms(user.phone, lineupSms({ eventName, phone: user.phone, password }), { kind: 'transactional', purpose: 'lineup.login' })
+}
+
+export async function sendPasswordResetSms(userId: string, token: string, minutes: number): Promise<void> {
+  if (!provider()) return
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } })
+  if (!user) return
+  await sendSms(user.phone, passwordResetSms({ token, minutes }), { kind: 'transactional', purpose: 'auth.password-reset' })
+}
+
+export async function sendReferralRewardSms(userId: string, amount: number): Promise<void> {
+  if (!provider()) return
+  const [user, total] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { phone: true } }),
+    prisma.referralReward.aggregate({ where: { userId, status: { not: 'cancelled' } }, _sum: { amount: true } }),
+  ])
+  if (!user) return
+  const text = referralRewardSms({ amount, total: Number(total._sum.amount ?? amount) })
+  await sendSms(user.phone, text, { kind: 'transactional', purpose: 'referral.reward' })
 }

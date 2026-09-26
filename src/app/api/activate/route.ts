@@ -5,6 +5,7 @@ import { generateOrderNumber } from '@/lib/qr'
 import { normalizeWhatsAppPhone } from '@/lib/phone'
 import { createAccountWithOneTimePassword, splitName } from '@/lib/onboarding'
 import { sendWelcomeEmail } from '@/lib/email'
+import { sendWelcomeSms } from '@/lib/sms'
 import { writeAuditLog } from '@/lib/auditLog'
 import { z } from 'zod'
 import { ticketSalesClosedReason } from '@/lib/utils'
@@ -119,10 +120,15 @@ export async function POST(req: Request) {
       return { order, buyer, accountCreated }
     })
 
-    if (newAccount && buyerEmail) {
+    if (newAccount) {
       const { userId, plaintextPassword } = newAccount
-      sendWelcomeEmail(userId, plaintextPassword).catch((err) => {
-        console.error(`Welcome email failed for user ${userId}`, err)
+      if (buyerEmail) {
+        sendWelcomeEmail(userId, plaintextPassword).catch((err) => {
+          console.error(`Welcome email failed for user ${userId}`, err)
+        })
+      }
+      sendWelcomeSms(userId, plaintextPassword).catch((err) => {
+        console.error(`Welcome SMS failed for user ${userId}`, err)
       })
     }
 

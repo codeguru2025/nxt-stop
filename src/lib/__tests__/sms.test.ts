@@ -35,17 +35,17 @@ afterEach(() => {
 })
 
 describe('sendSms via SMSala', () => {
-  it('posts the documented fields, number without the plus, and logs it as sent', async () => {
+  it('posts the fields as a one-message array, number without the plus, and logs it as sent', async () => {
     reply([{ MessageId: 25, OperationCode: 0, Status: 'Success', Remarks: 'Message Submitted' }])
     await expect(sendSms('0771234567', 'Hello', { ...opts, reference: 'ORD-1' })).resolves.toBe('sent')
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('https://api2.smsala.com/SendSmsV2')
     expect(init.method).toBe('POST')
-    expect(JSON.parse(init.body)).toEqual({
+    expect(JSON.parse(init.body)).toEqual([{
       apiToken: 'tok', messageType: '2', messageEncoding: '0', destinationAddress: '263771234567',
       sourceAddress: 'NXTSTOP', messageText: 'Hello', userReferenceId: 'ORD-1',
-    })
+    }])
     expect(logCreate.mock.calls[0][0].data).toMatchObject({
       status: 'sent', purpose: 'order.paid', phone: '+26377***567', segments: 1, reference: 'ORD-1',
     })
@@ -57,8 +57,8 @@ describe('sendSms via SMSala', () => {
     reply([{ OperationCode: 0, Status: 'Success' }])
     await sendSms('+263771234567', 'a', { ...opts, kind: 'otp' })
     await sendSms('+263771234567', 'b', { ...opts, kind: 'promotional' })
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).messageType).toBe('3')
-    expect(JSON.parse(fetchMock.mock.calls[1][1].body).messageType).toBe('1')
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)[0].messageType).toBe('3')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)[0].messageType).toBe('1')
   })
 
   it('logs a refusal as failed with the reason, without throwing', async () => {

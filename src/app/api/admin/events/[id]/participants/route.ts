@@ -6,6 +6,7 @@ import { normalizeWhatsAppPhone } from '@/lib/phone'
 import bcrypt from 'bcryptjs'
 import { createAccountWithOneTimePassword, generateOneTimePassword, splitName } from '@/lib/onboarding'
 import { sendWelcomeEmail } from '@/lib/email'
+import { sendLineupSms } from '@/lib/sms'
 import { writeAuditLog } from '@/lib/auditLog'
 import { getReferralPercent } from '@/lib/referralRate'
 import { canIssuePassword, hasOwnPassword } from '@/lib/participantPasswords'
@@ -90,6 +91,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (p.user.email) {
       sendWelcomeEmail(p.user.id, oneTimePassword).catch(err => console.error(`Welcome email failed for participant ${p.user.id}`, err))
     }
+    sendLineupSms(p.user.id, p.event.name, oneTimePassword).catch(err => console.error(`Line-up SMS failed for participant ${p.user.id}`, err))
     writeAuditLog({
       actorId: session.id, actorRole: session.role, req,
       action: 'event.participant.new-password', entityType: 'EventParticipant', entityId: p.id,
@@ -157,6 +159,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     if (oneTimePassword && email) {
       sendWelcomeEmail(participant.user.id, oneTimePassword).catch(err => {
         console.error(`Welcome email failed for participant ${participant.user.id}`, err)
+      })
+    }
+    if (oneTimePassword) {
+      sendLineupSms(participant.user.id, event.name, oneTimePassword).catch(err => {
+        console.error(`Line-up SMS failed for participant ${participant.user.id}`, err)
       })
     }
 

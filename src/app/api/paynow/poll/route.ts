@@ -5,6 +5,7 @@ import { pollPaynowTransaction } from '@/lib/paynow'
 import { fulfillOrder } from '@/lib/fulfillOrder'
 import { checkPollLimit } from '@/lib/rateLimit'
 import { notifyAdminsPaymentFailed } from '@/lib/push'
+import { sendPaymentFailedSms } from '@/lib/sms'
 
 function getIp(req: Request): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
@@ -59,7 +60,10 @@ export async function GET(req: Request) {
       // Only the request that actually flips pending → failed alerts admins, so a
       // poll racing the webhook can't send the same alert twice.
       const { count } = await prisma.order.updateMany({ where: { id: orderId, status: 'pending' }, data: { status: 'failed' } })
-      if (count === 1) void notifyAdminsPaymentFailed(orderId)
+      if (count === 1) {
+        void notifyAdminsPaymentFailed(orderId)
+        sendPaymentFailedSms(orderId).catch(err => console.error(`Payment failed SMS failed for order ${orderId}`, err))
+      }
       return ok({ status: 'failed', message: 'Payment was declined or cancelled. Please try again.' })
     }
 

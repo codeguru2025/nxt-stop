@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { fulfillOrder } from '@/lib/fulfillOrder'
 import { createHash } from 'crypto'
 import { notifyAdminsPaymentFailed } from '@/lib/push'
+import { sendPaymentFailedSms } from '@/lib/sms'
 
 // POST /api/paynow/webhook
 // Paynow posts status updates here (resultUrl).
@@ -61,7 +62,10 @@ export async function POST(req: Request) {
           where: { id: pending.id, status: 'pending' },
           data: { status: 'failed' },
         })
-        if (count === 1) void notifyAdminsPaymentFailed(pending.id)
+        if (count === 1) {
+          void notifyAdminsPaymentFailed(pending.id)
+          sendPaymentFailedSms(pending.id).catch(err => console.error(`Payment failed SMS failed for order ${pending.id}`, err))
+        }
       }
     }
 

@@ -7,6 +7,7 @@ import { normalizeWhatsAppPhone } from '@/lib/phone'
 import { eventDayStartUtc, eventEndTime } from '@/lib/utils'
 import { createAccountWithOneTimePassword, splitName } from '@/lib/onboarding'
 import { sendWelcomeEmail } from '@/lib/email'
+import { sendWelcomeSms } from '@/lib/sms'
 import { cookies } from 'next/headers'
 import { REF_COOKIE } from '@/lib/visits'
 import crypto from 'crypto'
@@ -269,6 +270,9 @@ export async function POST(req: Request) {
     if (newAccount) {
       sendWelcomeEmail(newAccount.userId, newAccount.plaintextPassword).catch((err) => {
         console.error(`Welcome email failed for user ${newAccount!.userId}`, err)
+      })
+      sendWelcomeSms(newAccount.userId, newAccount.plaintextPassword).catch((err) => {
+        console.error(`Welcome SMS failed for user ${newAccount!.userId}`, err)
       })
     }
 

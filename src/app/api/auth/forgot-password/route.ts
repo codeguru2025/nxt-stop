@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { ok, error, serverError } from '@/lib/api'
 import { checkAuthLimit } from '@/lib/rateLimit'
 import { sendPasswordResetEmail } from '@/lib/email'
+import { sendPasswordResetSms } from '@/lib/sms'
 import crypto from 'crypto'
 
 const TOKEN_TTL_MS = 30 * 60 * 1000
@@ -31,6 +32,9 @@ export async function POST(req: Request) {
 
     sendPasswordResetEmail(user.id, token).catch((err) => {
       console.error(`Password reset email failed for user ${user.id}`, err)
+    })
+    sendPasswordResetSms(user.id, token, TOKEN_TTL_MS / 60_000).catch((err) => {
+      console.error(`Password reset SMS failed for user ${user.id}`, err)
     })
 
     return generic

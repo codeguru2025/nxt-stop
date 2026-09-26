@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { toGsm7, gsm7Length, smsHost, ticketsPaidSms, vouchersPaidSms, SMS_LIMIT } from '../smsTemplates'
+import {
+  toGsm7, gsm7Length, smsHost, smsSegments, ticketsPaidSms, vouchersPaidSms, paymentPendingSms, paymentFailedSms,
+  welcomeSms, lineupSms, passwordResetSms, referralRewardSms, SMS_LIMIT,
+} from '../smsTemplates'
 
 // Anything outside GSM-7 turns the SMS into UCS-2 (70 chars a segment)
 const GSM7_ONLY = /^[@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&'()*+,\-./0-9:;<=>?¡A-ZÄÖÑÜ§¿a-zäöñüà^{}\\[~\]|€]*$/
@@ -61,5 +64,61 @@ describe('vouchersPaidSms', () => {
     const sms = vouchersPaidSms({ amount: 40, items: Array(20).fill('3x Premium Bottle Service').join(', '), orderNumber: 'ORD-MFX1ABCD-1A2B3C4D' })
     expect(gsm7Length(sms)).toBeLessThanOrEqual(SMS_LIMIT)
     expect(sms).toContain('nxt-stop.com/dashboard/purchases')
+  })
+})
+
+describe('payment pending and failed', () => {
+  const longName = 'Dlala Thukzin Live at the Harare International Conference Centre 2026 🔥🔥'
+
+  it('names the wallet and says what happens next', () => {
+    expect(paymentPendingSms({ amount: 20, method: 'ecocash', what: 'Dlala Thukzin', hasTickets: true })).toBe(
+      'NXT STOP: Check your phone and enter your EcoCash PIN to approve $20.00 for Dlala Thukzin. Your tickets will be sent as soon as payment is confirmed.',
+    )
+    expect(paymentPendingSms({ amount: 20, method: 'onemoney', what: '2x Beer', hasTickets: false }))
+      .toContain('OneMoney PIN to approve $20.00 for 2x Beer. Your order will be confirmed')
+  })
+
+  it('links back to the event, or to all events without one', () => {
+    expect(paymentFailedSms({ amount: 20, what: 'Dlala Thukzin', slug: 'dlala-thukzin' })).toBe(
+      'NXT STOP: Your payment of $20.00 for Dlala Thukzin did not go through and you were not charged. Try again: nxt-stop.com/events/dlala-thukzin',
+    )
+    expect(paymentFailedSms({ amount: 20, what: '1x Cap', slug: null })).toMatch(/Try again: nxt-stop\.com\/events$/)
+  })
+
+  it('fits one segment with a long event name', () => {
+    for (const sms of [
+      paymentPendingSms({ amount: 1234.5, method: 'onemoney', what: longName, hasTickets: true }),
+      paymentFailedSms({ amount: 1234.5, what: longName, slug: 'dlala-thukzin-live-hicc-2026' }),
+    ]) {
+      expect(gsm7Length(sms)).toBeLessThanOrEqual(SMS_LIMIT)
+      expect(sms).toMatch(GSM7_ONLY)
+    }
+  })
+})
+
+describe('account messages', () => {
+  it('welcome carries the login details in one segment', () => {
+    const sms = welcomeSms({ phone: '+263771234567', password: 'AB3DEF7HJK' })
+    expect(sms).toBe('Welcome to NXT STOP! Log in at nxt-stop.com/login with +263771234567 and one-time password AB3DEF7HJK. You will choose your own password after logging in.')
+    expect(smsSegments(sms)).toBe(1)
+  })
+
+  it('line-up keeps the whole event name', () => {
+    const sms = lineupSms({ eventName: 'Dlala Thukzin Live', phone: '+263771234567', password: 'AB3DEF7HJK' })
+    expect(sms).toBe('NXT STOP: You are on the line-up for Dlala Thukzin Live! Log in at nxt-stop.com/login with +263771234567 and one-time password AB3DEF7HJK to see your sales and earnings.')
+    expect(smsSegments(sms)).toBe(2)
+  })
+
+  it('password reset has the full link and the real expiry', () => {
+    const token = 'a'.repeat(64)
+    const sms = passwordResetSms({ token, minutes: 30 })
+    expect(sms).toContain(`nxt-stop.com/reset-password?token=${token} This link expires in 30 minutes.`)
+    expect(smsSegments(sms)).toBe(2)
+  })
+
+  it('referral reward shows this reward and the running total', () => {
+    expect(referralRewardSms({ amount: 2.5, total: 17 })).toBe(
+      'NXT STOP: You earned $2.50! Someone bought tickets through your link. Total earnings: $17.00. Track it: nxt-stop.com/dashboard',
+    )
   })
 })
