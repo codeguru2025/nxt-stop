@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   toGsm7, gsm7Length, smsHost, smsSegments, ticketsPaidSms, vouchersPaidSms, paymentPendingSms, paymentFailedSms,
   welcomeSms, lineupSms, passwordResetSms, referralRewardSms, passwordChangedSms, ticketsDelayedSms, refundSms,
-  eventTomorrowSms, eventTodaySms, loginCodeSms, phoneChangeCodeSms, ticketTransferSms, SMS_LIMIT,
+  eventTomorrowSms, eventTodaySms, loginCodeSms, phoneChangeCodeSms, ticketTransferSms, PROMO_TEMPLATES, SMS_LIMIT,
 } from '../smsTemplates'
 
 // Anything outside GSM-7 turns the SMS into UCS-2 (70 chars a segment)
@@ -169,5 +169,47 @@ describe('ticketTransferSms', () => {
   it('fits one segment with long names', () => {
     const sms = ticketTransferSms({ sender: 'Tendai Rutendo Chipo Nyasha Moyo-Mutasa', eventName: 'Dlala Thukzin Live at the Harare International Conference Centre 2026', eventDate: 'Sat 4 Oct' })
     expect(gsm7Length(sms)).toBeLessThanOrEqual(SMS_LIMIT)
+  })
+})
+
+describe('promotional templates', () => {
+  const fields = {
+    eventName: 'Dlala Thukzin', slug: 'dlala-thukzin', date: 'Sat 4 Oct', venue: 'HICC', price: 20,
+    deadline: 'Friday', ticketType: 'VIP', referralCode: 'cmto9l5rv00020uqzituhchx9', referralPercent: 10,
+  }
+
+  it('every one ends with the opt-out link and stays GSM-7', () => {
+    for (const build of Object.values(PROMO_TEMPLATES)) {
+      const sms = build(fields)
+      expect(sms).toMatch(/ Opt out: nxt-stop\.com\/stop$/)
+      expect(sms).toMatch(GSM7_ONLY)
+    }
+  })
+
+  it('reads like the agreed copy', () => {
+    expect(PROMO_TEMPLATES['new-event'](fields)).toBe(
+      'NXT STOP: Dlala Thukzin is coming Sat 4 Oct at HICC! Tickets from $20.00. Get yours: nxt-stop.com/events/dlala-thukzin Opt out: nxt-stop.com/stop',
+    )
+    expect(PROMO_TEMPLATES['win-back'](fields)).toBe(
+      'NXT STOP: We miss you! Check out what is on this month and get your tickets early: nxt-stop.com/events Opt out: nxt-stop.com/stop',
+    )
+  })
+
+  it('shortens a long event name to stay in one segment', () => {
+    const sms = PROMO_TEMPLATES['new-event']({ ...fields, eventName: 'Dlala Thukzin Live at the Harare International Conference Centre 2026' })
+    expect(smsSegments(sms)).toBe(1)
+    expect(sms).toContain('nxt-stop.com/events/dlala-thukzin Opt out')
+  })
+
+  it('goes to two segments rather than cut a name below 12 characters', () => {
+    const sms = PROMO_TEMPLATES['last-chance']({ ...fields, eventName: 'Dlala Thukzin Live at the Harare International Conference Centre 2026' })
+    expect(sms).toContain('Dlala Thukzin Live at the Harare International Conference Centre 2026 is tomorrow')
+    expect(smsSegments(sms)).toBe(2)
+  })
+
+  it('never cuts the link or opt-out: the share link goes to two segments instead', () => {
+    const sms = PROMO_TEMPLATES['share-link']({ ...fields, eventName: 'Dlala Thukzin Live at the HICC' })
+    expect(sms).toContain(`nxt-stop.com/r/${fields.referralCode}?e=dlala-thukzin Opt out: nxt-stop.com/stop`)
+    expect(smsSegments(sms)).toBe(2)
   })
 })

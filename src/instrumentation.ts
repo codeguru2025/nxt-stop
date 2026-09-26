@@ -19,4 +19,8 @@ export async function register() {
   } catch (err) {
     console.error('[sms] failed to initialize — event reminders disabled', err)
   }
+  // A campaign cut off by this restart would otherwise show "sending" forever
+  import('./lib/smsCampaigns')
+    .then(m => m.markInterruptedCampaigns())
+    .catch(err => console.error('[sms] could not mark interrupted campaigns', err))
 }

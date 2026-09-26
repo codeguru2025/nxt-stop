@@ -46,6 +46,7 @@ const ROUTES = {
   '/api/admin/orders': () => import('@/app/api/admin/orders/route'),
   '/api/admin/password-resets/[id]': () => import('@/app/api/admin/password-resets/[id]/route'),
   '/api/admin/tickets': () => import('@/app/api/admin/tickets/route'),
+  '/api/admin/sms/campaigns': () => import('@/app/api/admin/sms/campaigns/route'),
 } as const
 export type ApprovalRoute = keyof typeof ROUTES
 

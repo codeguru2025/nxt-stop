@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout'
+import SmsCampaignsPanel from './SmsCampaignsPanel'
 import { MessageSquare, Loader2, AlertTriangle, Plus, Lock } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
@@ -32,6 +33,13 @@ const PURPOSE: Record<string, string> = {
   'ticket.transfer': 'Ticket transfer',
   'event.reminder-tomorrow': 'Reminder: tomorrow',
   'event.reminder-today': 'Reminder: today',
+  'campaign.new-event': 'Promo: new event',
+  'campaign.early-bird': 'Promo: early bird',
+  'campaign.almost-sold-out': 'Promo: almost sold out',
+  'campaign.last-chance': 'Promo: last chance',
+  'campaign.share-link': 'Promo: share your link',
+  'campaign.thank-you': 'Promo: thank you',
+  'campaign.win-back': 'Promo: win back',
 }
 const STATUS: Record<string, { label: string; className: string }> = {
   sent: { label: 'Sent', className: 'text-green-400' },
@@ -101,7 +109,7 @@ export default function AdminSmsClient() {
             SMS
           </h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            SMS credits bought and used. Customers always get their tickets by email and WhatsApp too, so if credits run out nobody misses their tickets.
+            SMS credits bought and used, and promotional messages. Customers always get their tickets by email and WhatsApp too, so if credits run out nobody misses their tickets.
           </p>
         </div>
 
@@ -173,6 +181,8 @@ export default function AdminSmsClient() {
                 {formError && <p className="text-xs text-red-400 mt-2">{formError}</p>}
               </form>
             )}
+
+            <SmsCampaignsPanel onSent={load} />
 
             <h2 className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-2">Credits bought</h2>
             {data.topUps.length === 0 ? (

@@ -80,7 +80,12 @@ export function describeAuditEntry(row: AuditRow, names: Record<string, string> 
     case 'account.phone-changed':
       return d(`${who} changed their phone number from ${str(b.phone)} to ${str(a.phone)} (confirmed by SMS code)`, 'security')
     case 'ticket.transferred':
-      return d(`${who} transferred ticket ${str(a.ticketNumber)} for ${str(a.eventName)} to ${str(a.toPhone)}`, 'security')
+      return d(`${who} transferred ticket ${str(a.ticketNumber)} for ${str(a.eventName)} to ${str(a.toPhone)}`, 'sales')
+    case 'sms.campaign.sent':
+      return d(
+        `${who} sent a promotional SMS (${str(a.template)}${a.eventName ? ` for ${str(a.eventName)}` : ''}) to ${str(a.audience)} people, ${str(a.credits)} credits`,
+        'events'
+      )
 
     // ── Two-admin approvals ──
     case 'change.requested':

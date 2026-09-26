@@ -320,3 +320,22 @@ export async function describeTicketPrint(body: any): Promise<Description> {
   }
 }
 
+
+// ── SMS campaigns ────────────────────────────────────────────────────────────
+
+export async function describeSmsCampaign(body: any): Promise<Description> {
+  const { CAMPAIGNS, isPromoTemplate, prepareCampaign } = await import('./smsCampaigns')
+  const template = String(body.template)
+  if (!isPromoTemplate(template)) return { title: 'Send a promotional SMS', changes: [{ label: 'Template', to: template }] }
+  const p = await prepareCampaign({ ...body, template })
+  const label = CAMPAIGNS[template].label
+  if (!p.ok) return { title: `Send promotional SMS: ${label}`, changes: [{ label: 'Problem', to: p.error }] }
+  return {
+    title: `Send promotional SMS "${label}"${p.eventName ? ` for ${p.eventName}` : ''} to ${p.recipients.length} people (${p.creditsNeeded} credits)`,
+    changes: [
+      { label: 'Message', to: p.sample },
+      { label: 'Recipients', to: String(p.recipients.length) },
+      { label: 'Credits', from: String(p.creditsLeft), to: String(p.creditsLeft - p.creditsNeeded) },
+    ],
+  }
+}

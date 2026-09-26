@@ -185,3 +185,67 @@ export function ticketTransferSms(o: { sender: string; eventName: string; eventD
     '',
   )
 }
+
+// ── Promotional ──────────────────────────────────────────────────────────────
+// Every promotional SMS must say how to stop them. Replies can't reach an alphanumeric
+// sender ID, so it's a link, not "Reply STOP".
+
+export const OPT_OUT_PATH = '/stop'
+const optOut = () => ` Opt out: ${smsHost()}${OPT_OUT_PATH}`
+const eventLink = (slug: string) => `${smsHost()}/events/${slug}`
+
+/**
+ * Shortens only the event name to fit one segment (never below 12 characters). If that
+ * isn't enough it goes out as two segments: the link and opt-out are never cut.
+ */
+function promo(build: (name: string) => string, name: string): string {
+  const cleanName = toGsm7(name)
+  const full = toGsm7(build(cleanName))
+  if (gsm7Length(full) <= SMS_LIMIT) return full
+  const room = SMS_LIMIT - (gsm7Length(toGsm7(build('X'))) - 1)
+  return room >= 12 ? toGsm7(build(clip(cleanName, room))) : full
+}
+
+/** What a campaign message is filled in with; each template uses some of it. */
+export type PromoFields = {
+  eventName: string
+  slug: string
+  date: string
+  venue: string
+  price: number
+  deadline: string
+  ticketType: string
+  referralCode: string
+  referralPercent: number
+}
+
+const promoTemplates = {
+  'new-event': (f: PromoFields) => promo(
+    event => `NXT STOP: ${event} is coming ${f.date} at ${toGsm7(f.venue)}! Tickets from ${money(f.price)}. Get yours: ${eventLink(f.slug)}${optOut()}`,
+    f.eventName,
+  ),
+  'early-bird': (f: PromoFields) => promo(
+    event => `NXT STOP: Early bird for ${event} ends ${toGsm7(f.deadline)}! Get tickets at ${money(f.price)} before prices go up: ${eventLink(f.slug)}${optOut()}`,
+    f.eventName,
+  ),
+  'almost-sold-out': (f: PromoFields) => promo(
+    event => `NXT STOP: Only a few ${toGsm7(f.ticketType)} tickets left for ${event}! Grab yours before they are gone: ${eventLink(f.slug)}${optOut()}`,
+    f.eventName,
+  ),
+  'last-chance': (f: PromoFields) => promo(
+    event => `NXT STOP: Last chance! ${event} is tomorrow. Tickets still available online, skip the gate queue: ${eventLink(f.slug)}${optOut()}`,
+    f.eventName,
+  ),
+  'share-link': (f: PromoFields) => promo(
+    event => `NXT STOP: Earn ${f.referralPercent}% on every ticket sold through your link for ${event}. Share it: ${smsHost()}/r/${f.referralCode}?e=${f.slug}${optOut()}`,
+    f.eventName,
+  ),
+  'thank-you': (f: PromoFields) => promo(
+    event => `NXT STOP: Thanks for coming to ${event}! Photos are up: ${smsHost()}/gallery. Watch this space for the next one.${optOut()}`,
+    f.eventName,
+  ),
+  'win-back': () => `NXT STOP: We miss you! Check out what is on this month and get your tickets early: ${smsHost()}/events${optOut()}`,
+}
+
+export type PromoTemplate = keyof typeof promoTemplates
+export const PROMO_TEMPLATES: Record<PromoTemplate, (f: PromoFields) => string> = promoTemplates
