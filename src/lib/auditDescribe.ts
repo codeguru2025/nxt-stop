@@ -68,6 +68,19 @@ export function describeAuditEntry(row: AuditRow, names: Record<string, string> 
           : 'Failed login: someone tried to log in with a phone number that has no account',
         'security', [], true
       )
+    case 'auth.login-code.success':
+      return d(`${who}${role ? ` (${role})` : ''} logged in with an SMS code`, 'security')
+    case 'auth.login-code.failure':
+      return d(
+        target
+          ? `Failed login: someone entered a wrong or expired SMS code for ${target}'s account`
+          : 'Failed login: someone entered an SMS code that matched no live code',
+        'security', [], true
+      )
+    case 'account.phone-changed':
+      return d(`${who} changed their phone number from ${str(b.phone)} to ${str(a.phone)} (confirmed by SMS code)`, 'security')
+    case 'ticket.transferred':
+      return d(`${who} transferred ticket ${str(a.ticketNumber)} for ${str(a.eventName)} to ${str(a.toPhone)}`, 'security')
 
     // ── Two-admin approvals ──
     case 'change.requested':

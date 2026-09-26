@@ -28,6 +28,7 @@ model User {
   mustResetPassword     Boolean   @default(false) // set on account creation (system-issued one-time password); cleared only by POST /api/auth/set-password
   passwordSetAt         DateTime? // last time the user (not the system) set their own password
   oneTimePasswordUsedAt DateTime? // first successful login with the system-issued password — guards against reuse after that
+  smsOptOutAt           DateTime? // set when they opt out of promotional SMS (/stop or account settings); null = opted in
   isPlatformOwner       Boolean   @default(false) // irrevocable, only ever set via prisma/scripts/seed-platform-owner.ts — never accept this field from any API request body
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -688,6 +689,44 @@ model SmsMessage {
 
   @@index([createdAt])
   @@index([status, createdAt])
+  @@index([purpose, reference]) // sent-once checks (reminders, delayed tickets, campaigns)
+}
+
+// One-time codes sent by SMS: logging in without a password, or confirming a new phone
+// number. Only a hash of the code is stored.
+model SmsCode {
+  id        String    @id @default(cuid())
+  purpose   String    // login | phone-change
+  phone     String    // where the code went (normalized)
+  userId    String
+  codeHash  String    // sha256 of the code
+  attempts  Int       @default(0) // wrong guesses; the code dies after 5
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([phone, purpose, createdAt])
+  @@index([userId, purpose, createdAt])
+}
+
+// A promotional SMS sent to many people at once from Admin → SMS
+model SmsCampaign {
+  id          String    @id @default(cuid())
+  template    String    // new-event | early-bird | almost-sold-out | last-chance | share-link | thank-you | win-back
+  eventId     String?
+  params      Json      // what the admin filled in (price, deadline, ticket type)
+  preview     String    // the message as the first recipient saw it
+  audience    Int       // people it was going to
+  sent        Int       @default(0)
+  failed      Int       @default(0)
+  status      String    @default("sending") // sending | done | stopped
+  stopReason  String?
+  createdById String
+  createdByName String
+  createdAt   DateTime  @default(now())
+  finishedAt  DateTime?
+
+  @@index([createdAt])
 }
 
 // ─── SETTINGS ────────────────────────────────────────────────────────────────

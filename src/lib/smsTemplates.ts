@@ -169,3 +169,11 @@ export function eventTodaySms(o: { eventName: string; time: string; venue: strin
     '',
   )
 }
+
+export function loginCodeSms(o: { code: string; minutes: number }): string {
+  return `${o.code} is your NXT STOP verification code. It expires in ${o.minutes} minutes. Never share this code with anyone, including NXT STOP staff.`
+}
+
+export function phoneChangeCodeSms(o: { code: string; minutes: number }): string {
+  return `NXT STOP: Your code to change your phone number is ${o.code}. Valid for ${o.minutes} minutes. If you did not request this, ignore this message and your account stays safe.`
+}

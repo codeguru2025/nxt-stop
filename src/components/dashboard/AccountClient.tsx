@@ -12,6 +12,7 @@ type Profile = {
   email: string | null
   homeTown: string | null
   isWhatsApp: boolean
+  smsOptOutAt: string | null
 }
 
 function Notice({ kind, text }: { kind: 'ok' | 'error'; text: string }) {
@@ -29,7 +30,7 @@ export default function AccountClient() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [phone, setPhone] = useState('')
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', homeTown: '', isWhatsApp: true })
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', homeTown: '', isWhatsApp: true, smsPromos: true })
   const [saving, setSaving] = useState(false)
   const [profileMsg, setProfileMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
@@ -37,6 +38,13 @@ export default function AccountClient() {
   const [showPw, setShowPw] = useState(false)
   const [changingPw, setChangingPw] = useState(false)
   const [pwMsg, setPwMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+
+  // Changing the phone number: a code goes to the new number first
+  const [newPhone, setNewPhone] = useState('')
+  const [phoneCode, setPhoneCode] = useState('')
+  const [phoneCodeSent, setPhoneCodeSent] = useState(false)
+  const [phoneBusy, setPhoneBusy] = useState(false)
+  const [phoneMsg, setPhoneMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
     fetch('/api/dashboard/profile')
@@ -54,6 +62,7 @@ export default function AccountClient() {
           email: p.email ?? '',
           homeTown: p.homeTown ?? '',
           isWhatsApp: p.isWhatsApp,
+          smsPromos: !p.smsOptOutAt,
         })
       })
       .finally(() => setLoading(false))
@@ -101,6 +110,35 @@ export default function AccountClient() {
     }
   }
 
+  const changePhone = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPhoneMsg(null)
+    setPhoneBusy(true)
+    try {
+      const res = await fetch(phoneCodeSent ? '/api/dashboard/phone/verify' : '/api/dashboard/phone/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(phoneCodeSent ? { code: phoneCode } : { phone: newPhone }),
+      }).then(r => r.json())
+      if (!res.success) {
+        setPhoneMsg({ kind: 'error', text: res.error ?? 'Could not change your number' })
+      } else if (!phoneCodeSent) {
+        setPhoneCodeSent(true)
+        setPhoneMsg({ kind: 'ok', text: res.data?.message ?? 'Code sent' })
+      } else {
+        setPhone(res.data.phone)
+        setNewPhone('')
+        setPhoneCode('')
+        setPhoneCodeSent(false)
+        setPhoneMsg({ kind: 'ok', text: res.data.message })
+      }
+    } catch {
+      setPhoneMsg({ kind: 'error', text: 'Network error — check connection' })
+    } finally {
+      setPhoneBusy(false)
+    }
+  }
+
   if (loading) return (
     <div className="max-w-xl mx-auto px-4 py-8">
       <div className="skeleton h-8 w-48 rounded mb-6" />
@@ -123,11 +161,15 @@ export default function AccountClient() {
         </div>
         <div>
           <input value={phone} disabled className="w-full opacity-60" aria-label="Phone number" />
-          <p className="text-xs text-gray-600 mt-1">Your phone number is your login. Ask an admin if it needs to change.</p>
+          <p className="text-xs text-gray-600 mt-1">Your phone number is your login. Change it below.</p>
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-400">
           <input type="checkbox" checked={form.isWhatsApp} onChange={e => setForm({ ...form, isWhatsApp: e.target.checked })} />
           This number is on WhatsApp — send my tickets there
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-400">
+          <input type="checkbox" checked={form.smsPromos} onChange={e => setForm({ ...form, smsPromos: e.target.checked })} />
+          Text me about new events and offers
         </label>
         <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Email — for receipts, tickets and password resets" className="w-full" />
         <input value={form.homeTown} onChange={e => setForm({ ...form, homeTown: e.target.value })} placeholder="Home town" className="w-full" />
@@ -135,6 +177,35 @@ export default function AccountClient() {
         <button type="submit" disabled={saving} className="btn-primary w-full flex items-center justify-center gap-2">
           {saving && <Loader2 size={16} className="animate-spin" />}
           {saving ? 'Saving…' : 'Save profile'}
+        </button>
+      </form>
+
+      <form onSubmit={changePhone} className="card p-5 space-y-3">
+        <h2 className="text-sm text-gray-400 font-semibold uppercase tracking-wider">Change phone number</h2>
+        <input
+          type="tel"
+          value={newPhone}
+          onChange={e => { setNewPhone(e.target.value); setPhoneCodeSent(false); setPhoneCode('') }}
+          placeholder="New number, e.g. +263 77 123 4567"
+          required
+          className="w-full"
+        />
+        {phoneCodeSent && (
+          <input
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={phoneCode}
+            onChange={e => setPhoneCode(e.target.value.replace(/\D/g, ''))}
+            placeholder="6-digit code sent to the new number"
+            required
+            className="w-full"
+          />
+        )}
+        {phoneMsg && <Notice {...phoneMsg} />}
+        <button type="submit" disabled={phoneBusy} className="btn-primary w-full flex items-center justify-center gap-2">
+          {phoneBusy && <Loader2 size={16} className="animate-spin" />}
+          {phoneCodeSent ? 'Confirm new number' : 'Text a code to the new number'}
         </button>
       </form>
 

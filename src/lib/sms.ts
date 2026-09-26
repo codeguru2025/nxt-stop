@@ -3,11 +3,12 @@ import { env } from './env'
 import { normalizeWhatsAppPhone } from './phone'
 import { formatDate } from './utils'
 import {
-  eventTodaySms, eventTomorrowSms, lineupSms, passwordChangedSms, passwordResetSms, paymentFailedSms,
-  paymentPendingSms, referralRewardSms, refundSms, smsSegments, ticketsDelayedSms,
-  ticketsPaidSms, vouchersPaidSms, welcomeSms,
+  eventTodaySms, eventTomorrowSms, lineupSms, loginCodeSms, passwordChangedSms, passwordResetSms,
+  paymentFailedSms, paymentPendingSms, phoneChangeCodeSms, referralRewardSms, refundSms, smsSegments,
+  ticketsDelayedSms, ticketsPaidSms, vouchersPaidSms, welcomeSms,
 } from './smsTemplates'
 import { checkSmsCreditAlert, maskPhone, smsCredits } from './smsCredits'
+import { CODE_TTL_MINUTES } from './smsCodes'
 
 /** Gateways route and bill these differently; promotional ones must carry an opt-out. */
 export type SmsKind = 'transactional' | 'otp' | 'promotional'
@@ -339,4 +340,17 @@ export async function sendEventReminders(now = new Date()): Promise<number> {
     }
   }
   return attempted
+}
+
+/** Whether SMS can go out at all — callers offering an SMS-only feature check this first. */
+export function smsEnabled(): boolean {
+  return provider() !== null
+}
+
+export async function sendLoginCodeSms(phone: string, code: string): Promise<SmsResult> {
+  return sendSms(phone, loginCodeSms({ code, minutes: CODE_TTL_MINUTES }), { kind: 'otp', purpose: 'auth.login-code' })
+}
+
+export async function sendPhoneChangeCodeSms(phone: string, code: string): Promise<SmsResult> {
+  return sendSms(phone, phoneChangeCodeSms({ code, minutes: CODE_TTL_MINUTES }), { kind: 'otp', purpose: 'auth.phone-change-code' })
 }

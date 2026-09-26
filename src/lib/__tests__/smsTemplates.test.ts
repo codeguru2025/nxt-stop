@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   toGsm7, gsm7Length, smsHost, smsSegments, ticketsPaidSms, vouchersPaidSms, paymentPendingSms, paymentFailedSms,
   welcomeSms, lineupSms, passwordResetSms, referralRewardSms, passwordChangedSms, ticketsDelayedSms, refundSms,
-  eventTomorrowSms, eventTodaySms, SMS_LIMIT,
+  eventTomorrowSms, eventTodaySms, loginCodeSms, phoneChangeCodeSms, SMS_LIMIT,
 } from '../smsTemplates'
 
 // Anything outside GSM-7 turns the SMS into UCS-2 (70 chars a segment)
@@ -147,5 +147,14 @@ describe('order follow-ups and reminders', () => {
     expect(eventTomorrowSms({ eventName: 'Dlala', time: '20:00', venue: 'HICC' })).toBe(
       'NXT STOP: See you tomorrow at Dlala! Gates open 20:00 at HICC. Have your ticket QR ready: nxt-stop.com/dashboard/tickets',
     )
+  })
+})
+
+describe('code messages', () => {
+  it('put the code first for the login code and fit one segment', () => {
+    const login = loginCodeSms({ code: '482913', minutes: 10 })
+    expect(login).toBe('482913 is your NXT STOP verification code. It expires in 10 minutes. Never share this code with anyone, including NXT STOP staff.')
+    expect(smsSegments(login)).toBe(1)
+    expect(smsSegments(phoneChangeCodeSms({ code: '482913', minutes: 10 }))).toBe(1)
   })
 })
