@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   toGsm7, gsm7Length, smsHost, smsSegments, ticketsPaidSms, vouchersPaidSms, paymentPendingSms, paymentFailedSms,
-  welcomeSms, lineupSms, passwordResetSms, referralRewardSms, SMS_LIMIT,
+  welcomeSms, lineupSms, passwordResetSms, referralRewardSms, passwordChangedSms, ticketsDelayedSms, refundSms,
+  eventTomorrowSms, eventTodaySms, SMS_LIMIT,
 } from '../smsTemplates'
 
 // Anything outside GSM-7 turns the SMS into UCS-2 (70 chars a segment)
@@ -119,6 +120,32 @@ describe('account messages', () => {
   it('referral reward shows this reward and the running total', () => {
     expect(referralRewardSms({ amount: 2.5, total: 17 })).toBe(
       'NXT STOP: You earned $2.50! Someone bought tickets through your link. Total earnings: $17.00. Track it: nxt-stop.com/dashboard',
+    )
+  })
+})
+
+describe('order follow-ups and reminders', () => {
+  it('points to a page instead of asking for a reply', () => {
+    expect(passwordChangedSms()).toBe('NXT STOP: Your password was just changed. If this was not you, reset it now at nxt-stop.com/forgot-password to secure your account.')
+    expect(ticketsDelayedSms({ amount: 20, orderNumber: 'ORD-1' })).toBe(
+      'NXT STOP: We received $20.00 for order ORD-1. Your tickets are being prepared and will arrive shortly. No need to pay again.',
+    )
+  })
+
+  it('names the wallet the refund went to', () => {
+    expect(refundSms({ amount: 20, orderNumber: 'ORD-MFX1ABCD-1A2B3C4D', method: 'ecocash' })).toBe(
+      'NXT STOP: A refund of $20.00 for order ORD-MFX1ABCD-1A2B3C4D has been processed to your EcoCash. It may take up to 3 working days to reflect.',
+    )
+  })
+
+  it('reminders fit one segment with long names and venues', () => {
+    const o = { eventName: 'Dlala Thukzin Live at the Harare International Conference Centre 2026', time: '20:00', venue: 'Harare International Conference Centre' }
+    for (const sms of [eventTomorrowSms(o), eventTodaySms(o)]) {
+      expect(gsm7Length(sms)).toBeLessThanOrEqual(SMS_LIMIT)
+      expect(sms).toMatch(GSM7_ONLY)
+    }
+    expect(eventTomorrowSms({ eventName: 'Dlala', time: '20:00', venue: 'HICC' })).toBe(
+      'NXT STOP: See you tomorrow at Dlala! Gates open 20:00 at HICC. Have your ticket QR ready: nxt-stop.com/dashboard/tickets',
     )
   })
 })

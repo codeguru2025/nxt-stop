@@ -94,6 +94,7 @@ const STATUS_COLOR: Record<string, string> = {
   paid:    'bg-green-500/20 text-green-400',
   pending: 'bg-yellow-500/20 text-yellow-400',
   failed:  'bg-red-500/20 text-red-400',
+  refunded: 'bg-yellow-500/20 text-yellow-400',
 }
 
 export default function AdminTicketsClient() {
@@ -467,7 +468,7 @@ ${rowsHtml}
     printWin.document.close()
   }
 
-  const orderAction = async (orderId: string, action: 'fulfill' | 'check' | 'cancel') => {
+  const orderAction = async (orderId: string, action: 'fulfill' | 'check' | 'cancel' | 'refund') => {
     setActionLoading(orderId)
     const res = await fetch('/api/admin/orders', {
       method: 'POST',
@@ -866,6 +867,23 @@ ${rowsHtml}
                             className="flex items-center gap-1 text-xs bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 rounded-lg px-3 py-1.5 transition-colors"
                           >
                             <X size={11} /> Cancel
+                          </button>
+                        </div>
+                      )}
+
+                      {o.status === 'paid' && (
+                        <div className="mt-3 flex flex-wrap gap-2" onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => {
+                              if (confirm(`Mark order #${o.orderNumber} as refunded? Only do this after the money has been sent back. Its tickets and vouchers stop working and the customer gets an SMS.`)) {
+                                orderAction(o.id, 'refund')
+                              }
+                            }}
+                            disabled={!!actionLoading}
+                            className="flex items-center gap-1 text-xs bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 hover:bg-yellow-500/20 rounded-lg px-3 py-1.5 transition-colors"
+                          >
+                            {actionLoading === o.id ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                            Mark refunded
                           </button>
                         </div>
                       )}

@@ -9,6 +9,8 @@ import { normalizeWhatsAppPhone } from '@/lib/phone'
 import { env } from '@/lib/env'
 import { holdForApproval } from '@/lib/approvals'
 import { describeOrderAction } from '@/lib/approvalDescribe'
+import { refundOrder } from '@/lib/refundOrder'
+import { sendRefundSms } from '@/lib/sms'
 
 // GET /api/admin/orders?search=&status=&page=
 export async function GET(req: Request) {
@@ -57,8 +59,8 @@ export async function GET(req: Request) {
   }
 }
 
-// POST /api/admin/orders — manual fulfill, re-check, cancel, or resend tickets
-// Body: { orderId, action: 'fulfill' | 'check' | 'cancel' | 'resend', channel?, contact? }
+// POST /api/admin/orders — manual fulfill, re-check, cancel, refund, or resend tickets
+// Body: { orderId, action: 'fulfill' | 'check' | 'cancel' | 'refund' | 'resend', channel?, contact? }
 export async function POST(req: Request) {
   try {
     const session = await requireCapability('tickets').catch(() => null)
@@ -71,7 +73,7 @@ export async function POST(req: Request) {
     const order = await prisma.order.findUnique({ where: { id: orderId } })
     if (!order) return error('Order not found', 404)
 
-    if (action === 'fulfill' || action === 'cancel') {
+    if (action === 'fulfill' || action === 'cancel' || action === 'refund') {
       const held = await holdForApproval(req, session, {
         action: `order.${action}`, capability: 'tickets', route: '/api/admin/orders', body,
         entityType: 'Order', entityId: String(orderId), describe: () => describeOrderAction(body),
@@ -108,6 +110,14 @@ export async function POST(req: Request) {
     if (action === 'cancel') {
       await prisma.order.update({ where: { id: orderId }, data: { status: 'failed' } })
       return ok({ message: 'Order marked as failed' })
+    }
+
+    if (action === 'refund') {
+      // The money goes back outside the app; this records it and tells the customer
+      const result = await refundOrder(orderId)
+      if (!result.ok) return error(result.reason)
+      sendRefundSms(orderId).catch(err => console.error(`Refund SMS failed for order ${orderId}`, err))
+      return ok({ message: 'Order refunded — tickets and vouchers cancelled' })
     }
 
     if (action === 'resend') {

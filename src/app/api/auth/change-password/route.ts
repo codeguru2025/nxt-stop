@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
 import bcrypt from 'bcryptjs'
+import { sendPasswordChangedSms } from '@/lib/sms'
 
 export async function POST(req: Request) {
   try {
@@ -31,6 +32,7 @@ export async function POST(req: Request) {
 
     const passwordHash = await bcrypt.hash(newPassword, 10)
     await prisma.user.update({ where: { id: session.id }, data: { passwordHash } })
+    sendPasswordChangedSms(session.id).catch(err => console.error(`Password changed SMS failed for user ${session.id}`, err))
 
     return ok({ message: 'Password changed successfully' })
   } catch (e) {

@@ -5,7 +5,7 @@ import { pollPaynowTransaction } from '@/lib/paynow'
 import { fulfillOrder } from '@/lib/fulfillOrder'
 import { checkPollLimit } from '@/lib/rateLimit'
 import { notifyAdminsPaymentFailed } from '@/lib/push'
-import { sendPaymentFailedSms } from '@/lib/sms'
+import { sendPaymentFailedSms, sendTicketsDelayedSms } from '@/lib/sms'
 
 function getIp(req: Request): string {
   return req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
@@ -51,6 +51,7 @@ export async function GET(req: Request) {
         await fulfillOrder(orderId, order.paymentMethod ?? 'paynow', order.paymentRef)
       } catch (fulfillErr) {
         console.error('fulfillOrder failed during poll — will retry on next poll', fulfillErr)
+        sendTicketsDelayedSms(orderId).catch(err => console.error(`Delayed tickets SMS failed for order ${orderId}`, err))
         return ok({ status: 'pending' })
       }
       return ok({ status: 'paid' })

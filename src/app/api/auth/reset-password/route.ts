@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { ok, error, serverError } from '@/lib/api'
 import { checkAuthLimit } from '@/lib/rateLimit'
 import bcrypt from 'bcryptjs'
+import { sendPasswordChangedSms } from '@/lib/sms'
 
 // POST /api/auth/reset-password
 // Public. Body: { token, newPassword }. Single-use, expiring token created by
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
         data: { usedAt: new Date() },
       }),
     ])
+    sendPasswordChangedSms(record.userId).catch(err => console.error(`Password changed SMS failed for user ${record.userId}`, err))
 
     return ok({ message: 'Password reset — you can now sign in' })
   } catch (e) {

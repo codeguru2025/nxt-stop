@@ -95,7 +95,9 @@ export function vouchersPaidSms(o: { amount: number; items: string; orderNumber:
   )
 }
 
-const METHOD_LABEL: Record<string, string> = { ecocash: 'EcoCash', onemoney: 'OneMoney' }
+const METHOD_LABEL: Record<string, string> = {
+  ecocash: 'EcoCash', onemoney: 'OneMoney', innbucks: 'InnBucks', omari: "O'mari", vmc: 'card', standard: 'payment method',
+}
 
 /** `what` is the event name, or the item list for an order without tickets. */
 export function paymentPendingSms(o: { amount: number; method: string; what: string; hasTickets: boolean }): string {
@@ -134,4 +136,36 @@ export function passwordResetSms(o: { token: string; minutes: number }): string 
 
 export function referralRewardSms(o: { amount: number; total: number }): string {
   return toGsm7(`NXT STOP: You earned ${money(o.amount)}! Someone bought tickets through your link. Total earnings: ${money(o.total)}. Track it: ${smsHost()}/dashboard`)
+}
+
+// Replies can't reach an alphanumeric sender ID, so messages point to a page instead of
+// "reply to this message".
+
+export function passwordChangedSms(): string {
+  return `NXT STOP: Your password was just changed. If this was not you, reset it now at ${smsHost()}/forgot-password to secure your account.`
+}
+
+/** Paid, but the tickets couldn't be issued yet — sent once while the retry happens. */
+export function ticketsDelayedSms(o: { amount: number; orderNumber: string }): string {
+  return toGsm7(`NXT STOP: We received ${money(o.amount)} for order ${o.orderNumber}. Your tickets are being prepared and will arrive shortly. No need to pay again.`)
+}
+
+export function refundSms(o: { amount: number; orderNumber: string; method: string }): string {
+  return toGsm7(`NXT STOP: A refund of ${money(o.amount)} for order ${o.orderNumber} has been processed to your ${METHOD_LABEL[o.method] ?? o.method}. It may take up to 3 working days to reflect.`)
+}
+
+export function eventTomorrowSms(o: { eventName: string; time: string; venue: string }): string {
+  return fit(
+    event => `NXT STOP: See you tomorrow at ${event}! Gates open ${o.time} at ${toGsm7(o.venue)}. Have your ticket QR ready: ${smsHost()}/dashboard/tickets`,
+    o.eventName,
+    '',
+  )
+}
+
+export function eventTodaySms(o: { eventName: string; time: string; venue: string }): string {
+  return fit(
+    event => `NXT STOP: Today is the day! ${event} - gates open ${o.time}, ${toGsm7(o.venue)}. Screenshot your ticket QR before you arrive in case signal is weak.`,
+    o.eventName,
+    '',
+  )
 }

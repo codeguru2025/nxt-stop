@@ -16,7 +16,23 @@ type Summary =
       topUps: TopUp[]; messages: Message[]
     }
 
-const PURPOSE: Record<string, string> = { 'order.paid': 'Payment confirmation' }
+const PURPOSE: Record<string, string> = {
+  'order.paid': 'Payment confirmation',
+  'order.pending': 'Approve payment prompt',
+  'order.failed': 'Payment failed',
+  'order.delayed': 'Tickets delayed',
+  'order.refunded': 'Refund',
+  'account.welcome': 'Welcome / one-time password',
+  'lineup.login': 'Line-up login',
+  'auth.password-reset': 'Password reset link',
+  'auth.password-changed': 'Password changed',
+  'auth.login-code': 'Login code',
+  'auth.phone-change-code': 'Phone change code',
+  'referral.reward': 'Referral reward',
+  'ticket.transfer': 'Ticket transfer',
+  'event.reminder-tomorrow': 'Reminder: tomorrow',
+  'event.reminder-today': 'Reminder: today',
+}
 const STATUS: Record<string, { label: string; className: string }> = {
   sent: { label: 'Sent', className: 'text-green-400' },
   failed: { label: 'Failed', className: 'text-red-400' },

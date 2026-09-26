@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db'
 import { fulfillOrder } from '@/lib/fulfillOrder'
 import { createHash } from 'crypto'
 import { notifyAdminsPaymentFailed } from '@/lib/push'
-import { sendPaymentFailedSms } from '@/lib/sms'
+import { sendPaymentFailedSms, sendTicketsDelayedSms } from '@/lib/sms'
 
 // POST /api/paynow/webhook
 // Paynow posts status updates here (resultUrl).
@@ -51,6 +51,7 @@ export async function POST(req: Request) {
           await fulfillOrder(order.id, order.paymentMethod ?? 'paynow', paynowRef ?? undefined)
         } catch (fulfillErr) {
           console.error(`Webhook: fulfillOrder failed for order ${order.id}`, fulfillErr)
+          sendTicketsDelayedSms(order.id).catch(err => console.error(`Delayed tickets SMS failed for order ${order.id}`, err))
           return new Response('Fulfillment Error', { status: 500 })
         }
       }

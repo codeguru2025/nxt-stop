@@ -3,7 +3,8 @@ import { env } from './env'
 import { normalizeWhatsAppPhone } from './phone'
 import { formatDate } from './utils'
 import {
-  lineupSms, passwordResetSms, paymentFailedSms, paymentPendingSms, referralRewardSms, smsSegments,
+  eventTodaySms, eventTomorrowSms, lineupSms, passwordChangedSms, passwordResetSms, paymentFailedSms,
+  paymentPendingSms, referralRewardSms, refundSms, smsSegments, ticketsDelayedSms,
   ticketsPaidSms, vouchersPaidSms, welcomeSms,
 } from './smsTemplates'
 import { checkSmsCreditAlert, maskPhone, smsCredits } from './smsCredits'
@@ -172,7 +173,7 @@ async function unpaidOrder(orderId: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     select: {
-      orderNumber: true, total: true, whatsappPhone: true, guestPhone: true,
+      orderNumber: true, total: true, status: true, whatsappPhone: true, guestPhone: true,
       user: { select: { phone: true } },
       items: {
         select: {
@@ -188,6 +189,7 @@ async function unpaidOrder(orderId: string) {
   const event = ticketEvent ?? order.items.find(i => i.product?.event)?.product?.event ?? null
   return {
     orderNumber: order.orderNumber,
+    status: order.status,
     amount: Number(order.total),
     phone: order.whatsappPhone || order.guestPhone || order.user.phone,
     hasTickets: !!ticketEvent,
@@ -247,4 +249,94 @@ export async function sendReferralRewardSms(userId: string, amount: number): Pro
   if (!user) return
   const text = referralRewardSms({ amount, total: Number(total._sum.amount ?? amount) })
   await sendSms(user.phone, text, { kind: 'transactional', purpose: 'referral.reward' })
+}
+
+/** The SMS ledger doubles as a sent-once guard for messages that have no sent-at column. */
+async function alreadyLogged(purpose: string, reference: string): Promise<boolean> {
+  return !!(await prisma.smsMessage.findFirst({ where: { purpose, reference }, select: { id: true } }))
+}
+
+export async function sendPasswordChangedSms(userId: string): Promise<void> {
+  if (!provider()) return
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { phone: true } })
+  if (!user) return
+  await sendSms(user.phone, passwordChangedSms(), { kind: 'transactional', purpose: 'auth.password-changed' })
+}
+
+// Payment confirmed but fulfilOrder failed and will be retried (webhook redelivery, next
+// poll, or an admin). Once per order, however many times the retry fails.
+export async function sendTicketsDelayedSms(orderId: string): Promise<void> {
+  if (!provider()) return
+  const order = await unpaidOrder(orderId)
+  // A webhook and a poll can race: the one that loses may fail after the other fulfilled it
+  if (!order || order.status === 'paid' || await alreadyLogged('order.delayed', order.orderNumber)) return
+  const text = ticketsDelayedSms({ amount: order.amount, orderNumber: order.orderNumber })
+  await sendSms(order.phone, text, { kind: 'transactional', purpose: 'order.delayed', reference: order.orderNumber })
+}
+
+export async function sendRefundSms(orderId: string): Promise<void> {
+  if (!provider()) return
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { orderNumber: true, total: true, paymentMethod: true, whatsappPhone: true, guestPhone: true, user: { select: { phone: true } } },
+  })
+  if (!order) return
+  const text = refundSms({ amount: Number(order.total), orderNumber: order.orderNumber, method: order.paymentMethod ?? 'standard' })
+  const phone = order.whatsappPhone || order.guestPhone || order.user.phone
+  await sendSms(phone, text, { kind: 'transactional', purpose: 'order.refunded', reference: order.orderNumber })
+}
+
+export type ReminderKind = 'tomorrow' | 'today'
+const REMINDER_HOUR: Record<ReminderKind, number> = { tomorrow: 12, today: 9 } // venue time
+
+/**
+ * Which reminder, if any, is due for an event right now: "tomorrow" from noon the day
+ * before, "today" from 9am on the day until it starts. Days and hours are venue time.
+ */
+export function reminderDue(eventDate: Date, now: Date): ReminderKind | null {
+  if (eventDate <= now) return null
+  const day = (d: Date) => formatDate(d, 'yyyy-MM-dd')
+  const hour = Number(formatDate(now, 'H'))
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+  if (day(eventDate) === day(now)) return hour >= REMINDER_HOUR.today ? 'today' : null
+  if (day(eventDate) === day(tomorrow)) return hour >= REMINDER_HOUR.tomorrow ? 'tomorrow' : null
+  return null
+}
+
+/**
+ * Reminds every ticket holder of events happening tomorrow or today. Run hourly: each
+ * holder gets each reminder once (the ledger remembers), and a later run picks up anyone
+ * who bought since. Returns how many SMS were attempted.
+ */
+export async function sendEventReminders(now = new Date()): Promise<number> {
+  if (!provider()) return 0
+  const events = await prisma.event.findMany({
+    where: { status: { in: ['published', 'live'] }, date: { gt: now, lt: new Date(now.getTime() + 48 * 60 * 60 * 1000) } },
+    select: { id: true, name: true, venue: true, date: true },
+  })
+  let attempted = 0
+  for (const event of events) {
+    const kind = reminderDue(event.date, now)
+    if (!kind) continue
+    const purpose = `event.reminder-${kind}`
+    const holders = await prisma.ticket.findMany({
+      where: { eventId: event.id, status: 'valid' },
+      distinct: ['userId'],
+      select: { userId: true, user: { select: { phone: true } } },
+    })
+    const done = new Set((await prisma.smsMessage.findMany({
+      where: { purpose, reference: { startsWith: `${event.id}:` } },
+      select: { reference: true },
+    })).map(m => m.reference))
+    const args = { eventName: event.name, time: formatDate(event.date, 'HH:mm'), venue: event.venue }
+    const text = kind === 'tomorrow' ? eventTomorrowSms(args) : eventTodaySms(args)
+    for (const h of holders) {
+      const reference = `${event.id}:${h.userId}`
+      if (done.has(reference)) continue
+      const result = await sendSms(h.user.phone, text, { kind: 'transactional', purpose, reference })
+      attempted++
+      if (result === 'no_credit') return attempted // the rest would be refused too
+    }
+  }
+  return attempted
 }

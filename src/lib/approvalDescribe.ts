@@ -259,6 +259,13 @@ export async function describeOrderAction(body: any): Promise<Description> {
       entityVersion: await entityVersion('Order', String(body.orderId)),
     }
   }
+  if (body.action === 'refund') {
+    return {
+      title: `Refund order #${o.orderNumber} (${money(Number(o.total))}, ${who}) — cancels its tickets and vouchers and texts the customer`,
+      changes: [{ label: `Order #${o.orderNumber}`, from: o.status, to: 'Refunded' }],
+      entityVersion: await entityVersion('Order', String(body.orderId)),
+    }
+  }
   return {
     title: `Cancel order #${o.orderNumber} (${money(Number(o.total))}, ${who})`,
     changes: [{ label: `Order #${o.orderNumber}`, from: o.status, to: 'Cancelled' }],

@@ -1,6 +1,7 @@
 import { env } from './env'
 import { buildDailyReport } from './reportData'
 import { sendAdminDigestEmail } from './email'
+import { sendEventReminders } from './sms'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -37,4 +38,22 @@ export function startDailyDigestScheduler() {
     runDigest()
     setInterval(runDigest, DAY_MS)
   }, delay)
+}
+
+const HOUR_MS = 60 * 60 * 1000
+
+async function runEventReminders() {
+  try {
+    const n = await sendEventReminders()
+    if (n > 0) console.log(`[sms] sent ${n} event reminder(s)`)
+  } catch (err) {
+    console.error('[sms] event reminders failed', err)
+  }
+}
+
+// Hourly, so reminders go out within the hour they fall due (see reminderDue) and anyone
+// who buys after the first run still gets theirs. Without SMS configured each run is a no-op.
+export function startEventReminderScheduler() {
+  setTimeout(runEventReminders, 60_000) // shortly after boot, not during it
+  setInterval(runEventReminders, HOUR_MS)
 }
