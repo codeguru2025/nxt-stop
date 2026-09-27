@@ -49,15 +49,25 @@ type OrderRow = {
   total: number
   paymentMethod: string | null
   createdAt: string
-  user: { name: string; phone: string }
+  user: { name: string; phone: string; email?: string | null }
   items: { name: string; quantity: number; price: number }[]
   tickets: { id: string; ticketNumber: string; status: string }[]
+  _count?: { vouchers: number }
   guestPhone?: string
   guestName?: string
   email?: string | null
   whatsappPhone?: string | null
   emailSentAt?: string | null
+  voucherEmailSentAt?: string | null
   whatsappSentAt?: string | null
+}
+
+/** Paid, but the buyer got no tickets (neither WhatsApp nor email) or no voucher email. */
+function notDelivered(o: OrderRow): boolean {
+  if (o.status !== 'paid') return false
+  const ticketsMissing = o.tickets.length > 0 && !o.whatsappSentAt && !o.emailSentAt
+  const vouchersMissing = (o._count?.vouchers ?? 0) > 0 && !o.voucherEmailSentAt
+  return ticketsMissing || vouchersMissing
 }
 
 type EventOption = {
@@ -816,10 +826,13 @@ ${rowsHtml}
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[o.status] ?? ''}`}>{o.status}</span>
-                              {o.status === 'paid' && !o.whatsappSentAt && !o.emailSentAt && (
+                              {notDelivered(o) && (
                                 <span className="flex items-center gap-1 text-[10px] text-orange-400 font-medium">
                                   <AlertTriangle size={10} /> Not delivered
                                 </span>
+                              )}
+                              {o.status === 'paid' && !o.email && !o.user.email && (
+                                <span className="text-[10px] text-gray-500 font-medium">No email address</span>
                               )}
                               <span className="text-[10px] text-purple-400 font-medium">Open details</span>
                             </div>
@@ -1144,10 +1157,11 @@ ${rowsHtml}
                   </div>
                 )}
 
-                {orderDetailData.status === 'paid' && orderDetailData.tickets?.length > 0 && (
+                {orderDetailData.status === 'paid' && (orderDetailData.tickets?.length > 0 || orderDetailData.vouchers?.length > 0) && (
                   <div className="border border-[#2a2a2a] rounded-xl p-3 bg-[#151515]">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Deliver tickets</p>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Deliver to buyer</p>
                     <div className="space-y-1.5 text-xs text-gray-400 mb-3">
+                      {orderDetailData.tickets?.length > 0 && <>
                       <div className="flex items-center gap-1.5">
                         <MessageCircle size={12} className={orderDetailData.whatsappSentAt ? 'text-green-400' : 'text-gray-600'} />
                         {orderDetailData.whatsappSentAt
@@ -1158,11 +1172,24 @@ ${rowsHtml}
                         <Mail size={12} className={orderDetailData.emailSentAt ? 'text-green-400' : 'text-gray-600'} />
                         {orderDetailData.emailSentAt
                           ? <span>Email sent {formatDate(orderDetailData.emailSentAt, 'MMM d, h:mm a')}</span>
-                          : <span className="text-orange-400">Email not sent{orderDetailData.email ? '' : ' — no address on file'}</span>}
+                          : <span className="text-orange-400">Ticket email not sent{orderDetailData.email || orderDetailData.user?.email ? '' : ' — no address on file'}</span>}
                       </div>
+                      </>}
+                      {orderDetailData.vouchers?.length > 0 && (
+                        <div className="flex items-center gap-1.5">
+                          <Mail size={12} className={orderDetailData.voucherEmailSentAt ? 'text-green-400' : 'text-gray-600'} />
+                          {orderDetailData.voucherEmailSentAt
+                            ? <span>Voucher email sent {formatDate(orderDetailData.voucherEmailSentAt, 'MMM d, h:mm a')}</span>
+                            : <span className="text-orange-400">Voucher email not sent{orderDetailData.email || orderDetailData.user?.email ? '' : ' — no address on file'}</span>}
+                        </div>
+                      )}
+                      {!orderDetailData.email && !orderDetailData.user?.email && (
+                        <p className="text-gray-500">No email address for this buyer. Their tickets and vouchers are in their NXT STOP account; add an email below to send them.</p>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap gap-2">
+                      {orderDetailData.tickets?.length > 0 && (
                       <button
                         type="button"
                         onClick={() => { setResendChannel(c => c === 'whatsapp' ? null : 'whatsapp'); setResendContact(orderDetailData.whatsappPhone ?? ''); setResendMsg(null) }}
@@ -1170,12 +1197,13 @@ ${rowsHtml}
                       >
                         <MessageCircle size={11} /> {orderDetailData.whatsappSentAt ? 'Resend' : 'Send'} via WhatsApp
                       </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => { setResendChannel(c => c === 'email' ? null : 'email'); setResendContact(orderDetailData.email ?? ''); setResendMsg(null) }}
+                        onClick={() => { setResendChannel(c => c === 'email' ? null : 'email'); setResendContact(orderDetailData.email ?? orderDetailData.user?.email ?? ''); setResendMsg(null) }}
                         className="flex items-center gap-1 text-xs bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded-lg px-3 py-1.5 transition-colors"
                       >
-                        <Mail size={11} /> {orderDetailData.emailSentAt ? 'Resend' : 'Send'} via Email
+                        <Mail size={11} /> {orderDetailData.emailSentAt || orderDetailData.voucherEmailSentAt ? 'Resend' : 'Send'} via Email
                       </button>
                     </div>
 

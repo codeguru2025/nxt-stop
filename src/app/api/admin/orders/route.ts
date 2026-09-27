@@ -4,7 +4,7 @@ import { ok, error, forbidden, serverError } from '@/lib/api'
 import { fulfillOrder } from '@/lib/fulfillOrder'
 import { pollPaynowTransaction } from '@/lib/paynow'
 import { sendOrderTicketsWhatsApp } from '@/lib/whatsapp'
-import { sendOrderConfirmationEmail } from '@/lib/email'
+import { sendOrderConfirmationEmail, sendVoucherPurchaseEmail } from '@/lib/email'
 import { normalizeWhatsAppPhone } from '@/lib/phone'
 import { env } from '@/lib/env'
 import { holdForApproval } from '@/lib/approvals'
@@ -45,9 +45,10 @@ export async function GET(req: Request) {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          user: { select: { name: true, phone: true } },
+          user: { select: { name: true, phone: true, email: true } },
           items: true,
           tickets: { select: { id: true, ticketNumber: true, status: true } },
+          _count: { select: { vouchers: true } },
         },
       }),
       prisma.order.count({ where }),
@@ -127,12 +128,16 @@ export async function POST(req: Request) {
       if (channel !== 'whatsapp' && channel !== 'email') return error("channel must be 'whatsapp' or 'email'")
       if (order.status !== 'paid') return error('Order is not paid — nothing to send')
 
-      const ticketCount = await prisma.ticket.count({ where: { orderId } })
-      if (ticketCount === 0) return error('Order has no tickets yet — fulfill it first')
+      const [ticketCount, voucherCount] = await Promise.all([
+        prisma.ticket.count({ where: { orderId } }),
+        prisma.voucher.count({ where: { orderId } }),
+      ])
+      if (ticketCount === 0 && voucherCount === 0) return error('Order has no tickets or vouchers yet — fulfill it first')
 
       const contactInput = typeof contact === 'string' ? contact.trim() : ''
 
       if (channel === 'whatsapp') {
+        if (ticketCount === 0) return error('WhatsApp delivery is for tickets — send vouchers by email')
         if (!env.META_WHATSAPP_TOKEN || !env.META_WHATSAPP_PHONE_NUMBER_ID) {
           return error('WhatsApp delivery is not configured on this server')
         }
@@ -157,7 +162,8 @@ export async function POST(req: Request) {
       if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
         return error('Email delivery is not configured on this server')
       }
-      let emailAddr = order.email
+      // Same address the automatic send uses: the order's, else the account's
+      let emailAddr = order.email || (await prisma.user.findUnique({ where: { id: order.userId }, select: { email: true } }))?.email || null
       if (contactInput) {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactInput)) return error('That does not look like a valid email address')
         await prisma.order.update({ where: { id: orderId }, data: { email: contactInput } })
@@ -165,12 +171,15 @@ export async function POST(req: Request) {
       }
       if (!emailAddr) return error('No email address on file for this order — enter one to send')
 
+      // An order can hold both: tickets and vouchers each have their own email
       try {
-        await sendOrderConfirmationEmail(orderId)
+        if (ticketCount > 0) await sendOrderConfirmationEmail(orderId)
+        if (voucherCount > 0) await sendVoucherPurchaseEmail(orderId)
       } catch (e) {
         return error(`Email send failed: ${e instanceof Error ? e.message : 'unknown error'}`)
       }
-      return ok({ message: `Tickets emailed to ${emailAddr}` })
+      const what = ticketCount > 0 && voucherCount > 0 ? 'Tickets and vouchers' : ticketCount > 0 ? 'Tickets' : 'Vouchers'
+      return ok({ message: `${what} emailed to ${emailAddr}` })
     }
 
     return error('Unknown action')

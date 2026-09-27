@@ -14,7 +14,7 @@ export async function GET(
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, name: true, phone: true } },
+        user: { select: { id: true, name: true, phone: true, email: true } },
         items: true,
         tickets: {
           select: {
@@ -26,6 +26,7 @@ export async function GET(
             ticketType: { select: { name: true, price: true } },
           },
         },
+        vouchers: { select: { id: true, code: true, status: true, product: { select: { name: true } } } },
       },
     })
     if (!order) return notFound('Order')

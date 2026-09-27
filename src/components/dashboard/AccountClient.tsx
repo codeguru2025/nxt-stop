@@ -78,7 +78,9 @@ export default function AccountClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       }).then(r => r.json())
-      setProfileMsg(res.success ? { kind: 'ok', text: 'Profile saved' } : { kind: 'error', text: res.error ?? 'Could not save' })
+      setProfileMsg(!res.success ? { kind: 'error', text: res.error ?? 'Could not save' }
+        : res.data?.emailAdded ? { kind: 'ok', text: 'Profile saved. Any tickets and vouchers we couldn’t email you before are on their way to your new address.' }
+        : { kind: 'ok', text: 'Profile saved' })
     } catch {
       setProfileMsg({ kind: 'error', text: 'Network error — check connection' })
     } finally {

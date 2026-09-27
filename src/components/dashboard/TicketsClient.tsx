@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { Calendar, MapPin, Printer, X, ExternalLink, Ticket, Download, Share2, Check, Send, Loader2 } from 'lucide-react'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
@@ -494,6 +495,8 @@ export default function TicketsClient() {
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<TicketData | null>(null)
   const [transferMsg, setTransferMsg] = useState('')
+  // Signed-in buyers with no email only get tickets here and on WhatsApp — invite them to add one
+  const [noEmail, setNoEmail] = useState(false)
   const retryRef = useRef(0)
   const MAX_RETRIES = 6
 
@@ -505,6 +508,7 @@ export default function TicketsClient() {
     if (!guestToken) {
       fetch('/api/auth/me').then(r => r.json()).then(d => {
         if (!d.success) router.push('/login')
+        else setNoEmail(!d.data.email)
       }).catch(() => {})
     }
 
@@ -550,6 +554,14 @@ export default function TicketsClient() {
           <p className="text-gray-500 text-sm">{tickets.length} ticket{tickets.length !== 1 ? 's' : ''}</p>
         </div>
       </div>
+
+      {noEmail && (
+        <div className="rounded-xl p-3 mb-4 text-sm border bg-purple-500/10 border-purple-500/20 text-purple-200">
+          We have no email address for you, so your tickets only come here and on WhatsApp.{' '}
+          <Link href="/dashboard/account" className="text-purple-400 hover:text-purple-300 font-semibold">Add your email</Link>{' '}
+          to get them by email too.
+        </div>
+      )}
 
       {transferMsg && (
         <div className="flex items-center gap-2 rounded-xl p-3 mb-4 text-sm border bg-green-500/10 border-green-500/20 text-green-400">

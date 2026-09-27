@@ -7,6 +7,7 @@ import { generateQRDataURL } from './qr'
 import type { DailyReport } from './reportData'
 import { SMS_LOW_CREDITS } from './smsCredits'
 import { smsHost } from './smsTemplates'
+import { eventEndTime } from './utils'
 
 let client: Resend | null | undefined
 
@@ -15,6 +16,24 @@ function getClient(): Resend | null {
   const apiKey = env.RESEND_API_KEY
   client = apiKey ? new Resend(apiKey) : null
   return client
+}
+
+const RATE_LIMIT_RETRIES = 4
+
+/**
+ * Every email goes through here. Resend reports a refused email in its response rather than
+ * by throwing, so this throws instead — callers never record an email as sent when it
+ * wasn't. Resend also caps sends per second, which a busy moment can hit: wait and retry.
+ */
+async function deliver(resend: Resend, email: Parameters<Resend['emails']['send']>[0]): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    const { error } = await resend.emails.send(email)
+    if (!error) return
+    if (error.name !== 'rate_limit_exceeded' || attempt >= RATE_LIMIT_RETRIES) {
+      throw new Error(`Email refused by Resend (${error.name}): ${error.message}`)
+    }
+    await new Promise(r => setTimeout(r, attempt * 1000))
+  }
 }
 
 function esc(text: string): string {
@@ -53,21 +72,14 @@ export async function sendTextEmail(to: string, subject: string, text: string): 
     <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
       <p style="font-size: 15px; line-height: 1.5;">${body}</p>
     </div>`
-  // Resend caps sends per second, which a batch (event reminders) can hit: wait and retry
-  for (let attempt = 1; ; attempt++) {
-    try {
-      const { error } = await resend.emails.send({ from, to, subject, html, text })
-      if (!error) return true
-      if (error.name !== 'rate_limit_exceeded' || attempt >= RATE_LIMIT_RETRIES) throw new Error(error.message)
-    } catch (err) {
-      console.error(`[email] "${subject}" could not be sent`, err)
-      return false
-    }
-    await new Promise(r => setTimeout(r, attempt * 1000))
+  try {
+    await deliver(resend, { from, to, subject, html, text })
+    return true
+  } catch (err) {
+    console.error(`[email] "${subject}" could not be sent`, err)
+    return false
   }
 }
-
-const RATE_LIMIT_RETRIES = 4
 
 export async function sendOrderConfirmationEmail(orderId: string): Promise<void> {
   const resend = getClient()
@@ -129,7 +141,7 @@ export async function sendOrderConfirmationEmail(orderId: string): Promise<void>
       <p style="color:#999; font-size: 12px;">Present the QR code in each attached ticket at the gate.</p>
     </div>`
 
-  await resend.emails.send({
+  await deliver(resend, {
     from,
     to,
     subject: `Your ticket${order.tickets.length > 1 ? 's' : ''} for ${eventName}`,
@@ -160,7 +172,7 @@ export async function sendWelcomeEmail(userId: string, plaintextPassword: string
       <p style="color:#666; font-size: 13px;">This password only works once — you'll be asked to set your own password the first time you sign in.</p>
     </div>`
 
-  await resend.emails.send({
+  await deliver(resend, {
     from,
     to: user.email,
     subject: 'Welcome to NXT STOP — your one-time password',
@@ -188,7 +200,7 @@ export async function sendPasswordResetEmail(userId: string, token: string): Pro
       <p style="color:#999; font-size: 12px;">If you didn't request this, you can safely ignore this email.</p>
     </div>`
 
-  await resend.emails.send({
+  await deliver(resend, {
     from,
     to: user.email,
     subject: 'NXT STOP — reset your password',
@@ -212,7 +224,7 @@ export async function sendReferralRewardEarnedEmail(userId: string, amount: numb
       <p style="color:#666; font-size: 13px;">Track your total earnings and payout status on your NXT STOP dashboard.</p>
     </div>`
 
-  await resend.emails.send({
+  await deliver(resend, {
     from,
     to: user.email,
     subject: `You earned $${amount.toFixed(2)} from a referral`,
@@ -261,13 +273,15 @@ export async function sendVoucherPurchaseEmail(orderId: string): Promise<void> {
       <p style="color:#666; font-size: 13px;">Order #${esc(order.orderNumber)}</p>
     </div>`
 
-  await resend.emails.send({
+  await deliver(resend, {
     from,
     to,
     subject: `Your NXT STOP purchase — order #${order.orderNumber}`,
     html,
     attachments,
   })
+
+  await prisma.order.update({ where: { id: order.id }, data: { voucherEmailSentAt: new Date() } })
 }
 
 /**
@@ -350,6 +364,8 @@ export async function sendAdminDigestEmail(report: DailyReport, opts: { onlyTo?:
   // report carries it (as a branded PDF). Everyone else gets the report alone.
   const auditRecipients = new Set(admins.filter((a) => a.isPlatformOwner).map((a) => a.email as string))
   const plainRecipients = recipients.filter((r) => !auditRecipients.has(r))
+  // Both copies are attempted even if one is refused; the first failure is reported after
+  const failures: unknown[] = []
 
   if (auditRecipients.size > 0) {
     let attachments: { filename: string; content: Buffer }[] = []
@@ -365,16 +381,61 @@ export async function sendAdminDigestEmail(report: DailyReport, opts: { onlyTo?:
       console.error('[digest] audit log PDF failed — sending report without it', err)
       auditNote = '<p style="margin-top:24px; color:#b91c1c; font-size:13px;">The audit log PDF could not be generated today — view it in the admin panel.</p>'
     }
-    await resend.emails.send({
+    await deliver(resend, {
       from,
       to: [...auditRecipients],
       subject,
       html: html.replace(/<\/div>\s*$/, `${auditNote}</div>`),
       attachments,
-    })
+    }).catch(err => failures.push(err))
   }
 
   if (plainRecipients.length > 0) {
-    await resend.emails.send({ from, to: plainRecipients, subject, html })
+    await deliver(resend, { from, to: plainRecipients, subject, html }).catch(err => failures.push(err))
   }
+  if (failures.length > 0) throw failures[0]
+}
+
+/**
+ * A buyer who had no email address has just added one: sends the ticket and voucher emails
+ * they never got, for orders that still matter — tickets still valid for an event that isn't
+ * over, vouchers not yet redeemed. Orders with their own address were already emailed there.
+ * Returns how many emails went. Throws only if the orders can't be read.
+ */
+export async function sendMissedPurchaseEmails(userId: string, now = new Date()): Promise<number> {
+  if (!getClient() || !env.EMAIL_FROM) return 0
+  const orders = await prisma.order.findMany({
+    where: {
+      userId, status: 'paid', email: null,
+      OR: [
+        { emailSentAt: null, tickets: { some: { status: 'valid', event: { date: { gt: new Date(now.getTime() - 2 * 24 * 3600e3) } } } } },
+        { voucherEmailSentAt: null, vouchers: { some: { status: 'unredeemed' } } },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+    select: {
+      id: true, emailSentAt: true, voucherEmailSentAt: true,
+      tickets: { where: { status: 'valid' }, take: 1, select: { event: { select: { date: true, endDate: true } } } },
+      _count: { select: { vouchers: { where: { status: 'unredeemed' } } } },
+    },
+  })
+  let sent = 0
+  for (const o of orders) {
+    const event = o.tickets[0]?.event
+    const jobs: [boolean, () => Promise<void>][] = [
+      [!o.emailSentAt && !!event && eventEndTime(event.date, event.endDate) > now, () => sendOrderConfirmationEmail(o.id)],
+      [!o.voucherEmailSentAt && o._count.vouchers > 0, () => sendVoucherPurchaseEmail(o.id)],
+    ]
+    for (const [due, send] of jobs) {
+      if (!due) continue
+      try {
+        await send()
+        sent++
+      } catch (err) {
+        console.error(`[email] missed purchase email for order ${o.id} failed`, err)
+      }
+    }
+  }
+  return sent
 }

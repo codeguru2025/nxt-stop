@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/api'
+import { sendMissedPurchaseEmails } from '@/lib/email'
 
 const PROFILE_SELECT = {
   phone: true, firstName: true, lastName: true, name: true,
@@ -40,8 +41,8 @@ export async function PATCH(req: Request) {
     const parsed = profileSchema.safeParse(await req.json().catch(() => ({})))
     if (!parsed.success) return error(parsed.error.issues.map(i => i.message).join('; '))
     const { firstName, lastName, email, homeTown, isWhatsApp, smsPromos } = parsed.data
-    const current = smsPromos === undefined ? null
-      : await prisma.user.findUnique({ where: { id: session.id }, select: { smsOptOutAt: true } })
+    const current = await prisma.user.findUnique({ where: { id: session.id }, select: { smsOptOutAt: true, email: true } })
+    if (!current) return unauthorized()
 
     const user = await prisma.user.update({
       where: { id: session.id },
@@ -53,11 +54,17 @@ export async function PATCH(req: Request) {
         homeTown: homeTown || null,
         isWhatsApp,
         // Keep the original opt-out date when it's already off
-        ...(current && { smsOptOutAt: smsPromos ? null : (current.smsOptOutAt ?? new Date()) }),
+        ...(smsPromos !== undefined && { smsOptOutAt: smsPromos ? null : (current.smsOptOutAt ?? new Date()) }),
       },
       select: PROFILE_SELECT,
     })
-    return ok(user)
+
+    // First email address on the account: send the tickets and vouchers that had nowhere to go
+    const emailAdded = !current.email && !!user.email
+    if (emailAdded) {
+      sendMissedPurchaseEmails(session.id).catch(err => console.error(`Missed purchase emails failed for user ${session.id}`, err))
+    }
+    return ok({ ...user, emailAdded })
   } catch (e) {
     return serverError(e)
   }

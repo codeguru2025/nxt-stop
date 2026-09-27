@@ -282,7 +282,8 @@ model Order {
   whatsappSentAt DateTime?
   recipientName String?
   email         String?
-  emailSentAt   DateTime?
+  emailSentAt   DateTime? // ticket email
+  voucherEmailSentAt DateTime? // voucher/merch email (its own email, with the voucher QR codes)
   ecocashPayerPhone String? // orphaned since the EcoCash direct-pay revert — kept (not dropped) because
                             // production has real historical values here; no code reads it anymore
   createdAt     DateTime  @default(now())
