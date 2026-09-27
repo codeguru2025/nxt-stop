@@ -1,7 +1,7 @@
 import { env } from './env'
 import { buildDailyReport } from './reportData'
 import { sendAdminDigestEmail } from './email'
-import { sendEventReminders } from './sms'
+import { sendEventReminders, sendMissedOrderPaidSms } from './sms'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -49,10 +49,17 @@ async function runEventReminders() {
   } catch (err) {
     console.error('[sms] event reminders failed', err)
   }
+  try {
+    const n = await sendMissedOrderPaidSms()
+    if (n > 0) console.log(`[sms] caught up ${n} payment confirmation SMS`)
+  } catch (err) {
+    console.error('[sms] payment confirmation catch-up failed', err)
+  }
 }
 
 // Hourly, so reminders go out within the hour they fall due (see reminderDue) and anyone
-// who buys after the first run still gets theirs. Without SMS configured each run is a no-op.
+// who buys after the first run still gets theirs; also texts any payment confirmations
+// still owed (see sendMissedOrderPaidSms). Without SMS or email configured each run is a no-op.
 export function startEventReminderScheduler() {
   setTimeout(runEventReminders, 60_000) // shortly after boot, not during it
   setInterval(runEventReminders, HOUR_MS)

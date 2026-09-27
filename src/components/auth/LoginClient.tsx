@@ -22,7 +22,7 @@ export default function LoginClient() {
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  // Sign in with a code texted to the phone instead of a password
+  // Sign in with a one-time code (by SMS, or email when SMS can't go) instead of a password
   const [mode, setMode] = useState<'password' | 'code'>('password')
   const [codeSent, setCodeSent] = useState(false)
   const [code, setCode] = useState('')
@@ -81,7 +81,7 @@ export default function LoginClient() {
     setNotice('')
   }
 
-  const submitLabel = mode === 'password' ? 'Sign In' : codeSent ? 'Sign In' : 'Text me a code'
+  const submitLabel = mode === 'password' ? 'Sign In' : codeSent ? 'Sign In' : 'Send me a code'
 
   return (
     <div className="w-full max-w-md">
@@ -131,7 +131,7 @@ export default function LoginClient() {
               </div>
               <div className="flex justify-between mt-1">
                 <button type="button" onClick={() => switchMode('code')} className="text-xs text-gray-500 hover:text-purple-400 transition-colors">
-                  Sign in with an SMS code
+                  Sign in with a one-time code
                 </button>
                 <Link href="/forgot-password" className="text-xs text-gray-500 hover:text-purple-400 transition-colors">
                   Forgot password?

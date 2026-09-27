@@ -6,6 +6,7 @@ import { createTicketAttachmentPng } from './ticketAttachment'
 import { generateQRDataURL } from './qr'
 import type { DailyReport } from './reportData'
 import { SMS_LOW_CREDITS } from './smsCredits'
+import { smsHost } from './smsTemplates'
 
 let client: Resend | null | undefined
 
@@ -22,6 +23,51 @@ function esc(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 }
+
+/** "tendai.moyo@gmail.com" → "te***@gmail.com": enough to recognise, like maskPhone. */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@')
+  if (at < 1) return '***'
+  return `${email.slice(0, Math.min(2, at))}***${email.slice(at)}`
+}
+
+export function emailEnabled(): boolean {
+  return !!getClient() && !!env.EMAIL_FROM
+}
+
+/**
+ * Emails an SMS's text when the SMS couldn't go (see smsOrEmail in sms.ts), links made
+ * clickable. Returns whether it was handed to the email service. Never throws.
+ */
+export async function sendTextEmail(to: string, subject: string, text: string): Promise<boolean> {
+  const resend = getClient()
+  const from = env.EMAIL_FROM
+  if (!resend || !from) return false
+
+  // SMS links are written without https:// (see smsHost) — put it back for the href
+  const host = smsHost().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const body = esc(text)
+    .replace(new RegExp(`\\b${host}[^\\s<]*`, 'g'), link => `<a href="https://${link}">${link}</a>`)
+    .replace(/\n/g, '<br>')
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+      <p style="font-size: 15px; line-height: 1.5;">${body}</p>
+    </div>`
+  // Resend caps sends per second, which a batch (event reminders) can hit: wait and retry
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const { error } = await resend.emails.send({ from, to, subject, html, text })
+      if (!error) return true
+      if (error.name !== 'rate_limit_exceeded' || attempt >= RATE_LIMIT_RETRIES) throw new Error(error.message)
+    } catch (err) {
+      console.error(`[email] "${subject}" could not be sent`, err)
+      return false
+    }
+    await new Promise(r => setTimeout(r, attempt * 1000))
+  }
+}
+
+const RATE_LIMIT_RETRIES = 4
 
 export async function sendOrderConfirmationEmail(orderId: string): Promise<void> {
   const resend = getClient()
@@ -282,6 +328,7 @@ export async function sendAdminDigestEmail(report: DailyReport, opts: { onlyTo?:
         ${report.sms ? `
         ${row('SMS sent', `${report.sms.sent} (${report.sms.creditsUsed} credit${report.sms.creditsUsed === 1 ? '' : 's'})`)}
         ${report.sms.failed > 0 ? row('SMS failed', report.sms.failed) : ''}
+        ${report.sms.emailed > 0 ? row('SMS emailed instead', report.sms.emailed) : ''}
         ${report.sms.noCredit > 0 ? row('SMS not sent — no credits', `<span style="color:#b91c1c;">${report.sms.noCredit}</span>`) : ''}
         ${report.sms.creditsAdded !== 0 ? row('SMS credits added', report.sms.creditsAdded) : ''}
         ${row('SMS credits left', `<span style="color:${report.sms.remaining <= SMS_LOW_CREDITS ? '#b91c1c' : 'inherit'};">${report.sms.remaining} of ${report.sms.bought} bought</span>`)}` : ''}

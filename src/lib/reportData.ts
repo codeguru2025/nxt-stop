@@ -25,6 +25,7 @@ export type DailyReport = {
 export type SmsSummary = {
   sent: number        // SMS accepted by the gateway in the window
   failed: number      // refused by the gateway
+  emailed: number     // went by email instead (switched off, no credits or refused)
   noCredit: number    // not sent because credits had run out (email/WhatsApp still went)
   creditsUsed: number // segments of the SMS sent in the window
   creditsAdded: number // top-ups recorded in the window
@@ -172,6 +173,7 @@ async function smsSummary(from: Date, to: Date): Promise<SmsSummary | null> {
     return {
       sent: row('sent')?._count.id ?? 0,
       failed: row('failed')?._count.id ?? 0,
+      emailed: row('emailed')?._count.id ?? 0,
       noCredit: row('no_credit')?._count.id ?? 0,
       creditsUsed: row('sent')?._sum.segments ?? 0,
       creditsAdded: added._sum.credits ?? 0,

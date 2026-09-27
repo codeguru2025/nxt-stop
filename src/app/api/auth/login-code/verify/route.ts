@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}))
     const phone = normalizeWhatsAppPhone(String(body?.phone ?? ''))
     const code = String(body?.code ?? '')
-    if (!phone || !/^\d{6}$/.test(code.trim())) return error('Enter the 6-digit code from the SMS')
+    if (!phone || !/^\d{6}$/.test(code.trim())) return error('Enter the 6-digit code we sent you')
 
     const used = await redeemCode('login', { phone }, code)
     const user = used ? await prisma.user.findUnique({ where: { id: used.userId } }) : null

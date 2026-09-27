@@ -136,6 +136,14 @@ export function describeAuditEntry(row: AuditRow, names: Record<string, string> 
       )
     }
 
+    case 'sms.switches.update': {
+      const list = (v: unknown) => (Array.isArray(v) && v.length ? v.map(String).join(', ') : 'none')
+      return d(`${who} changed which automatic SMS are switched off`, 'other', [
+        `Switched off before: ${list(b.switchedOff)}`,
+        `Switched off now: ${list(a.switchedOff)}`,
+      ])
+    }
+
     // ── Sales ──
     case 'ticket.physical.activate': {
       const buyer = a.buyerId ? names[str(a.buyerId)] : undefined

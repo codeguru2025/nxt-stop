@@ -43,6 +43,7 @@ function TransferPanel({ ticket, onTransferred }: { ticket: TicketData; onTransf
   const [open, setOpen] = useState(false)
   const [phone, setPhone] = useState('')
   const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -55,7 +56,7 @@ function TransferPanel({ ticket, onTransferred }: { ticket: TicketData; onTransf
       const res = await fetch(`/api/tickets/${ticket.id}/transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, name: name || undefined }),
+        body: JSON.stringify({ phone, name: name || undefined, email: email || undefined }),
       }).then(r => r.json())
       if (res.success) onTransferred(res.data.message)
       else setErr(res.error ?? 'Could not transfer the ticket')
@@ -74,9 +75,10 @@ function TransferPanel({ ticket, onTransferred }: { ticket: TicketData; onTransf
 
   return (
     <form onSubmit={transfer} className="card p-4 mt-3 space-y-2">
-      <p className="text-xs text-gray-400">They get the ticket on their NXT STOP account and an SMS. Your QR code stops working.</p>
+      <p className="text-xs text-gray-400">They get the ticket on their NXT STOP account and a message telling them. Your QR code stops working.</p>
       <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Their phone number, e.g. +263 77 123 4567" required className="w-full" />
       <input value={name} onChange={e => setName(e.target.value)} placeholder="Their name (if they have no account yet)" className="w-full" />
+      <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Their email (if they have no account yet)" className="w-full" />
       {err && <p className="text-xs text-red-400">{err}</p>}
       <div className="flex gap-2">
         <button type="submit" disabled={busy} className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm">
