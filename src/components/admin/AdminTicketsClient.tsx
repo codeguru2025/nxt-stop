@@ -3,9 +3,34 @@
 import { useEffect, useState, useCallback } from 'react'
 import AdminLayout from './AdminLayout'
 import { Search, Ticket, Check, X, RefreshCw, AlertTriangle, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Printer, Calendar, MapPin, QrCode, Send, Mail, MessageCircle, Download, FileText } from 'lucide-react'
+import QRCode from 'qrcode'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 const LOGO_URL = 'https://nxtstop-uploads.lon1.cdn.digitaloceanspaces.com/nxt-stop%20logo%20png.png'
+
+// Only this many physical tickets get an on-screen preview; printing always includes every ticket.
+const PREVIEW_LIMIT = 48
+
+// Same options as the server's generateQRDataURL, so printed codes match the digital ones.
+function qrDataUrl(code: string): Promise<string> {
+  return QRCode.toDataURL(code, { width: 300, margin: 2, color: { dark: '#000000', light: '#ffffff' }, errorCorrectionLevel: 'H' })
+}
+
+// Cached for the on-screen previews only; printing draws codes uncached so a batch of
+// thousands doesn't stay in memory.
+const previewQrCache = new Map<string, Promise<string>>()
+
+function QrImg({ code, alt, className }: { code: string; alt: string; className?: string }) {
+  const [src, setSrc] = useState<string | null>(null)
+  useEffect(() => {
+    let live = true
+    let p = previewQrCache.get(code)
+    if (!p) { p = qrDataUrl(code); previewQrCache.set(code, p) }
+    p.then(s => { if (live) setSrc(s) }, () => {})
+    return () => { live = false }
+  }, [code])
+  return src ? <img src={src} alt={alt} className={className} /> : <div className={className} />
+}
 
 function money(v: unknown): number {
   if (v == null) return 0
@@ -81,7 +106,7 @@ type EventOption = {
 type GeneratedBatch = {
   event: { name: string; date: string; venue: string; posterImage?: string | null }
   ticketType: { name: string; color: string; price: number }
-  tickets: { ticketNumber: string; qrCode: string; qrDataUrl: string; activationCode: string }[]
+  tickets: { ticketNumber: string; qrCode: string; activationCode: string }[]
 }
 
 type BatchSummary = {
@@ -129,12 +154,14 @@ export default function AdminTicketsClient() {
   const [hcBatch, setHcBatch] = useState<GeneratedBatch | null>(null)
   const [hcLoadingExisting, setHcLoadingExisting] = useState(false)
   const [hcExistingCount, setHcExistingCount] = useState<number | null>(null)
+  const [hcError, setHcError] = useState<string | null>(null)
+  const [printProgress, setPrintProgress] = useState<string | null>(null)
 
   // Batch overview state
   const [batches, setBatches] = useState<BatchSummary[]>([])
   const [batchesLoading, setBatchesLoading] = useState(false)
   const [expandedBatch, setExpandedBatch] = useState<string | null>(null)
-  const [expandedTickets, setExpandedTickets] = useState<any[]>([])
+  const [expandedTickets, setExpandedTickets] = useState<GeneratedBatch['tickets']>([])
   const [expandedLoading, setExpandedLoading] = useState(false)
 
   const [adminTicketId, setAdminTicketId] = useState<string | null>(null)
@@ -153,7 +180,7 @@ export default function AdminTicketsClient() {
   const [physicalPreview, setPhysicalPreview] = useState<{
     event: GeneratedBatch['event'] & { posterImage?: string | null }
     ticketType: GeneratedBatch['ticketType']
-    ticket: { ticketNumber: string; qrDataUrl: string; activationCode: string }
+    ticket: { ticketNumber: string; qrCode: string; activationCode: string }
   } | null>(null)
 
   useEffect(() => {
@@ -252,25 +279,25 @@ export default function AdminTicketsClient() {
     if (expandedBatch === key) { setExpandedBatch(null); return }
     setExpandedBatch(key)
     setExpandedLoading(true)
-    const res = await fetch(`/api/admin/tickets?status=physical&eventId=${eventId}&ticketTypeId=${ticketTypeId}&includeQR=true`).then(r => r.json()).catch(() => null)
+    const res = await fetch(`/api/admin/tickets?status=physical&eventId=${eventId}&ticketTypeId=${ticketTypeId}&all=true`).then(r => r.json()).catch(() => null)
     if (res?.success) setExpandedTickets(res.data.tickets ?? [])
     setExpandedLoading(false)
   }
 
-  // Check how many unsold physical tickets already exist for the selected event
+  // Check how many unsold physical tickets already exist for the selected ticket type
   const checkExisting = async (eventId: string, ticketTypeId: string) => {
     if (!eventId || !ticketTypeId) { setHcExistingCount(null); return }
-    const res = await fetch(`/api/admin/tickets?status=physical&eventId=${eventId}`).then(r => r.json())
-    if (res.success) setHcExistingCount(res.data.total ?? 0)
+    const res = await fetch(`/api/admin/tickets?status=physical&eventId=${eventId}&ticketTypeId=${ticketTypeId}`).then(r => r.json()).catch(() => null)
+    if (res?.success) setHcExistingCount(res.data.total ?? 0)
   }
 
   const loadExistingBatch = async () => {
     if (!hcEventId || !hcTicketTypeId) return
     setHcLoadingExisting(true)
     setHcBatch(null)
-    const res = await fetch(`/api/admin/tickets?status=physical&eventId=${hcEventId}&includeQR=true`).then(r => r.json())
+    const res = await fetch(`/api/admin/tickets?status=physical&eventId=${hcEventId}&ticketTypeId=${hcTicketTypeId}&all=true`).then(r => r.json()).catch(() => null)
     setHcLoadingExisting(false)
-    if (res.success && res.data.tickets?.length > 0) {
+    if (res?.success && res.data.tickets?.length > 0) {
       setHcBatch({
         event: res.data.event,
         ticketType: res.data.ticketType,
@@ -283,44 +310,60 @@ export default function AdminTicketsClient() {
     if (!hcEventId || !hcTicketTypeId || hcQty < 1) return
     setHcGenerating(true)
     setHcBatch(null)
+    setHcError(null)
     const res = await fetch('/api/admin/tickets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId: hcEventId, ticketTypeId: hcTicketTypeId, quantity: hcQty }),
-    }).then(r => r.json())
+    }).then(r => r.json()).catch(() => null)
     setHcGenerating(false)
-    if (res.success) { setHcBatch(res.data); loadBatches() }
+    if (res?.success) { setHcBatch(res.data); loadBatches() }
+    else setHcError(res?.error ?? 'Could not generate tickets')
   }
 
-  const printBatch = async () => {
-    if (!hcBatch) return
+  // Opens a print view of every ticket in the batch; the browser's print dialog can
+  // print it or save it as a PDF. QR codes are drawn here in chunks so large batches
+  // don't freeze the page.
+  const printBatch = async (batch: GeneratedBatch | null = hcBatch) => {
+    if (!batch || batch.tickets.length === 0) return
+    // Open synchronously from the click so popup blockers allow it
     const printWin = window.open('', '_blank', 'width=1000,height=800')
-    if (!printWin) return
+    if (!printWin) { setHcError('Allow pop-ups for this site to print tickets.'); return }
+    printWin.document.write(`<p style="font:14px sans-serif;padding:24px">Preparing ${batch.tickets.length} tickets…</p>`)
+
+    const qrs: string[] = []
+    for (let i = 0; i < batch.tickets.length; i += 50) {
+      setPrintProgress(`Preparing tickets ${Math.min(i + 50, batch.tickets.length)} of ${batch.tickets.length}…`)
+      qrs.push(...await Promise.all(batch.tickets.slice(i, i + 50).map(t => qrDataUrl(t.qrCode))))
+      await new Promise(r => setTimeout(r, 0))
+    }
+    setPrintProgress(null)
+    if (printWin.closed) return
 
     const logoDataUrl = await fetchAsDataURL(LOGO_URL)
-    const dateStr = formatDate(hcBatch.event.date, 'EEEE, d MMMM yyyy')
-    const timeStr = formatDate(hcBatch.event.date, 'h:mm a')
-    const priceStr = `$${money(hcBatch.ticketType.price).toFixed(2)}`
-    const color = hcBatch.ticketType.color
+    const dateStr = formatDate(batch.event.date, 'EEEE, d MMMM yyyy')
+    const timeStr = formatDate(batch.event.date, 'h:mm a')
+    const priceStr = `$${money(batch.ticketType.price).toFixed(2)}`
+    const color = batch.ticketType.color
 
-    const mkTicket = (t: typeof hcBatch.tickets[0]) => `
+    const mkTicket = (t: GeneratedBatch['tickets'][number], qr: string) => `
       <div class="ticket">
         <div class="t-head">
-          <img src="${logoDataUrl}" class="t-logo" />
+          <div class="t-logo"></div>
           <div class="t-head-text">
             <div class="t-brand">NXT STOP</div>
-            <div class="t-event">${hcBatch.event.name}</div>
+            <div class="t-event">${batch.event.name}</div>
           </div>
-          <div class="t-badge" style="background:${color}">${hcBatch.ticketType.name}</div>
+          <div class="t-badge" style="background:${color}">${batch.ticketType.name}</div>
         </div>
         <div class="t-body">
           <div class="t-details">
             <div class="t-row"><span class="t-icon">&#128197;</span><span>${dateStr} &nbsp;&middot;&nbsp; ${timeStr}</span></div>
-            <div class="t-row"><span class="t-icon">&#128205;</span><span>${hcBatch.event.venue}</span></div>
+            <div class="t-row"><span class="t-icon">&#128205;</span><span>${batch.event.venue}</span></div>
             <div class="t-price">${priceStr}</div>
           </div>
           <div class="t-qr-wrap">
-            <img src="${t.qrDataUrl}" class="t-qr" />
+            <img src="${qr}" class="t-qr" />
             <div class="t-cash">CASH</div>
           </div>
         </div>
@@ -348,7 +391,7 @@ export default function AdminTicketsClient() {
       </div>`
 
     // Build 2-column rows — 5 rows per page (10 tickets), page-break after every 5 rows
-    const tickets = hcBatch.tickets
+    const tickets = batch.tickets
     let rowsHtml = ''
     for (let i = 0; i < tickets.length; i += 2) {
       const rowIdx = i / 2
@@ -358,13 +401,14 @@ export default function AdminTicketsClient() {
         rowsHtml += `<div class="cut-h"><span class="cut-sci">&#9988;</span><span class="cut-dots"> - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</span><span class="cut-sci">&#9988;</span></div>`
       }
       rowsHtml += `<div class="ticket-row">
-        <div class="ticket-cell ticket-cell-l">${mkTicket(tickets[i])}</div>
+        <div class="ticket-cell ticket-cell-l">${mkTicket(tickets[i], qrs[i])}</div>
         <div class="cut-v"><span class="cut-sci-v">&#9988;</span></div>
-        <div class="ticket-cell">${tickets[i + 1] ? mkTicket(tickets[i + 1]) : ''}</div>
+        <div class="ticket-cell">${tickets[i + 1] ? mkTicket(tickets[i + 1], qrs[i + 1]) : ''}</div>
       </div>`
     }
 
-    printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>NXT STOP &mdash; ${hcBatch.event.name}</title>
+    printWin.document.open()
+    printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>NXT STOP &mdash; ${batch.event.name} &mdash; ${batch.ticketType.name}</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   @page{size:A4 portrait;margin:5mm}
@@ -416,7 +460,8 @@ export default function AdminTicketsClient() {
     background:linear-gradient(135deg,#6d28d9 0%,#7c3aed 40%,#9333ea 70%,#db2777 100%);
     padding:1.5mm 2mm;display:flex;align-items:center;gap:1.5mm;
   }
-  .t-logo{height:6mm;width:auto;object-fit:contain;flex-shrink:0;filter:brightness(0) invert(1)}
+  /* Logo set once here rather than as an <img> per ticket, so big batches stay light */
+  .t-logo{height:6mm;width:14mm;flex-shrink:0;background:url("${logoDataUrl}") left center/contain no-repeat;filter:brightness(0) invert(1)}
   .t-head-text{flex:1;min-width:0}
   .t-brand{font-size:4pt;color:rgba(255,255,255,.8);text-transform:uppercase;letter-spacing:.12em;line-height:1;margin-bottom:.3mm}
   .t-event{font-size:7pt;font-weight:900;color:#fff;line-height:1.15;
@@ -465,7 +510,7 @@ export default function AdminTicketsClient() {
 <div class="page-hd">
   <div>
     <div class="page-title">NXT STOP &mdash; Physical Tickets</div>
-    <div class="page-sub">${hcBatch.event.name} &nbsp;&middot;&nbsp; ${hcBatch.ticketType.name} &nbsp;&middot;&nbsp; ${hcBatch.tickets.length} ticket${hcBatch.tickets.length !== 1 ? 's' : ''}</div>
+    <div class="page-sub">${batch.event.name} &nbsp;&middot;&nbsp; ${batch.ticketType.name} &nbsp;&middot;&nbsp; ${batch.tickets.length} ticket${batch.tickets.length !== 1 ? 's' : ''}</div>
   </div>
   <div class="page-meta">
     Printed ${new Date().toLocaleString()}<br>
@@ -528,7 +573,7 @@ ${rowsHtml}
               <div className="grid sm:grid-cols-3 gap-4">
                 <div>
                   <label>Event *</label>
-                  <select value={hcEventId} onChange={e => { setHcEventId(e.target.value); setHcTicketTypeId(''); setHcBatch(null); setHcExistingCount(null) }}>
+                  <select value={hcEventId} onChange={e => { setHcEventId(e.target.value); setHcTicketTypeId(''); setHcBatch(null); setHcExistingCount(null); setHcError(null) }}>
                     <option value="">Select event…</option>
                     {events.map(ev => (
                       <option key={ev.id} value={ev.id}>{ev.name}</option>
@@ -537,7 +582,7 @@ ${rowsHtml}
                 </div>
                 <div>
                   <label>Ticket Type *</label>
-                  <select value={hcTicketTypeId} onChange={e => { setHcTicketTypeId(e.target.value); setHcBatch(null); checkExisting(hcEventId, e.target.value) }} disabled={!hcEventId}>
+                  <select value={hcTicketTypeId} onChange={e => { setHcTicketTypeId(e.target.value); setHcBatch(null); setHcError(null); checkExisting(hcEventId, e.target.value) }} disabled={!hcEventId}>
                     <option value="">Select type…</option>
                     {selectedEvent?.ticketTypes.map(tt => (
                       <option key={tt.id} value={tt.id}>{tt.name} — {formatCurrency(tt.price)}</option>
@@ -546,7 +591,7 @@ ${rowsHtml}
                 </div>
                 <div>
                   <label>Quantity *</label>
-                  <input type="number" min={1} max={200} value={hcQty} onChange={e => setHcQty(parseInt(e.target.value) || 1)} />
+                  <input type="number" min={1} value={hcQty} onChange={e => setHcQty(Math.max(1, parseInt(e.target.value) || 1))} />
                 </div>
               </div>
               {selectedTicketType && (
@@ -558,7 +603,7 @@ ${rowsHtml}
               {hcExistingCount !== null && hcExistingCount > 0 && !hcBatch && (
                 <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-between gap-3">
                   <span className="text-sm text-blue-300">
-                    <span className="font-bold">{hcExistingCount}</span> unsold physical ticket{hcExistingCount !== 1 ? 's' : ''} already exist for this event
+                    <span className="font-bold">{hcExistingCount}</span> unsold physical ticket{hcExistingCount !== 1 ? 's' : ''} already exist for this ticket type
                   </span>
                   <button
                     onClick={loadExistingBatch}
@@ -581,8 +626,8 @@ ${rowsHtml}
                 </button>
                 {hcBatch && (
                   <>
-                    <button onClick={printBatch} className="flex items-center gap-2 text-sm bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded-lg px-4 py-2">
-                      <Printer size={14} /> Print All
+                    <button onClick={() => printBatch()} disabled={!!printProgress} className="flex items-center gap-2 text-sm bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded-lg px-4 py-2">
+                      {printProgress ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />} Print / Save PDF ({hcBatch.tickets.length})
                     </button>
                     <a href="/gate/activate" target="_blank" className="flex items-center gap-2 text-sm bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/20 rounded-lg px-4 py-2 transition-colors">
                       <AlertTriangle size={14} /> Activate Page
@@ -590,6 +635,11 @@ ${rowsHtml}
                   </>
                 )}
               </div>
+              {printProgress && <p className="text-xs text-blue-300 mt-3">{printProgress}</p>}
+              {hcError && <p className="text-sm text-red-400 mt-3" role="alert">{hcError}</p>}
+              {hcBatch && !printProgress && (
+                <p className="text-xs text-gray-500 mt-3">To save instead of printing, choose <strong className="text-gray-300">Save as PDF</strong> as the printer in the print dialog.</p>
+              )}
             </div>
 
             {/* Generated ticket preview */}
@@ -605,14 +655,14 @@ ${rowsHtml}
                   These tickets are <strong>NOT yet sold</strong>. They will only count as sales once the activation code on the stub is entered at <strong>/gate/activate</strong>.
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {hcBatch.tickets.map(t => (
+                  {hcBatch.tickets.slice(0, PREVIEW_LIMIT).map(t => (
                     <button
                       type="button"
                       key={t.ticketNumber}
                       onClick={() => setPhysicalPreview({ event: hcBatch.event, ticketType: hcBatch.ticketType, ticket: t })}
                       className="bg-[#111] border border-[#2a2a2a] rounded-xl p-3 flex flex-col items-center gap-2 hover:border-purple-500/40 transition-colors text-left cursor-pointer"
                     >
-                      <img src={t.qrDataUrl} alt={t.ticketNumber} className="w-20 h-20 rounded-lg bg-white p-1 pointer-events-none" />
+                      <QrImg code={t.qrCode} alt={t.ticketNumber} className="w-20 h-20 rounded-lg bg-white p-1 pointer-events-none" />
                       <span className="text-xs font-mono text-gray-400 text-center break-all">{t.ticketNumber}</span>
                       <div className="flex flex-col items-center gap-0.5">
                         <span className="text-xs text-gray-600 uppercase tracking-widest">Activation</span>
@@ -622,6 +672,9 @@ ${rowsHtml}
                     </button>
                   ))}
                 </div>
+                {hcBatch.tickets.length > PREVIEW_LIMIT && (
+                  <p className="text-xs text-gray-500 mt-3">Showing the first {PREVIEW_LIMIT} of {hcBatch.tickets.length}. All {hcBatch.tickets.length} are included when you print or save.</p>
+                )}
               </div>
             )}
 
@@ -689,19 +742,21 @@ ${rowsHtml}
                                   <button
                                     onClick={() => {
                                       if (!b.event || !b.ticketType) return
-                                      setHcBatch({
+                                      printBatch({
                                         event: { name: b.event.name, date: b.event.date, venue: b.event.venue, posterImage: b.event.posterImage },
                                         ticketType: { name: b.ticketType.name, color: b.ticketType.color, price: b.ticketType.price },
                                         tickets: expandedTickets,
                                       })
                                     }}
+                                    disabled={!!printProgress}
                                     className="flex items-center gap-1.5 text-xs bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded-lg px-3 py-1.5 transition-colors"
                                   >
-                                    <Printer size={12} /> Print These
+                                    {printProgress ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />} Print / Save PDF (all {expandedTickets.length})
                                   </button>
                                 </div>
+                                {printProgress && <p className="text-xs text-blue-300 mb-3">{printProgress}</p>}
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                                  {expandedTickets.map((t: any) => (
+                                  {expandedTickets.slice(0, PREVIEW_LIMIT).map(t => (
                                     <button
                                       type="button"
                                       key={t.ticketNumber}
@@ -715,12 +770,15 @@ ${rowsHtml}
                                       }}
                                       className="bg-[#111] border border-[#2a2a2a] rounded-xl p-2.5 flex flex-col items-center gap-1.5 hover:border-purple-500/40 transition-colors cursor-pointer text-left"
                                     >
-                                      <img src={t.qrDataUrl} alt={t.ticketNumber} className="w-16 h-16 rounded-lg bg-white p-0.5 pointer-events-none" />
+                                      <QrImg code={t.qrCode} alt={t.ticketNumber} className="w-16 h-16 rounded-lg bg-white p-0.5 pointer-events-none" />
                                       <span className="text-[10px] font-mono text-gray-500 text-center break-all">{t.ticketNumber}</span>
                                       <span className="text-xs font-black font-mono text-orange-400 tracking-wider">{t.activationCode}</span>
                                     </button>
                                   ))}
                                 </div>
+                                {expandedTickets.length > PREVIEW_LIMIT && (
+                                  <p className="text-xs text-gray-500 mt-3">Showing the first {PREVIEW_LIMIT} of {expandedTickets.length}. All {expandedTickets.length} are included when you print or save.</p>
+                                )}
                               </>
                             )}
                           </div>
@@ -1275,7 +1333,7 @@ ${rowsHtml}
                 <div className="flex items-center gap-2"><MapPin size={14} />{physicalPreview.event.venue}</div>
               </div>
               <div className="flex flex-col items-center gap-3 bg-black/30 rounded-2xl p-5 border border-white/5">
-                <img src={physicalPreview.ticket.qrDataUrl} alt="QR" className="w-48 h-48 rounded-2xl bg-white p-2" />
+                <QrImg code={physicalPreview.ticket.qrCode} alt="QR" className="w-48 h-48 rounded-2xl bg-white p-2" />
                 <p className="font-mono text-xs text-gray-500 break-all text-center">{physicalPreview.ticket.ticketNumber}</p>
                 <div className="text-center">
                   <p className="text-[10px] text-gray-500 uppercase tracking-widest">Activation code</p>
