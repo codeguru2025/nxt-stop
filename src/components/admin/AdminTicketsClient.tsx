@@ -118,19 +118,25 @@ type BatchSummary = {
   activated: number
 }
 
-// Print shop file for plastic (PVC) tickets printed on both sides, exactly 88.5 x 57 mm
-// (business card size). Each ticket is two pages: the front shows the event poster,
+// Print shop file for plastic (PVC) tickets, exactly 88.5 x 57 mm (business card size).
+// Printed on both sides, each ticket is two pages: the front shows the event poster,
 // the back carries the QR code, the ticket details and the activation code, which the
-// printer covers with a silver scratch off panel at SCRATCH_PANEL. Colour runs to the
-// cut edge, but text and the QR code stay at least CARD_SAFE inside it, so a slightly
-// off cut never clips anything. Drawn with jsPDF because the browser's print dialog
-// rounds custom page sizes to whole pixels.
+// printer covers with a silver scratch off panel at SCRATCH_PANEL. Printed on one side
+// (cheaper), each ticket is one page with the poster down the left (or across the top, if
+// it is wide) beside the QR code, details and activation code. Colour runs to the cut edge, but text and
+// the QR code stay at least CARD_SAFE inside it, so a slightly off cut never clips
+// anything. Drawn with jsPDF because the browser's print dialog rounds custom page sizes
+// to whole pixels.
 const CARD_W = 88.5
 const CARD_H = 57
 const CARD_SAFE = 3.5
 const CARD_PX_PER_MM = 20 // about 500 dpi for the poster artwork
-// Where the printer puts the scratch off panel on the back, in mm from the top left.
+// Where the printer puts the scratch off panel, in mm from the top left.
 const SCRATCH_PANEL = { x: 52, y: 43, w: 33, h: 9 }
+// One sided cards: width of the poster panel on the left (tall posters), or height of the
+// poster band across the top (wide posters)
+const POSTER_PANEL_W = 37
+const POSTER_BAND_H = 32
 
 type WhiteLogo = { data: string; w: number; h: number }
 
@@ -148,7 +154,7 @@ async function uploadDataUrl(url: string): Promise<string> {
   return fetchAsDataURL(`/api/admin/upload-image?url=${encodeURIComponent(url)}`)
 }
 
-// The back's header is a purple to pink gradient; jsPDF has no gradient fill, so it is
+// The header is a purple to pink gradient; jsPDF has no gradient fill, so it is
 // drawn once to a canvas and reused on every page under one image alias.
 function headerGradient(): string {
   const c = document.createElement('canvas')
@@ -178,38 +184,52 @@ async function whiteLogo(src: string): Promise<WhiteLogo | null> {
   }
 }
 
-type CardFront = { data: string; top: number; bottom: number }
+// wide: a landscape poster, which a one sided card shows across the top instead of in
+// the panel on the left
+type PosterArt = { data: string; top: number; bottom: number; wide: boolean }
+type CardSides = 1 | 2
 
-// Front artwork, the same for every ticket in the batch: a blurred, darkened copy of the
-// poster fills the card, with the whole poster on top, centred and kept inside the safe
-// area. Returns where the poster sits (mm) so the text bands can go above and below it.
-// Null if there is no poster or it can't be loaded.
-async function cardFront(posterSrc: string): Promise<CardFront | null> {
+// Poster artwork, the same for every ticket in the batch: a blurred, darkened copy of the
+// poster fills a w x h mm area, with the whole poster on top, centred and no bigger than
+// maxW x maxH mm. Returns where the poster sits (mm from the top) so text can go above and
+// below it.
+function posterArt(img: HTMLImageElement, w: number, h: number, maxW: number, maxH: number, wide: boolean): PosterArt {
+  const k = CARD_PX_PER_MM
+  const c = document.createElement('canvas')
+  c.width = Math.round(w * k); c.height = Math.round(h * k)
+  const ctx = c.getContext('2d')!
+  const iw = img.naturalWidth, ih = img.naturalHeight
+
+  const cover = Math.max(c.width / iw, c.height / ih) * 1.15
+  ctx.filter = `blur(${2 * k}px) brightness(0.55) saturate(1.2)`
+  ctx.drawImage(img, (c.width - iw * cover) / 2, (c.height - ih * cover) / 2, iw * cover, ih * cover)
+  ctx.filter = 'none'
+
+  const fit = Math.min(maxW * k / iw, maxH * k / ih)
+  const pw = iw * fit, ph = ih * fit, x = (c.width - pw) / 2, y = (c.height - ph) / 2
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 0.8 * k; ctx.shadowOffsetY = 0.3 * k
+  ctx.beginPath(); ctx.roundRect(x, y, pw, ph, 0.8 * k); ctx.fillStyle = '#000'; ctx.fill()
+  ctx.restore()
+  ctx.save()
+  ctx.beginPath(); ctx.roundRect(x, y, pw, ph, 0.8 * k); ctx.clip()
+  ctx.drawImage(img, x, y, pw, ph)
+  ctx.restore()
+  return { data: c.toDataURL('image/jpeg', 0.92), top: y / k, bottom: (y + ph) / k, wide }
+}
+
+// Two sided front: the poster fills the card, leaving at least 12.5 mm above and below it
+// for text. One sided: a tall poster fills the panel on the left; a wide one (more than
+// 1.2 times as wide as it is tall) fills the band across the top. Null if the poster
+// can't be loaded.
+async function cardPoster(posterSrc: string, sides: CardSides): Promise<PosterArt | null> {
   try {
     const img = await loadImage(posterSrc)
-    const k = CARD_PX_PER_MM
-    const c = document.createElement('canvas')
-    c.width = Math.round(CARD_W * k); c.height = Math.round(CARD_H * k)
-    const ctx = c.getContext('2d')!
-    const iw = img.naturalWidth, ih = img.naturalHeight
-
-    const cover = Math.max(c.width / iw, c.height / ih) * 1.15
-    ctx.filter = `blur(${2 * k}px) brightness(0.55) saturate(1.2)`
-    ctx.drawImage(img, (c.width - iw * cover) / 2, (c.height - ih * cover) / 2, iw * cover, ih * cover)
-    ctx.filter = 'none'
-
-    // Whole poster inside the safe width, leaving at least 12.5 mm above and below for text
-    const fit = Math.min((CARD_W - 2 * CARD_SAFE) * k / iw, (CARD_H - 25) * k / ih)
-    const w = iw * fit, h = ih * fit, x = (c.width - w) / 2, y = (c.height - h) / 2
-    ctx.save()
-    ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 0.8 * k; ctx.shadowOffsetY = 0.3 * k
-    ctx.beginPath(); ctx.roundRect(x, y, w, h, 0.8 * k); ctx.fillStyle = '#000'; ctx.fill()
-    ctx.restore()
-    ctx.save()
-    ctx.beginPath(); ctx.roundRect(x, y, w, h, 0.8 * k); ctx.clip()
-    ctx.drawImage(img, x, y, w, h)
-    ctx.restore()
-    return { data: c.toDataURL('image/jpeg', 0.92), top: y / k, bottom: (y + h) / k }
+    const S = CARD_SAFE
+    if (sides === 2) return posterArt(img, CARD_W, CARD_H, CARD_W - 2 * S, CARD_H - 25, false)
+    return img.naturalWidth / img.naturalHeight > 1.2
+      ? posterArt(img, CARD_W, POSTER_BAND_H, CARD_W - 2 * S, POSTER_BAND_H - 2 * S, true)
+      : posterArt(img, POSTER_PANEL_W, CARD_H, POSTER_PANEL_W - 2 * S, CARD_H - 2 * S, false)
   } catch {
     return null
   }
@@ -217,8 +237,8 @@ async function cardFront(posterSrc: string): Promise<CardFront | null> {
 
 function buildCardPdf(
   JsPDF: typeof import('jspdf').jsPDF,
-  batch: GeneratedBatch, qrs: string[], logo: WhiteLogo | null, front: CardFront | null,
-  text: { date: string; time: string; price: string },
+  batch: GeneratedBatch, qrs: string[], logo: WhiteLogo | null, poster: PosterArt | null,
+  text: { date: string; shortDate: string; time: string; price: string }, sides: CardSides,
 ) {
   const { event, ticketType, tickets } = batch
   const doc = new JsPDF({ unit: 'mm', format: [CARD_W, CARD_H], orientation: 'landscape', compress: true })
@@ -230,9 +250,9 @@ function buildCardPdf(
     doc.text(s.toUpperCase(), x, y, { align })
   }
   const lines = (s: string, width: number, max: number) => (doc.splitTextToSize(s, width) as string[]).slice(0, max)
-  const pill = (s: string, x: number, y: number, h: number, size: number) => {
+  const pill = (s: string, x: number, y: number, h: number, size: number, maxW = 40) => {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(size)
-    const t = lines(s, 40, 1)[0] ?? ''
+    const t = lines(s, maxW, 1)[0] ?? ''
     const w = doc.getTextWidth(t) + h
     doc.setFillColor(badgeColor)
     doc.roundedRect(x, y, w, h, h / 2, h / 2, 'F')
@@ -240,16 +260,107 @@ function buildCardPdf(
     doc.text(t, x + h / 2, y + h * 0.68)
     return w
   }
+  const scratchPanel = (code: string) => {
+    const p = SCRATCH_PANEL
+    label('Activation code  ·  scratch when sold', p.x + p.w / 2, p.y - 1, 'center')
+    doc.setDrawColor('#d1d5db'); doc.setLineWidth(0.2)
+    doc.roundedRect(p.x, p.y, p.w, p.h, 1, 1, 'S')
+    doc.setFont('courier', 'bold'); doc.setFontSize(11); doc.setTextColor('#111827')
+    doc.text(code, p.x + p.w / 2, p.y + p.h / 2 + 1.4, { align: 'center' })
+  }
 
   tickets.forEach((t, i) => {
-    // ── Front: poster ──
     if (i > 0) doc.addPage([W, H], 'landscape')
-    if (front) {
-      doc.addImage(front.data, 'JPEG', 0, 0, W, H, 'nxt-front', 'FAST')
+
+    if (sides === 1 && poster?.wide) {
+      // ── One sided, wide poster: poster band across the top; QR code, details, activation code below ──
+      const Y = POSTER_BAND_H, R = W - S
+      doc.addImage(poster.data, 'JPEG', 0, 0, W, Y, 'nxt-poster', 'FAST')
+
+      doc.setDrawColor('#7c3aed'); doc.setLineWidth(0.4)
+      doc.roundedRect(S, Y + 2, 19.5, 19.5, 0.8, 0.8, 'S')
+      doc.addImage(qrs[i], 'PNG', S + 0.5, Y + 2.5, 18.5, 18.5, undefined, 'FAST')
+
+      const x = S + 22, dw = SCRATCH_PANEL.x - 2 - x
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(5.5); doc.setTextColor('#111827')
+      doc.text(lines(event.name, dw, 1)[0] ?? '', x, Y + 4.4)
+      pill(ticketType.name, x, Y + 5.8, 3, 4.6, dw - 3)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(4.8); doc.setTextColor('#374151')
+      doc.text(text.shortDate, x, Y + 11.4)
+      doc.setFont('helvetica', 'normal')
+      doc.text(lines(`${text.time}  ·  ${event.venue}`, dw, 1)[0] ?? '', x, Y + 13.6)
+      label('Ticket No.', x, Y + 17.2)
+      doc.setFont('courier', 'bold'); doc.setFontSize(4.4); doc.setTextColor('#1e1040')
+      doc.text(t.ticketNumber, x, Y + 19.5)
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor('#6d28d9')
+      doc.text(text.price, R, Y + 5.6, { align: 'right' })
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(3.4); doc.setTextColor('#6b7280')
+      doc.text('Admits one. Valid only once activated.', R, Y + 8, { align: 'right' })
+
+      scratchPanel(t.activationCode)
+      return
+    }
+
+    if (sides === 1) {
+      // ── One sided: poster panel on the left; QR code, details, activation code on the right ──
+      const P = POSTER_PANEL_W, X = P + 3, R = W - S
+      if (poster) {
+        doc.addImage(poster.data, 'JPEG', 0, 0, P, H, 'nxt-poster', 'FAST')
+      } else {
+        doc.addImage(gradient, 'PNG', 0, 0, P, H, 'nxt-header', 'FAST')
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(4.2); doc.setTextColor('#e9d5ff')
+        doc.text('NXT STOP PRESENTS', S, 22)
+        doc.setFontSize(8); doc.setTextColor('#ffffff')
+        lines(event.name, P - 2 * S, 4).forEach((l, n) => doc.text(l, S, 26 + n * 3.3))
+      }
+
+      doc.addImage(gradient, 'PNG', P, 0, W - P, 9.5, 'nxt-header', 'FAST')
+      let textX = X
+      if (logo) {
+        const h = Math.min(4, 10 * logo.h / logo.w), w = h * logo.w / logo.h
+        doc.addImage(logo.data, 'PNG', X, 5.6 - h / 2, w, h, 'nxt-logo', 'FAST')
+        textX = X + w + 1.5
+      }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor('#ffffff')
+      doc.text(lines(event.name, R - textX, 1)[0] ?? '', textX, 6.8)
+
+      pill(ticketType.name, X, 11.2, 3.2, 5, 27)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor('#6d28d9')
+      doc.text(text.price, R, 14, { align: 'right' })
+
+      doc.setDrawColor('#7c3aed'); doc.setLineWidth(0.4)
+      doc.roundedRect(X, 15.8, 21, 21, 0.8, 0.8, 'S')
+      doc.addImage(qrs[i], 'PNG', X + 0.5, 16.3, 20, 20, undefined, 'FAST')
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(3.6); doc.setTextColor('#6d28d9')
+      doc.text('SCAN AT THE GATE', X + 10.5, 39.2, { align: 'center' })
+
+      const x = X + 24, dw = R - x
+      label('Date', x, 17.6)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(5); doc.setTextColor('#374151')
+      doc.text(text.shortDate, x, 20)
+      doc.text(text.time, x, 22.3)
+      label('Venue', x, 25.9)
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(5); doc.setTextColor('#374151')
+      lines(event.venue, dw, 2).forEach((l, n) => doc.text(l, x, 28.3 + n * 2.1))
+      label('Ticket No.', x, 33.6)
+      doc.setFont('courier', 'bold'); doc.setFontSize(4.4); doc.setTextColor('#1e1040')
+      doc.text(t.ticketNumber, x, 35.9)
+
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(3.4); doc.setTextColor('#6b7280')
+      lines('Admits one. Valid only once activated.', SCRATCH_PANEL.x - X - 1, 4).forEach((l, n) => doc.text(l, X, 44.6 + n * 1.5))
+
+      scratchPanel(t.activationCode)
+      return
+    }
+
+    // ── Front: poster ──
+    if (poster) {
+      doc.addImage(poster.data, 'JPEG', 0, 0, W, H, 'nxt-poster', 'FAST')
     } else {
       doc.addImage(gradient, 'PNG', 0, 0, W, H, 'nxt-header', 'FAST')
     }
-    const top = front ? front.top : 22, bottom = front ? front.bottom : 35
+    const top = poster ? poster.top : 22, bottom = poster ? poster.bottom : 35
     doc.setFont('helvetica', 'bold'); doc.setFontSize(4.2); doc.setTextColor('#e9d5ff')
     doc.text('NXT STOP PRESENTS', S, top - 6.2)
     doc.setFontSize(9); doc.setTextColor('#ffffff')
@@ -303,14 +414,16 @@ function buildCardPdf(
     doc.setFont('helvetica', 'normal'); doc.setFontSize(3.6); doc.setTextColor('#6b7280')
     doc.text('Admits one. Valid only once activated by an authorised seller.', S, 52.2)
 
-    const p = SCRATCH_PANEL
-    label('Activation code  ·  scratch when sold', p.x + p.w / 2, p.y - 1, 'center')
-    doc.setDrawColor('#d1d5db'); doc.setLineWidth(0.2)
-    doc.roundedRect(p.x, p.y, p.w, p.h, 1, 1, 'S')
-    doc.setFont('courier', 'bold'); doc.setFontSize(11); doc.setTextColor('#111827')
-    doc.text(t.activationCode, p.x + p.w / 2, p.y + p.h / 2 + 1.4, { align: 'center' })
+    scratchPanel(t.activationCode)
   })
   return doc
+}
+
+type PrintFormat = 'a4' | 'card1' | 'card2'
+const PRINT_FORMAT_LABEL: Record<PrintFormat, string> = {
+  a4: 'Print / Save PDF',
+  card1: 'Print shop file, one sided',
+  card2: 'Print shop file, two sided',
 }
 
 const STATUS_COLOR_EXTRA: Record<string, string> = {
@@ -516,9 +629,10 @@ export default function AdminTicketsClient() {
     else setHcError(res?.error ?? 'Could not generate tickets')
   }
 
-  // Downloads the print shop file for plastic tickets: two exact 88.5 x 57 mm PDF pages
-  // per ticket, poster on the front and QR code plus scratch off activation code on the back.
-  const saveCardFile = async (batch: GeneratedBatch) => {
+  // Downloads the print shop file for plastic tickets as exact 88.5 x 57 mm PDF pages. Two
+  // sided: poster on the front, QR code plus scratch off activation code on the back. One
+  // sided: poster on the left, QR code and activation code on the right.
+  const saveCardFile = async (batch: GeneratedBatch, sides: CardSides) => {
     setHcError(null)
     try {
       const qrs: string[] = []
@@ -530,15 +644,16 @@ export default function AdminTicketsClient() {
       setPrintProgress('Building PDF…')
       await new Promise(r => setTimeout(r, 0))
       const logo = await whiteLogo(await uploadDataUrl(LOGO_URL))
-      const front = batch.event.posterImage ? await cardFront(await uploadDataUrl(batch.event.posterImage)) : null
+      const poster = batch.event.posterImage ? await cardPoster(await uploadDataUrl(batch.event.posterImage), sides) : null
       const { jsPDF } = await import('jspdf')
-      const doc = buildCardPdf(jsPDF, batch, qrs, logo, front, {
+      const doc = buildCardPdf(jsPDF, batch, qrs, logo, poster, {
         date: formatDate(batch.event.date, 'EEEE, d MMMM yyyy'),
+        shortDate: formatDate(batch.event.date, 'EEE d MMM yyyy'),
         time: formatDate(batch.event.date, 'h:mm a'),
         price: `$${money(batch.ticketType.price).toFixed(2)}`,
-      })
+      }, sides)
       const safe = (s: string) => s.replace(/[^\w ]+/g, ' ').replace(/\s+/g, ' ').trim()
-      doc.save(`NXT STOP ${safe(batch.event.name)} ${safe(batch.ticketType.name)} ${batch.tickets.length} tickets 88.5x57mm.pdf`)
+      doc.save(`NXT STOP ${safe(batch.event.name)} ${safe(batch.ticketType.name)} ${batch.tickets.length} tickets 88.5x57mm ${sides === 2 ? 'two' : 'one'} sided.pdf`)
     } catch {
       setHcError('Could not build the print shop file. Try again, or print a smaller batch.')
     } finally {
@@ -549,9 +664,9 @@ export default function AdminTicketsClient() {
   // Opens a print view of every ticket in the batch; the browser's print dialog can
   // print it or save it as a PDF. QR codes are drawn here in chunks so large batches
   // don't freeze the page.
-  const printBatch = async (batch: GeneratedBatch | null = hcBatch, format: 'a4' | 'card' = 'a4') => {
+  const printBatch = async (batch: GeneratedBatch | null = hcBatch, format: PrintFormat = 'a4') => {
     if (!batch || batch.tickets.length === 0) return
-    if (format === 'card') return saveCardFile(batch)
+    if (format !== 'a4') return saveCardFile(batch, format === 'card2' ? 2 : 1)
     // Open synchronously from the click so popup blockers allow it
     const printWin = window.open('', '_blank', 'width=1000,height=800')
     if (!printWin) { setHcError('Allow pop-ups for this site to print tickets.'); return }
@@ -567,6 +682,8 @@ export default function AdminTicketsClient() {
     if (printWin.closed) return
 
     const logoDataUrl = await fetchAsDataURL(LOGO_URL)
+    const posterFetched = batch.event.posterImage ? await uploadDataUrl(batch.event.posterImage) : ''
+    const posterDataUrl = posterFetched.startsWith('data:image/') ? posterFetched : null
     const dateStr = formatDate(batch.event.date, 'EEEE, d MMMM yyyy')
     const timeStr = formatDate(batch.event.date, 'h:mm a')
     const priceStr = `$${money(batch.ticketType.price).toFixed(2)}`
@@ -583,6 +700,7 @@ export default function AdminTicketsClient() {
           <div class="t-badge" style="background:${color}">${batch.ticketType.name}</div>
         </div>
         <div class="t-body">
+          ${posterDataUrl ? '<div class="t-poster"></div>' : ''}
           <div class="t-details">
             <div class="t-row"><span class="t-icon">&#128197;</span><span>${dateStr} &nbsp;&middot;&nbsp; ${timeStr}</span></div>
             <div class="t-row"><span class="t-icon">&#128205;</span><span>${batch.event.venue}</span></div>
@@ -700,6 +818,8 @@ export default function AdminTicketsClient() {
   /* ── Body ── */
   .t-body{display:flex;padding:1.5mm 2mm;gap:1.5mm;align-items:center}
   .t-details{flex:1;min-width:0}
+  /* Poster set once here like the logo; the whole poster shows, centred in the box */
+  .t-poster{width:14mm;height:19mm;flex-shrink:0;border-radius:.8mm;background:#1e1040 url("${posterDataUrl ?? ''}") center/contain no-repeat}
   .t-row{font-size:5.5pt;color:#374151;margin-bottom:.6mm;display:flex;align-items:flex-start;gap:1mm;line-height:1.3;font-weight:500}
   .t-icon{flex-shrink:0}
   .t-price{font-size:12pt;font-weight:900;color:#6d28d9;margin-top:1.5mm;line-height:1}
@@ -855,9 +975,11 @@ ${rowsHtml}
                     <button onClick={() => printBatch()} disabled={!!printProgress} className="flex items-center gap-2 text-sm bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 rounded-lg px-4 py-2">
                       {printProgress ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />} Print / Save PDF ({hcBatch.tickets.length})
                     </button>
-                    <button onClick={() => printBatch(hcBatch, 'card')} disabled={!!printProgress} title="One ticket per 88.5 x 57 mm page, for the print shop" className="flex items-center gap-2 text-sm bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:bg-purple-500/20 rounded-lg px-4 py-2">
-                      {printProgress ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} Print shop file 88.5 × 57 mm ({hcBatch.tickets.length})
-                    </button>
+                    {(['card1', 'card2'] as const).map(format => (
+                      <button key={format} onClick={() => printBatch(hcBatch, format)} disabled={!!printProgress} title={format === 'card1' ? 'One 88.5 x 57 mm page per ticket, for the print shop' : 'Two 88.5 x 57 mm pages per ticket (front and back), for the print shop'} className="flex items-center gap-2 text-sm bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:bg-purple-500/20 rounded-lg px-4 py-2">
+                        {printProgress ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} {PRINT_FORMAT_LABEL[format]} ({hcBatch.tickets.length})
+                      </button>
+                    ))}
                     <a href="/gate/activate" target="_blank" className="flex items-center gap-2 text-sm bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/20 rounded-lg px-4 py-2 transition-colors">
                       <AlertTriangle size={14} /> Activate Page
                     </a>
@@ -867,7 +989,7 @@ ${rowsHtml}
               {printProgress && <p className="text-xs text-blue-300 mt-3">{printProgress}</p>}
               {hcError && <p className="text-sm text-red-400 mt-3" role="alert">{hcError}</p>}
               {hcBatch && !printProgress && (
-                <p className="text-xs text-gray-500 mt-3">To save instead of printing, choose <strong className="text-gray-300">Save as PDF</strong> as the printer in the print dialog. The <strong className="text-gray-300">print shop file</strong> downloads as a PDF for plastic tickets printed both sides: two 88.5 × 57 mm pages per ticket (poster on the front; QR code and scratch off activation code on the back).</p>
+                <p className="text-xs text-gray-500 mt-3">To save instead of printing, choose <strong className="text-gray-300">Save as PDF</strong> as the printer in the print dialog. The <strong className="text-gray-300">print shop files</strong> download as a PDF of 88.5 × 57 mm plastic tickets. One sided (cheaper): one page per ticket, with the event poster beside the QR code and scratch off activation code. Two sided: two pages per ticket, with the event poster on the front.</p>
               )}
             </div>
 
@@ -969,7 +1091,7 @@ ${rowsHtml}
                                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                                   <p className="text-xs text-gray-500">{expandedTickets.length} unsold ticket{expandedTickets.length !== 1 ? 's' : ''}</p>
                                   <div className="flex flex-wrap gap-2">
-                                    {(['a4', 'card'] as const).map(format => (
+                                    {(['a4', 'card1', 'card2'] as const).map(format => (
                                       <button
                                         key={format}
                                         onClick={() => {
@@ -986,7 +1108,7 @@ ${rowsHtml}
                                           : 'flex items-center gap-1.5 text-xs bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:bg-purple-500/20 rounded-lg px-3 py-1.5 transition-colors'}
                                       >
                                         {printProgress ? <Loader2 size={12} className="animate-spin" /> : format === 'a4' ? <Printer size={12} /> : <FileText size={12} />}
-                                        {format === 'a4' ? ` Print / Save PDF (all ${expandedTickets.length})` : ` Print shop file 88.5 × 57 mm (all ${expandedTickets.length})`}
+                                        {` ${PRINT_FORMAT_LABEL[format]} (all ${expandedTickets.length})`}
                                       </button>
                                     ))}
                                   </div>
